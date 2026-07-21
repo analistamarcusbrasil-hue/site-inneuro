@@ -50,3 +50,43 @@ Copie `.env.example` para `.env.local` e preencha apenas dados oficiais. Campos 
 3. Estruturar o catálogo de exames e a central de preparos.
 4. Configurar links oficiais para Proradis, WhatsApp e Instagram quando fornecidos.
 5. Criar a página inicial definitiva e realizar testes de acessibilidade.
+
+## Desenvolvimento e publicação
+
+### Desenvolvimento local
+
+```bash
+npm install
+npm run dev
+```
+
+### Validação
+
+```bash
+npm run lint
+npm run typecheck
+npm run format:check
+npm run build
+```
+
+### Envio para nuvem
+
+```bash
+git add .
+git commit -m "descrição da alteração"
+git push origin main
+```
+
+### Fluxo automático
+
+- O GitHub recebe o push na branch `main`.
+- A Vercel cria automaticamente um deployment de produção.
+- A URL principal `.vercel.app` do projeto é atualizada.
+- O domínio oficial será conectado somente na versão final.
+
+### Preview de branches
+
+Branches diferentes da `main`, como `feature/exames`, `feature/preparos`,
+`feature/contatos`, `feature/layout-mobile` e `fix/nome-da-correcao`, geram URLs
+temporárias de Preview Deployment na Vercel. Após a aprovação visual, a branch
+pode ser integrada à `main` para atualizar a versão estável de testes na nuvem.
