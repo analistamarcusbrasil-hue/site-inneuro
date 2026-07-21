@@ -29,16 +29,16 @@ export function PatientPortal() {
           <div className="portal-grid absolute inset-0" aria-hidden="true" />
           <div className="relative grid items-center gap-12 lg:grid-cols-[1fr_.9fr] lg:gap-16">
             <div className="max-w-2xl">
-              <Badge>Portal do Paciente</Badge>
+              <Badge>Portal de Exames</Badge>
               <h2
                 id="patient-portal-title"
                 className="font-heading text-ink mt-5 text-3xl leading-tight font-semibold tracking-[-0.045em] sm:text-4xl lg:text-5xl"
               >
-                Seus exames sempre disponíveis.
+                Portal de Exames
               </h2>
               <p className="text-muted mt-5 text-lg leading-relaxed">
-                Acesse seus laudos, imagens e histórico de exames armazenados em
-                nuvem pelo Portal do Paciente da INNEURO.
+                Acesse seus laudos, imagens e exames anteriores pelo Portal de
+                Exames da INNEURO.
               </p>
               <ul className="mt-8 grid gap-3 sm:grid-cols-2">
                 {benefits.map((benefit) => (
@@ -54,15 +54,15 @@ export function PatientPortal() {
                 ))}
               </ul>
               <div className="mt-9">
-                {siteConfig.patientPortalUrl ? (
+                {siteConfig.patientPortal.url ? (
                   <a
-                    href={siteConfig.patientPortalUrl}
+                    href={siteConfig.patientPortal.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    aria-label="Acessar Portal do Paciente — abre em nova aba"
+                    aria-label="Acessar exames e resultados — abre em nova aba"
                     className="bg-brand hover:bg-brand-dark focus-visible:ring-tech inline-flex min-h-12 items-center justify-center gap-2 rounded-full px-6 text-sm font-bold text-white transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
                   >
-                    Acessar Portal do Paciente{" "}
+                    Acessar exames e resultados{" "}
                     <ExternalLink aria-hidden="true" size={16} />
                   </a>
                 ) : (
@@ -70,15 +70,16 @@ export function PatientPortal() {
                     type="button"
                     disabled
                     aria-disabled="true"
-                    title="Portal do Paciente indisponível no momento"
+                    title="Portal de Exames indisponível no momento"
                     className="bg-border-light text-muted inline-flex min-h-12 cursor-not-allowed items-center justify-center gap-2 rounded-full px-6 text-sm font-bold opacity-75"
                   >
-                    Acessar Portal do Paciente{" "}
+                    Acessar exames e resultados{" "}
                     <ExternalLink aria-hidden="true" size={16} />
                   </button>
                 )}
                 <p className="text-muted mt-4 text-sm">
-                  Você será direcionado ao ambiente externo da Proradis.
+                  Você será direcionado ao ambiente externo e seguro do
+                  Image2Doc.
                 </p>
               </div>
             </div>

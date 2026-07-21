@@ -48,7 +48,7 @@ Copie `.env.example` para `.env.local` e preencha apenas dados oficiais. Campos 
 1. Adicionar os arquivos oficiais da marca e validar proporções.
 2. Definir arquitetura de conteúdo e páginas institucionais.
 3. Estruturar o catálogo de exames e a central de preparos.
-4. Configurar links oficiais para Proradis, WhatsApp e Instagram quando fornecidos.
+4. Manter os links oficiais do Image2Doc, WhatsApp e Instagram atualizados.
 5. Criar a página inicial definitiva e realizar testes de acessibilidade.
 
 ## Desenvolvimento e publicação

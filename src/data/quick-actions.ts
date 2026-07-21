@@ -20,25 +20,27 @@ export const quickActions: QuickAction[] = [
     disabled: false,
     href: "/preparos",
   },
-  siteConfig.patientPortalUrl
+  siteConfig.patientPortal.url
     ? {
         id: "results",
-        title: "Acessar resultados",
-        description: "Consulte seus laudos e imagens armazenados em nuvem.",
+        title: "Acessar exames e resultados",
+        description:
+          "Acesse seus laudos, imagens e exames anteriores pelo Portal de Exames da INNEURO.",
         icon: "results",
         featured: true,
         disabled: false,
-        href: siteConfig.patientPortalUrl,
+        href: siteConfig.patientPortal.url,
         external: true,
       }
     : {
         id: "results",
-        title: "Acessar resultados",
-        description: "Consulte seus laudos e imagens armazenados em nuvem.",
+        title: "Acessar exames e resultados",
+        description:
+          "Acesse seus laudos, imagens e exames anteriores pelo Portal de Exames da INNEURO.",
         icon: "results",
         featured: true,
         disabled: true,
-        disabledReason: "Portal do Paciente indisponível no momento",
+        disabledReason: "Portal de Exames indisponível no momento",
       },
   whatsappNumber
     ? {

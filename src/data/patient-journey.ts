@@ -24,7 +24,7 @@ export const patientJourney: JourneyStep[] = [
     number: 4,
     title: "Acesse seu resultado",
     description:
-      "Consulte laudos, imagens e exames anteriores pelo Portal do Paciente.",
+      "Consulte laudos, imagens e exames anteriores pelo Portal de Exames da INNEURO.",
     icon: "result",
   },
 ];

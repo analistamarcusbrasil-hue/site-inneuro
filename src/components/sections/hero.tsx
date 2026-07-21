@@ -40,24 +40,27 @@ export function Hero() {
               <CalendarCheck aria-hidden="true" size={19} />
               Agendar meu exame
             </Link>
-            {siteConfig.patientPortalUrl ? (
+            {siteConfig.patientPortal.url ? (
               <a
-                href={siteConfig.patientPortalUrl}
+                href={siteConfig.patientPortal.url}
                 target="_blank"
                 rel="noopener noreferrer"
+                aria-label="Acessar exames e resultados — abre em uma nova aba"
                 className="focus-visible:ring-tech focus-visible:ring-offset-brand-dark inline-flex min-h-13 items-center justify-center gap-2 rounded-full border border-white/24 bg-white/4 px-7 text-base font-bold text-white transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
               >
-                Acessar resultados <ExternalLink aria-hidden="true" size={17} />
+                Acessar exames e resultados{" "}
+                <ExternalLink aria-hidden="true" size={17} />
               </a>
             ) : (
               <button
                 type="button"
                 disabled
                 aria-disabled="true"
-                title="Portal do Paciente indisponível no momento"
+                title="Portal de Exames indisponível no momento"
                 className="inline-flex min-h-13 cursor-not-allowed items-center justify-center gap-2 rounded-full border border-white/14 bg-white/3 px-7 text-base font-bold text-white/42"
               >
-                Acessar resultados <ExternalLink aria-hidden="true" size={17} />
+                Acessar exames e resultados{" "}
+                <ExternalLink aria-hidden="true" size={17} />
               </button>
             )}
           </div>
@@ -69,8 +72,8 @@ export function Hero() {
               size={17}
             />
             <p>
-              Laudos, imagens e histórico de exames disponíveis no Portal do
-              Paciente.
+              Acesse seus laudos, imagens e exames anteriores pelo Portal de
+              Exames da INNEURO.
             </p>
           </div>
         </div>

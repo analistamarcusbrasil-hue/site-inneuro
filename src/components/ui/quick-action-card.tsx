@@ -88,6 +88,7 @@ export function QuickActionCard({ action }: QuickActionCardProps) {
         href={action.href}
         target="_blank"
         rel="noopener noreferrer"
+        aria-label={`${action.title} — abre em uma nova aba`}
         className={classes}
       >
         <CardContent action={action} />

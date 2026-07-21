@@ -9,6 +9,6 @@
 - Executar lint, verificação de tipos e build antes de concluir tarefas.
 - Não modificar funcionalidades fora do escopo solicitado.
 - Preservar o padrão visual da INNEURO.
-- Não criar portal próprio do paciente; o Portal do Paciente será um link externo para a Proradis.
+- Não criar portal próprio do paciente; o Portal de Exames será um link externo para o Image2Doc.
 - Não publicar automaticamente.
 - Não criar commits nem enviar alterações para repositórios remotos sem autorização expressa.

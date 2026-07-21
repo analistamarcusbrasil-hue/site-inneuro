@@ -92,11 +92,12 @@ export function Header() {
         </nav>
 
         <div className="hidden shrink-0 items-center gap-2 xl:flex">
-          {siteConfig.patientPortalUrl ? (
+          {siteConfig.patientPortal.url ? (
             <a
-              href={siteConfig.patientPortalUrl}
+              href={siteConfig.patientPortal.url}
               target="_blank"
               rel="noopener noreferrer"
+              aria-label="Portal de Exames — abre em uma nova aba"
               className={cn(
                 "focus-visible:ring-tech inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-4 text-sm font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
                 lightHeader
@@ -104,20 +105,20 @@ export function Header() {
                   : "text-brand-dark hover:bg-mint",
               )}
             >
-              Portal do Paciente <ExternalLink aria-hidden="true" size={15} />
+              Portal de Exames <ExternalLink aria-hidden="true" size={15} />
             </a>
           ) : (
             <button
               type="button"
               disabled
               aria-disabled="true"
-              title="Portal do Paciente indisponível no momento"
+              title="Portal de Exames indisponível no momento"
               className={cn(
                 "inline-flex min-h-11 cursor-not-allowed items-center gap-2 rounded-full px-4 text-sm font-semibold opacity-45",
                 lightHeader ? "text-white" : "text-muted",
               )}
             >
-              Portal do Paciente <ExternalLink aria-hidden="true" size={15} />
+              Portal de Exames <ExternalLink aria-hidden="true" size={15} />
             </button>
           )}
           <Link
@@ -201,15 +202,16 @@ export function Header() {
             );
           })}
           <div className="border-border-light mt-5 grid gap-3 border-t pt-5 sm:grid-cols-2">
-            {siteConfig.patientPortalUrl ? (
+            {siteConfig.patientPortal.url ? (
               <a
-                href={siteConfig.patientPortalUrl}
+                href={siteConfig.patientPortal.url}
                 target="_blank"
                 rel="noopener noreferrer"
+                aria-label="Portal de Exames — abre em uma nova aba"
                 onClick={closeMenu}
                 className="border-brand/25 text-brand-dark focus-visible:ring-tech inline-flex min-h-12 items-center justify-center gap-2 rounded-full border px-5 text-sm font-bold focus-visible:ring-2 focus-visible:outline-none"
               >
-                Portal do Paciente <ExternalLink aria-hidden="true" size={16} />
+                Portal de Exames <ExternalLink aria-hidden="true" size={16} />
               </a>
             ) : (
               <button
@@ -218,7 +220,7 @@ export function Header() {
                 aria-disabled="true"
                 className="border-border-light text-muted inline-flex min-h-12 cursor-not-allowed items-center justify-center gap-2 rounded-full border px-5 text-sm font-bold opacity-60"
               >
-                Portal do Paciente <ExternalLink aria-hidden="true" size={16} />
+                Portal de Exames <ExternalLink aria-hidden="true" size={16} />
               </button>
             )}
             <Link

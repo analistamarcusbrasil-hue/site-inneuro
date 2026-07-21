@@ -29,13 +29,13 @@ export const faqItems: FaqItem[] = [
     id: "resultados",
     question: "Como acesso meus resultados?",
     answer:
-      "Os resultados disponíveis podem ser consultados no ambiente externo do Portal do Paciente da Proradis.",
+      "Os resultados disponíveis podem ser consultados no ambiente externo e seguro do Portal de Exames da INNEURO, fornecido pelo Image2Doc.",
   },
   {
     id: "exames-anteriores",
     question: "Posso consultar exames anteriores?",
     answer:
-      "Quando disponíveis, laudos, imagens e exames anteriores podem ser consultados pelo Portal do Paciente.",
+      "Quando disponíveis, laudos, imagens e exames anteriores podem ser consultados pelo Portal de Exames da INNEURO.",
   },
   {
     id: "convenio",

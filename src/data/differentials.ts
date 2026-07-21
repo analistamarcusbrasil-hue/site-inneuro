@@ -31,14 +31,14 @@ export const differentials: Differential[] = [
   {
     id: "cloud-results",
     title: "Resultados em nuvem",
-    description: "Laudos e imagens disponíveis online pelo Portal do Paciente.",
+    description: "Laudos e imagens disponíveis online pelo Portal de Exames.",
     icon: "cloud-results",
   },
   {
     id: "patient-portal",
     title: "Acesso digital",
     description:
-      "Acesso externo ao Portal do Paciente para consultar informações disponíveis.",
+      "Acesso externo ao Portal de Exames para consultar informações disponíveis.",
     icon: "patient-portal",
   },
   {

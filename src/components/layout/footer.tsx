@@ -90,14 +90,15 @@ export function Footer() {
               Como chegar
               <ExternalLink aria-hidden="true" size={13} />
             </a>
-            {siteConfig.patientPortalUrl && (
+            {siteConfig.patientPortal.url && (
               <a
-                href={siteConfig.patientPortalUrl}
+                href={siteConfig.patientPortal.url}
                 target="_blank"
                 rel="noopener noreferrer"
+                aria-label="Portal de Exames — abre em uma nova aba"
                 className="inline-flex min-h-11 items-center gap-2 text-sm text-white/72"
               >
-                Portal do Paciente
+                Portal de Exames
                 <ExternalLink aria-hidden="true" size={13} />
               </a>
             )}

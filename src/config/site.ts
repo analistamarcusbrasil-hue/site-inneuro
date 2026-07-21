@@ -21,6 +21,12 @@ type SiteConfig = {
   description: string;
   url: string;
   patientPortalUrl: string;
+  patientPortal: {
+    name: string;
+    provider: string;
+    url: string;
+    external: true;
+  };
   whatsapp: { primary: WhatsAppChannel; secondary: WhatsAppChannel };
   instagram: { url: string; handle: string };
   phone: string;
@@ -31,13 +37,23 @@ type SiteConfig = {
   navigation: ReadonlyArray<{ label: string; href: string }>;
 };
 
+const patientPortalUrl =
+  process.env.NEXT_PUBLIC_PATIENT_PORTAL_URL ??
+  "https://exames.image2doc.com.br/#/login/protocolo";
+
 export const siteConfig: SiteConfig = {
   name: "INNEURO",
   fullName: "Instituto de Neurologia do Amapá",
   description:
     "Diagnóstico por imagem, neurologia e medicina nuclear com tecnologia, precisão e cuidado.",
   url: process.env.NEXT_PUBLIC_SITE_URL ?? "",
-  patientPortalUrl: process.env.NEXT_PUBLIC_PATIENT_PORTAL_URL ?? "",
+  patientPortalUrl,
+  patientPortal: {
+    name: "Portal de Exames",
+    provider: "Image2Doc",
+    url: patientPortalUrl,
+    external: true,
+  },
   whatsapp: {
     primary: {
       label: "WhatsApp principal",

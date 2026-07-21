@@ -112,14 +112,15 @@ export function PatientJourney() {
                     </p>
                     {step.number === 4 && (
                       <div className="mt-6">
-                        {siteConfig.patientPortalUrl ? (
+                        {siteConfig.patientPortal.url ? (
                           <a
-                            href={siteConfig.patientPortalUrl}
+                            href={siteConfig.patientPortal.url}
                             target="_blank"
                             rel="noopener noreferrer"
+                            aria-label="Acessar exames e resultados — abre em uma nova aba"
                             className="bg-tech text-brand-dark hover:bg-mint focus-visible:ring-tech focus-visible:ring-offset-brand-dark inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-5 text-sm font-bold transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
                           >
-                            Acessar Portal do Paciente
+                            Acessar exames e resultados
                             <ExternalLink aria-hidden="true" size={15} />
                           </a>
                         ) : (
@@ -127,10 +128,10 @@ export function PatientJourney() {
                             type="button"
                             disabled
                             aria-disabled="true"
-                            title="Portal do Paciente indisponível no momento"
+                            title="Portal de Exames indisponível no momento"
                             className="inline-flex min-h-11 cursor-not-allowed items-center justify-center gap-2 rounded-full border border-white/12 px-5 text-sm font-bold text-white/40"
                           >
-                            Acessar Portal do Paciente
+                            Acessar exames e resultados
                             <ExternalLink aria-hidden="true" size={15} />
                           </button>
                         )}
