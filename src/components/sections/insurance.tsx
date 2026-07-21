@@ -1,15 +1,15 @@
 import { ExternalLink, MessageCircle, ShieldCheck } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
 import { Container } from "@/components/layout/container";
-import { convenios } from "@/data/convenios";
+import { PartnersShowcase } from "@/components/partners/partners-showcase";
 import { siteConfig } from "@/config/site";
-
-const whatsappNumber = siteConfig.whatsapp.primary.number;
+import { createWhatsAppUrl } from "@/lib/whatsapp";
 
 export function Insurance() {
-  const activeConvenios = convenios.filter((convenio) => convenio.active);
-
+  const whatsappUrl = createWhatsAppUrl(
+    siteConfig.whatsapp.primary.number,
+    "Olá! Acessei o site da INNEURO e gostaria de confirmar cobertura e autorização para um exame.",
+  );
   return (
     <section
       id="convenios"
@@ -17,92 +17,51 @@ export function Insurance() {
       className="bg-white py-16 sm:py-20 lg:py-28"
     >
       <Container>
-        <div className="border-border-light bg-surface grid overflow-hidden rounded-[2rem] border lg:grid-cols-[.72fr_1.28fr]">
-          <div className="bg-brand-dark relative overflow-hidden p-8 text-white sm:p-10 lg:p-12">
-            <div className="insurance-rings" aria-hidden="true" />
-            <ShieldCheck
-              className="text-tech relative"
-              aria-hidden="true"
-              size={34}
-              strokeWidth={1.5}
-            />
-            <p className="text-mint relative mt-8 text-xs font-bold tracking-[0.14em] uppercase">
-              Atendimento
-            </p>
-            <h2
-              id="insurance-title"
-              className="font-heading relative mt-3 text-3xl leading-tight font-semibold tracking-[-0.04em] sm:text-4xl"
+        <div className="mb-10 max-w-3xl">
+          <ShieldCheck
+            className="text-brand"
+            aria-hidden="true"
+            size={34}
+            strokeWidth={1.5}
+          />
+          <p className="text-brand mt-6 text-xs font-bold tracking-[.14em] uppercase">
+            Atendimento
+          </p>
+          <h2
+            id="insurance-title"
+            className="font-heading text-ink mt-3 text-3xl font-semibold sm:text-4xl"
+          >
+            Convênios e parcerias
+          </h2>
+          <p className="text-muted mt-4 text-lg leading-relaxed">
+            Consulte nossa equipe para confirmar cobertura, autorização e
+            disponibilidade para o exame desejado.
+          </p>
+        </div>
+        <PartnersShowcase />
+        <div className="border-border-light bg-surface mt-10 flex flex-col gap-5 rounded-3xl border p-6 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-muted max-w-2xl text-sm leading-relaxed">
+            A cobertura pode variar conforme o plano, produto contratado e exame
+            solicitado.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <a
+              href={whatsappUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Consultar atendimento pelo WhatsApp — abre em nova aba"
+              className="bg-brand inline-flex min-h-12 items-center gap-2 rounded-full px-6 text-sm font-bold text-white"
             >
-              Convênios e atendimento particular
-            </h2>
-          </div>
-          <div className="p-8 sm:p-10 lg:p-12">
-            <p className="text-muted max-w-2xl text-lg leading-relaxed">
-              Consulte nossa equipe para confirmar cobertura, autorização e
-              disponibilidade do exame.
-            </p>
-
-            {activeConvenios.length > 0 && (
-              <ul className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3">
-                {activeConvenios.map((convenio) => (
-                  <li
-                    key={convenio.id}
-                    className="border-border-light grid min-h-24 place-items-center rounded-2xl border bg-white p-4"
-                  >
-                    {convenio.logo ? (
-                      <Image
-                        src={convenio.logo}
-                        alt={`Logo ${convenio.name}`}
-                        width={150}
-                        height={64}
-                        className="max-h-14 w-auto object-contain"
-                      />
-                    ) : (
-                      <span className="font-heading text-brand-dark text-center font-bold">
-                        {convenio.name}
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            <div className="mt-9">
-              <p className="text-muted mb-6 text-sm">
-                A cobertura e a necessidade de autorização podem variar conforme
-                o plano e o exame. Confirme as condições com nossa equipe.
-              </p>
-              {whatsappNumber ? (
-                <a
-                  href={`https://wa.me/${whatsappNumber}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Consultar atendimento pelo WhatsApp — abre em nova aba"
-                  className="bg-brand hover:bg-brand-dark focus-visible:ring-tech inline-flex min-h-12 items-center justify-center gap-2 rounded-full px-6 text-sm font-bold text-white transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
-                >
-                  <MessageCircle aria-hidden="true" size={18} /> Consultar
-                  atendimento
-                  <ExternalLink aria-hidden="true" size={15} />
-                </a>
-              ) : (
-                <button
-                  type="button"
-                  disabled
-                  aria-disabled="true"
-                  title="WhatsApp indisponível no momento"
-                  className="bg-border-light text-muted inline-flex min-h-12 cursor-not-allowed items-center justify-center gap-2 rounded-full px-6 text-sm font-bold opacity-75"
-                >
-                  <MessageCircle aria-hidden="true" size={18} /> Consultar
-                  atendimento
-                </button>
-              )}
-              <Link
-                href="/convenios"
-                className="text-brand ml-4 inline-flex min-h-12 items-center text-sm font-bold"
-              >
-                Ver todos os convênios
-              </Link>
-            </div>
+              <MessageCircle aria-hidden="true" size={18} />
+              Consultar atendimento
+              <ExternalLink aria-hidden="true" size={15} />
+            </a>
+            <Link
+              href="/convenios"
+              className="border-brand/25 text-brand-dark inline-flex min-h-12 items-center rounded-full border px-6 text-sm font-bold"
+            >
+              Ver todos
+            </Link>
           </div>
         </div>
       </Container>

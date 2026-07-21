@@ -9,6 +9,7 @@ import { PatientPortal } from "@/components/sections/patient-portal";
 import { QuickActions } from "@/components/sections/quick-actions";
 import { Scheduling } from "@/components/sections/scheduling";
 import { ServiceOverview } from "@/components/sections/service-overview";
+import { NewsHighlightsSection } from "@/components/sections/news-highlights-section";
 
 export default function Home() {
   return (
@@ -16,6 +17,7 @@ export default function Home() {
       <Hero />
       <QuickActions />
       <Modalities />
+      <NewsHighlightsSection />
       <PatientJourney />
       <PatientPortal />
       <Differentials />

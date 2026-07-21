@@ -90,3 +90,30 @@ Branches diferentes da `main`, como `feature/exames`, `feature/preparos`,
 `feature/contatos`, `feature/layout-mobile` e `fix/nome-da-correcao`, geram URLs
 temporárias de Preview Deployment na Vercel. Após a aprovação visual, a branch
 pode ser integrada à `main` para atualizar a versão estável de testes na nuvem.
+
+## Conteúdo editorial e marcas
+
+### Cadastrar uma notícia
+
+1. Adicione a fotografia real e autorizada em `public/images/noticias/`.
+2. Use WebP ou AVIF; a imagem principal deve ter no mínimo 1600 × 900 e as
+   miniaturas, 800 × 600.
+3. Cadastre o item em `src/data/news.ts` seguindo o tipo de `src/types/news.ts`.
+4. Mantenha `published: false` durante a revisão.
+5. Use `featured: true` para priorizar um item já aprovado.
+6. Altere para `published: true` somente após aprovação do texto, fotografia e
+   autorização de imagem.
+
+A seção da Home fica oculta enquanto não houver notícias publicadas. Instruções
+detalhadas de fotografia estão em `public/images/noticias/README.md`.
+
+### Adicionar convênio ou parceria
+
+Cadastre a organização em `src/data/health-partners.ts`, classifique-a como
+`convenio` ou `parceria` e registre o site institucional. Só defina `logo` e
+`logoStatus: "official"` depois de salvar um arquivo obtido de fonte oficial em
+`public/brands/convenios/` e documentar a origem em `docs/brand-assets.md`.
+
+A CAPSAÚDE deve permanecer tipográfica e com `logoStatus: "pending"` até a
+INNEURO fornecer o arquivo oficial. Para gerar um Preview Deployment, envie uma
+branch diferente da `main`; a integração GitHub/Vercel criará uma URL temporária.
