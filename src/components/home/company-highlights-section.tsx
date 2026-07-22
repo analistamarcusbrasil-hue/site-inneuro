@@ -1,13 +1,12 @@
 import { Container } from "@/components/layout/container";
 import { publishedCompanyHighlights } from "@/data/company-highlights";
+import { CompanyHighlightsEmptyState } from "./company-highlights-empty-state";
 import { CompanyHighlightsCarousel } from "./company-highlights-carousel";
 
 export function CompanyHighlightsSection() {
-  if (!publishedCompanyHighlights.length) return null;
-
   return (
     <section
-      className="bg-surface py-12 sm:py-16 lg:py-20"
+      className="bg-surface py-10 sm:py-12 lg:py-14"
       aria-labelledby="company-highlights-title"
     >
       <Container>
@@ -22,7 +21,11 @@ export function CompanyHighlightsSection() {
             Conheça nossa estrutura, serviços, campanhas e principais novidades.
           </p>
         </div>
-        <CompanyHighlightsCarousel items={publishedCompanyHighlights} />
+        {publishedCompanyHighlights.length ? (
+          <CompanyHighlightsCarousel items={publishedCompanyHighlights} />
+        ) : (
+          <CompanyHighlightsEmptyState />
+        )}
       </Container>
     </section>
   );
