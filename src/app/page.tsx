@@ -9,11 +9,13 @@ import { PatientPortal } from "@/components/sections/patient-portal";
 import { QuickActions } from "@/components/sections/quick-actions";
 import { Scheduling } from "@/components/sections/scheduling";
 import { ServiceOverview } from "@/components/sections/service-overview";
+import { CompanyHighlightsSection } from "@/components/home/company-highlights-section";
 
 export default function Home() {
   return (
     <main id="main-content" tabIndex={-1}>
       <Hero />
+      <CompanyHighlightsSection />
       <QuickActions />
       <Modalities />
       <PatientJourney />
