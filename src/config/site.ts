@@ -78,7 +78,7 @@ export const siteConfig: SiteConfig = {
     city: "Macapá",
     state: "AP",
     postalCode: "",
-    reference: "Esquina com a Avenida Duque de Caxias.",
+    reference: "Esquina com a Duque de Caxias.",
     formatted: "Rua Marcelo Cândia, 535 — Santa Rita, Macapá/AP",
   },
   openingHours: "",

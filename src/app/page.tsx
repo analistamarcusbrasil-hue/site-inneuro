@@ -3,7 +3,9 @@ import { Hero } from "@/components/sections/hero";
 import { Insurance } from "@/components/sections/insurance";
 import { Modalities } from "@/components/sections/modalities";
 import { Location } from "@/components/sections/location";
+import { NewsAndSocial } from "@/components/sections/news-and-social";
 import { QuickActions } from "@/components/sections/quick-actions";
+import { StructureAndEquipment } from "@/components/sections/structure-and-equipment";
 import { CompanyHighlightsSection } from "@/components/home/company-highlights-section";
 
 export default function Home() {
@@ -14,6 +16,8 @@ export default function Home() {
       <QuickActions />
       <Modalities />
       <Differentials />
+      <StructureAndEquipment />
+      <NewsAndSocial />
       <Insurance />
       <Location />
     </main>

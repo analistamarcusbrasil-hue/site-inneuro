@@ -31,7 +31,7 @@ export const companyHighlights: CompanyHighlight[] = [
     id: "tomografia-computadorizada",
     title: "Tomografia Computadorizada",
     description:
-      "Tecnologia e agilidade para exames de imagem com atendimento cuidadoso.",
+      "Tecnologia e agilidade com atendimento cuidadoso em cada etapa.",
     category: "Exames",
     image: "/images/carrossel/tomografia-ilustrativa.webp",
     imageAlt: "Imagem ilustrativa de equipamento de tomografia computadorizada",
