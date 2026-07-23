@@ -1,17 +1,15 @@
-import type { Metadata } from "next";
 import { Suspense } from "react";
 import { ExamCatalog } from "@/components/exams/exam-catalog";
 import { InternalHero } from "@/components/layout/internal-hero";
 import { Container } from "@/components/layout/container";
-import { siteConfig } from "@/config/site";
+import { createPageMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = {
-  title: "Exames | INNEURO",
-  description: "Consulte as modalidades de exames confirmadas da INNEURO.",
-  alternates: siteConfig.url
-    ? { canonical: `${siteConfig.url}/exames` }
-    : undefined,
-};
+export const metadata = createPageMetadata({
+  title: "Exames de imagem em Macapá | INNEURO",
+  description:
+    "Consulte modalidades de exames e informações disponíveis na INNEURO em Macapá, Amapá.",
+  path: "/exames",
+});
 
 export default function ExamsPage() {
   return (

@@ -1,17 +1,14 @@
-import type { Metadata } from "next";
 import { InternalHero } from "@/components/layout/internal-hero";
 import { Container } from "@/components/layout/container";
 import { PreparationCatalog } from "@/components/preparations/preparation-catalog";
-import { siteConfig } from "@/config/site";
+import { createPageMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = {
-  title: "Preparos de Exames | INNEURO",
-  description: "Consulte a central de preparos de exames da INNEURO.",
-  alternates: siteConfig.url
-    ? { canonical: `${siteConfig.url}/preparos` }
-    : undefined,
-  robots: { index: true, follow: true },
-};
+export const metadata = createPageMetadata({
+  title: "Preparos para exames | INNEURO Macapá",
+  description:
+    "Consulte orientações de preparo validadas pela INNEURO para exames realizados em Macapá.",
+  path: "/preparos",
+});
 
 export default function PreparationsPage() {
   return (

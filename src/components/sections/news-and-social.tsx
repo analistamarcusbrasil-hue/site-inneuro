@@ -1,29 +1,17 @@
+import Image from "next/image";
+import Link from "next/link";
 import { ArrowUpRight, AtSign } from "lucide-react";
 import { Container } from "@/components/layout/container";
+import { NewsCard } from "@/components/news/news-card";
 import { siteConfig } from "@/config/site";
-
-type NewsItem = {
-  id: string;
-  title: string;
-  summary: string;
-  category: string | null;
-  slug: string;
-};
-type SocialItem = {
-  id: string;
-  title: string;
-  callout: string | null;
-  network: string;
-  url: string;
-  cta_label: string | null;
-};
+import type { PublicNews, PublicSocial } from "@/lib/cms/public-content";
 
 export function NewsAndSocial({
   news,
   social,
 }: {
-  news: NewsItem[];
-  social: SocialItem[];
+  news: PublicNews[];
+  social: PublicSocial[];
 }) {
   return (
     <section
@@ -69,20 +57,7 @@ export function NewsAndSocial({
         {news.length || social.length ? (
           <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {news.map((item) => (
-              <article
-                key={item.id}
-                className="border-border-light rounded-2xl border bg-white p-5"
-              >
-                <p className="text-brand text-xs font-bold tracking-wide uppercase">
-                  {item.category ?? "Notícia"}
-                </p>
-                <h3 className="font-heading text-brand-dark mt-2 text-lg font-semibold">
-                  {item.title}
-                </h3>
-                <p className="text-muted mt-2 line-clamp-3 text-sm leading-relaxed">
-                  {item.summary}
-                </p>
-              </article>
+              <NewsCard key={item.id} item={item} />
             ))}
             {social.map((item) => (
               <a
@@ -90,24 +65,47 @@ export function NewsAndSocial({
                 href={item.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="border-border-light hover:border-brand rounded-2xl border bg-white p-5 transition-colors"
+                className="border-border-light hover:border-brand focus-visible:ring-brand overflow-hidden rounded-3xl border bg-white transition-colors focus-visible:ring-2 focus-visible:outline-none"
               >
-                <p className="text-brand text-xs font-bold tracking-wide uppercase">
-                  {item.network}
-                </p>
-                <h3 className="font-heading text-brand-dark mt-2 text-lg font-semibold">
-                  {item.title}
-                </h3>
-                {item.callout ? (
-                  <p className="text-muted mt-2 line-clamp-3 text-sm leading-relaxed">
-                    {item.callout}
-                  </p>
+                {item.thumbnailUrl ? (
+                  <div className="bg-surface relative aspect-[16/9] overflow-hidden">
+                    <Image
+                      src={item.thumbnailUrl}
+                      alt={item.thumbnailAlt}
+                      fill
+                      sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
+                      className="object-cover"
+                    />
+                  </div>
                 ) : null}
-                <span className="text-brand mt-4 inline-flex text-sm font-bold">
-                  {item.cta_label ?? "Acessar publicação"}
-                </span>
+                <div className="p-5 sm:p-6">
+                  <p className="text-brand text-xs font-bold tracking-wide uppercase">
+                    {item.network}
+                  </p>
+                  <h3 className="font-heading text-brand-dark mt-2 text-lg font-semibold">
+                    {item.title}
+                  </h3>
+                  {item.callout ? (
+                    <p className="text-muted mt-2 line-clamp-3 text-sm leading-relaxed">
+                      {item.callout}
+                    </p>
+                  ) : null}
+                  <span className="text-brand mt-4 inline-flex text-sm font-bold">
+                    {item.cta_label ?? "Acessar publicação"}
+                  </span>
+                </div>
               </a>
             ))}
+          </div>
+        ) : null}
+        {news.length ? (
+          <div className="mt-8 text-center">
+            <Link
+              href="/noticias"
+              className="border-brand/30 text-brand-dark hover:bg-mint focus-visible:ring-brand inline-flex min-h-12 items-center justify-center rounded-full border px-6 text-sm font-bold focus-visible:ring-2 focus-visible:outline-none"
+            >
+              Ver todas as notícias
+            </Link>
           </div>
         ) : null}
       </Container>

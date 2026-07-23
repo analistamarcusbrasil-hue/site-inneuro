@@ -1,21 +1,19 @@
-import type { Metadata } from "next";
 import { AtSign, ExternalLink, MapPin, MessageCircle } from "lucide-react";
 import { Container } from "@/components/layout/container";
 import { InternalHero } from "@/components/layout/internal-hero";
 import { siteConfig } from "@/config/site";
 import { clinicalServices } from "@/data/clinical-services";
 import { createWhatsAppUrl } from "@/lib/whatsapp";
+import { createPageMetadata } from "@/lib/metadata";
 
 const message =
   "Olá! Acessei o site da INNEURO e gostaria de informações sobre exames.";
-export const metadata: Metadata = {
-  title: "Contato | INNEURO",
+export const metadata = createPageMetadata({
+  title: "Contato da INNEURO em Macapá | Amapá",
   description:
-    "Canais oficiais, endereço e horários por modalidade da INNEURO.",
-  alternates: siteConfig.url
-    ? { canonical: `${siteConfig.url}/contato` }
-    : undefined,
-};
+    "Consulte endereço, WhatsApp, Instagram, mapa e horários confirmados da INNEURO em Macapá.",
+  path: "/contato",
+});
 
 export default function ContactPage() {
   return (
@@ -102,8 +100,7 @@ export default function ContactPage() {
               Horários por modalidade
             </h2>
             <p className="text-muted mt-3">
-              O horário geral administrativo e o horário de atendimento humano
-              ainda serão confirmados pela INNEURO.
+              Consulte os horários confirmados para cada modalidade.
             </p>
             <div className="mt-6 grid gap-5 md:grid-cols-2">
               {clinicalServices.map((service) => (

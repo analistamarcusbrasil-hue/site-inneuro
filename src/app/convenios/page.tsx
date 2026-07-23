@@ -1,17 +1,16 @@
-import type { Metadata } from "next";
 import { Container } from "@/components/layout/container";
 import { InternalHero } from "@/components/layout/internal-hero";
 import { getPublicPartners } from "@/lib/cms/public-content";
-import { siteConfig } from "@/config/site";
 import { PartnerLogoCard } from "@/components/partners/partner-logo-card";
+import { createPageMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = {
-  title: "Convênios | INNEURO",
-  description: "Convênios confirmados pela INNEURO.",
-  alternates: siteConfig.url
-    ? { canonical: `${siteConfig.url}/convenios` }
-    : undefined,
-};
+export const metadata = createPageMetadata({
+  title: "Convênios e parcerias da INNEURO | Macapá",
+  description:
+    "Consulte convênios e parcerias apresentados pela INNEURO e confirme cobertura para seu exame.",
+  path: "/convenios",
+});
+
 export default async function InsurancePage() {
   const convenios = await getPublicPartners();
   return (

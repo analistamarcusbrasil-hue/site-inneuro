@@ -1,6 +1,7 @@
 import { AdminPageHeading } from "@/components/admin/admin-page-heading";
 import { inviteUserAction, updateUserRoleAction } from "@/app/admin/actions";
 import { requireAdmin } from "@/lib/cms/auth";
+import { isCmsAdminConfigured } from "@/lib/cms/config";
 
 const roles = ["editor", "admin", "super_admin"] as const;
 
@@ -26,12 +27,22 @@ export default async function UsersPage({
           role="status"
           className="bg-mint text-brand mb-6 rounded-xl p-4 font-bold"
         >
-          Convite enviado.
+          {query.success === "role" ? "Função atualizada." : "Convite enviado."}
         </p>
       ) : null}
       {query.error ? (
         <p role="alert" className="bg-error/10 text-error mb-6 rounded-xl p-4">
           Não foi possível concluir a operação.
+        </p>
+      ) : null}
+      {!isCmsAdminConfigured ? (
+        <p
+          role="status"
+          className="border-warning/30 text-warning mb-6 rounded-xl border bg-white p-4"
+        >
+          Convites e alterações de função dependem da variável secreta
+          <code className="mx-1 font-mono">SUPABASE_SERVICE_ROLE_KEY</code> no
+          servidor. Nenhuma chave deve ser informada nesta página.
         </p>
       ) : null}
       <div className="grid gap-8 xl:grid-cols-[22rem_1fr]">
@@ -41,29 +52,34 @@ export default async function UsersPage({
             action={inviteUserAction}
             className="border-border-light mt-4 space-y-4 rounded-3xl border bg-white p-5"
           >
-            <label className="block text-sm font-bold">
-              E-mail
-              <input
-                name="email"
-                type="email"
-                required
-                className="border-border-light mt-2 min-h-12 w-full rounded-xl border px-3"
-              />
-            </label>
-            <label className="block text-sm font-bold">
-              Função
-              <select
-                name="role"
-                className="border-border-light mt-2 min-h-12 w-full rounded-xl border px-3"
-              >
-                {roles.map((role) => (
-                  <option key={role}>{role}</option>
-                ))}
-              </select>
-            </label>
-            <button className="bg-brand min-h-11 rounded-full px-5 text-sm font-bold text-white">
-              Enviar convite
-            </button>
+            <fieldset
+              disabled={!isCmsAdminConfigured}
+              className="space-y-4 disabled:opacity-60"
+            >
+              <label className="block text-sm font-bold">
+                E-mail
+                <input
+                  name="email"
+                  type="email"
+                  required
+                  className="border-border-light mt-2 min-h-12 w-full rounded-xl border px-3"
+                />
+              </label>
+              <label className="block text-sm font-bold">
+                Função
+                <select
+                  name="role"
+                  className="border-border-light mt-2 min-h-12 w-full rounded-xl border px-3"
+                >
+                  {roles.map((role) => (
+                    <option key={role}>{role}</option>
+                  ))}
+                </select>
+              </label>
+              <button className="bg-brand min-h-11 rounded-full px-5 text-sm font-bold text-white">
+                Enviar convite
+              </button>
+            </fieldset>
           </form>
         </section>
         <section>
@@ -85,13 +101,17 @@ export default async function UsersPage({
                   <select
                     name="role"
                     defaultValue={item.role}
+                    disabled={!isCmsAdminConfigured}
                     className="border-border-light min-h-10 rounded-full border px-3 text-sm"
                   >
                     {roles.map((role) => (
                       <option key={role}>{role}</option>
                     ))}
                   </select>
-                  <button className="border-brand text-brand rounded-full border px-3 text-sm font-bold">
+                  <button
+                    disabled={!isCmsAdminConfigured}
+                    className="border-brand text-brand rounded-full border px-3 text-sm font-bold disabled:opacity-50"
+                  >
                     Atualizar
                   </button>
                 </form>

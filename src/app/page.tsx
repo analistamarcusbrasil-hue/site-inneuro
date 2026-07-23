@@ -7,12 +7,21 @@ import { NewsAndSocial } from "@/components/sections/news-and-social";
 import { QuickActions } from "@/components/sections/quick-actions";
 import { StructureAndEquipment } from "@/components/sections/structure-and-equipment";
 import { CompanyHighlightsSection } from "@/components/home/company-highlights-section";
+import { Scheduling } from "@/components/sections/scheduling";
 import {
   getPublicCarousel,
   getPublicEquipment,
   getPublicNewsAndSocial,
   getPublicPartners,
 } from "@/lib/cms/public-content";
+import { createPageMetadata } from "@/lib/metadata";
+
+export const metadata = createPageMetadata({
+  title: "INNEURO | Diagnóstico por Imagem em Macapá",
+  description:
+    "Conheça exames, preparos, convênios e canais oficiais da INNEURO em Macapá, Amapá.",
+  path: "/",
+});
 
 export default async function Home() {
   const [highlights, partners, newsAndSocial, equipment] = await Promise.all([
@@ -31,6 +40,7 @@ export default async function Home() {
       <StructureAndEquipment equipment={equipment} />
       <NewsAndSocial {...newsAndSocial} />
       <Insurance partners={partners} />
+      <Scheduling />
       <Location />
     </main>
   );

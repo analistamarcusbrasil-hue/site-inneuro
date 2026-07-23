@@ -17,3 +17,13 @@ export const exames: Exame[] = modalities.map((modality) => ({
     ? modality.slug
     : undefined,
 }));
+
+export function hasIndexableExamContent(exam: Exame) {
+  return Boolean(
+    exam.purpose ||
+    exam.howPerformed ||
+    exam.generalGuidance ||
+    exam.documents ||
+    exam.preparationSlug,
+  );
+}

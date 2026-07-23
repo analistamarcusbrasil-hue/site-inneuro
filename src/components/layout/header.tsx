@@ -42,6 +42,15 @@ export function Header() {
     }
   }, [isMenuOpen]);
 
+  useEffect(() => {
+    if (!isMenuOpen) return;
+    const previousOverflow = document.documentElement.style.overflow;
+    document.documentElement.style.overflow = "hidden";
+    return () => {
+      document.documentElement.style.overflow = previousOverflow;
+    };
+  }, [isMenuOpen]);
+
   const closeMenu = () => dialogRef.current?.close();
   const lightHeader = !isScrolled && !isMenuOpen;
 
@@ -114,7 +123,7 @@ export function Header() {
               aria-disabled="true"
               title="Portal de Exames indisponível no momento"
               className={cn(
-                "inline-flex min-h-11 cursor-not-allowed items-center gap-2 rounded-full px-4 text-sm font-semibold opacity-45",
+                "inline-flex min-h-11 cursor-not-allowed items-center gap-2 rounded-full px-4 text-sm font-semibold opacity-65",
                 lightHeader ? "text-white" : "text-muted",
               )}
             >
@@ -163,6 +172,27 @@ export function Header() {
           if (event.key === "Escape") {
             event.preventDefault();
             closeMenu();
+          }
+          if (event.key === "Tab") {
+            const focusable = Array.from(
+              event.currentTarget.querySelectorAll<HTMLElement>(
+                'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+              ),
+            ).filter(
+              (element) =>
+                element.getAttribute("aria-hidden") !== "true" &&
+                element.getClientRects().length > 0,
+            );
+            const first = focusable[0];
+            const last = focusable.at(-1);
+            if (!first || !last) return;
+            if (event.shiftKey && document.activeElement === first) {
+              event.preventDefault();
+              last.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+              event.preventDefault();
+              first.focus();
+            }
           }
         }}
         className="border-border-light text-ink backdrop:bg-brand-dark/40 fixed inset-x-0 top-20 m-0 max-h-[calc(100dvh-5rem)] w-full max-w-none overflow-y-auto border-x-0 border-t bg-white px-5 pt-5 pb-8 shadow-2xl backdrop:backdrop-blur-[2px] sm:px-8 xl:hidden"

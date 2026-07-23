@@ -145,6 +145,10 @@ export async function saveContentAction(formData: FormData) {
   );
   revalidatePath("/");
   revalidatePath("/convenios");
+  revalidatePath("/noticias");
+  if (moduleKey === "noticias") {
+    revalidatePath(`/noticias/${String(raw.slug ?? "")}`);
+  }
   revalidatePath(`/admin/${moduleKey}`);
   redirect(`/admin/${moduleKey}?success=saved`);
 }
@@ -163,11 +167,12 @@ export async function contentCommandAction(formData: FormData) {
   }
 
   if (command === "duplicate") {
-    const { data: original } = await supabase
+    const { data: original, error: readError } = await supabase
       .from(cmsModule.table)
       .select("*")
       .eq("id", id)
       .single();
+    if (readError || !original) redirect(`/admin/${moduleKey}?error=duplicate`);
     if (original) {
       const copy = {
         ...original,
@@ -181,7 +186,8 @@ export async function contentCommandAction(formData: FormData) {
       };
       if ("slug" in copy) copy.slug = `${copy.slug}-copia-${Date.now()}`;
       if ("title" in copy) copy.title = `${copy.title} (cópia)`;
-      await supabase.from(cmsModule.table).insert(copy);
+      const { error } = await supabase.from(cmsModule.table).insert(copy);
+      if (error) redirect(`/admin/${moduleKey}?error=duplicate`);
     }
   } else {
     const updates: Record<string, unknown> = { updated_by: user.id };
@@ -196,17 +202,23 @@ export async function contentCommandAction(formData: FormData) {
     if (command === "publish")
       Object.assign(updates, {
         status: "published",
-        published_at:
-          moduleKey === "noticias" ? new Date().toISOString() : undefined,
+        ...(moduleKey === "noticias"
+          ? { published_at: new Date().toISOString() }
+          : {}),
       });
     if (command === "activate") updates.active = true;
     if (command === "deactivate") updates.active = false;
-    await supabase.from(cmsModule.table).update(updates).eq("id", id);
+    const { error } = await supabase
+      .from(cmsModule.table)
+      .update(updates)
+      .eq("id", id);
+    if (error) redirect(`/admin/${moduleKey}?error=command`);
   }
 
   await audit(supabase, user.id, command, cmsModule.table, id);
   revalidatePath("/");
   revalidatePath("/convenios");
+  revalidatePath("/noticias");
   revalidatePath(`/admin/${moduleKey}`);
 }
 
@@ -297,9 +309,10 @@ export async function inviteUserAction(formData: FormData) {
     { data: { full_name: "" } },
   );
   if (error || !data.user) redirect("/admin/usuarios?error=invite");
-  await admin
+  const { error: profileError } = await admin
     .from("profiles")
     .upsert({ id: data.user.id, role: parsed.data.role });
+  if (profileError) redirect("/admin/usuarios?error=profile");
   await admin.from("audit_logs").insert({
     actor_id: user.id,
     action: "invite",
@@ -323,10 +336,11 @@ export async function updateUserRoleAction(formData: FormData) {
     redirect("/admin/usuarios?error=validation");
   const admin = createSupabaseAdminClient();
   if (!admin) redirect("/admin/usuarios?error=config");
-  await admin
+  const { error } = await admin
     .from("profiles")
     .update({ role: parsed.data.role })
     .eq("id", parsed.data.id);
+  if (error) redirect("/admin/usuarios?error=role");
   await admin.from("audit_logs").insert({
     actor_id: user.id,
     action: "role_update",
@@ -335,6 +349,7 @@ export async function updateUserRoleAction(formData: FormData) {
     after_data: { role: parsed.data.role },
   });
   revalidatePath("/admin/usuarios");
+  redirect("/admin/usuarios?success=role");
 }
 
 export async function mediaCommandAction(formData: FormData) {
@@ -351,16 +366,25 @@ export async function mediaCommandAction(formData: FormData) {
       .select("storage_path")
       .eq("id", id)
       .single();
-    if (data?.storage_path)
-      await supabase.storage.from("site-media").remove([data.storage_path]);
-    await supabase.from("media_assets").delete().eq("id", id);
+    const { error: deleteError } = await supabase
+      .from("media_assets")
+      .delete()
+      .eq("id", id);
+    if (deleteError) redirect("/admin/midias?error=in-use");
+    if (data?.storage_path) {
+      const { error: storageError } = await supabase.storage
+        .from("site-media")
+        .remove([data.storage_path]);
+      if (storageError) redirect("/admin/midias?error=storage");
+    }
   } else {
-    await supabase
+    const { error } = await supabase
       .from("media_assets")
       .update({
         archived_at: command === "archive" ? new Date().toISOString() : null,
       })
       .eq("id", id);
+    if (error) redirect("/admin/midias?error=command");
   }
   await audit(supabase, user.id, command, "media_assets", id);
   revalidatePath("/admin/midias");
@@ -375,7 +399,11 @@ export async function updateMediaMetadataAction(formData: FormData) {
     .safeParse(Object.fromEntries(formData));
   if (!parsed.success) redirect("/admin/midias?error=validation");
   const { id, ...metadata } = parsed.data;
-  await supabase.from("media_assets").update(metadata).eq("id", id);
+  const { error } = await supabase
+    .from("media_assets")
+    .update(metadata)
+    .eq("id", id);
+  if (error) redirect("/admin/midias?error=metadata");
   await audit(
     supabase,
     user.id,
@@ -408,12 +436,14 @@ export async function trashCommandAction(formData: FormData) {
   if (command === "delete") {
     if (profile.role !== "super_admin")
       redirect("/admin/lixeira?error=permission");
-    await supabase.from(table).delete().eq("id", id);
+    const { error } = await supabase.from(table).delete().eq("id", id);
+    if (error) redirect("/admin/lixeira?error=delete");
   } else {
-    await supabase
+    const { error } = await supabase
       .from(table)
       .update({ status: "draft", archived_at: null, updated_by: user.id })
       .eq("id", id);
+    if (error) redirect("/admin/lixeira?error=restore");
   }
   await audit(supabase, user.id, command, table, id);
   revalidatePath("/admin/lixeira");

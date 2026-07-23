@@ -1,10 +1,12 @@
 # Site institucional INNEURO
 
-Fundação técnica e visual do site do Instituto de Neurologia do Amapá. Esta etapa inclui o design system, componentes reutilizáveis e uma página inicial provisória, sem integrações reais.
+Site institucional do Instituto de Neurologia do Amapá, com páginas públicas,
+conteúdo editorial e painel administrativo integrado ao Supabase.
 
 ## Tecnologias
 
-Next.js (App Router), TypeScript, Tailwind CSS, ESLint, Prettier, Lucide React, Framer Motion e `next/font`.
+Next.js (App Router), TypeScript, Tailwind CSS, Supabase, ESLint, Prettier,
+Lucide React e `next/font`.
 
 ## Requisitos e instalação
 
@@ -33,7 +35,9 @@ npm start
 - `src/components/sections`: blocos de seção.
 - `src/components/ui`: componentes fundamentais.
 - `src/config`: configuração institucional centralizada.
-- `src/data`, `src/types`: reservados para conteúdo e tipos futuros.
+- `src/data`, `src/types`: conteúdo estático validado e tipos compartilhados.
+- `src/app/admin`: painel editorial protegido.
+- `supabase/migrations`: banco, permissões, armazenamento e diagnóstico do CMS.
 - `public/brand`: arquivos oficiais da marca.
 - `public/images`, `public/icons`: mídia estática futura.
 
@@ -43,13 +47,8 @@ Adicione as logos oficiais, sem alterar os nomes, em `public/brand/inneuro-logo.
 
 Copie `.env.example` para `.env.local` e preencha apenas dados oficiais. Campos vazios são aceitos nesta etapa.
 
-## Próximas tarefas
-
-1. Adicionar os arquivos oficiais da marca e validar proporções.
-2. Definir arquitetura de conteúdo e páginas institucionais.
-3. Estruturar o catálogo de exames e a central de preparos.
-4. Manter os links oficiais do Image2Doc, WhatsApp e Instagram atualizados.
-5. Criar a página inicial definitiva e realizar testes de acessibilidade.
+Consulte `docs/admin-cms.md` para configurar usuários e operar notícias, mídias,
+carrossel, convênios, redes sociais e equipamentos.
 
 ## Desenvolvimento e publicação
 

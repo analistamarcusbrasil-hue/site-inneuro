@@ -1,4 +1,4 @@
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabasePublicClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 export type CmsConnectionStatus =
@@ -11,7 +11,7 @@ export async function getCmsConnectionStatus(): Promise<CmsConnectionStatus> {
   }
 
   try {
-    const supabase = await createSupabaseServerClient();
+    const supabase = createSupabasePublicClient();
     if (!supabase) {
       return { configured: false, database: "not_configured" };
     }
