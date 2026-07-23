@@ -2,8 +2,8 @@ import {
   ArrowUpRight,
   CalendarCheck,
   ClipboardList,
-  FileCheck2,
-  MessageCircle,
+  MapPin,
+  ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -13,8 +13,8 @@ import type { QuickAction, QuickActionIcon } from "@/types/quick-action";
 const icons: Record<QuickActionIcon, LucideIcon> = {
   calendar: CalendarCheck,
   preparations: ClipboardList,
-  results: FileCheck2,
-  whatsapp: MessageCircle,
+  insurance: ShieldCheck,
+  location: MapPin,
 };
 
 type QuickActionCardProps = {
@@ -58,7 +58,7 @@ function CardContent({ action }: QuickActionCardProps) {
 }
 
 const baseClasses =
-  "group flex min-h-64 w-full flex-col rounded-3xl border p-6 text-left transition-[border-color,background-color,transform] duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tech focus-visible:ring-offset-4 sm:p-7";
+  "group flex min-h-56 w-full flex-col rounded-3xl border p-6 text-left transition-[border-color,background-color,transform] duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tech focus-visible:ring-offset-4 sm:p-7";
 
 export function QuickActionCard({ action }: QuickActionCardProps) {
   const classes = cn(

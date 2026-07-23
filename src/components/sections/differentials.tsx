@@ -2,11 +2,7 @@ import {
   BrainCircuit,
   CircleUserRound,
   ClipboardCheck,
-  Cloud,
   FolderHeart,
-  LayoutGrid,
-  MessagesSquare,
-  Route,
   type LucideIcon,
 } from "lucide-react";
 import { Container } from "@/components/layout/container";
@@ -17,12 +13,8 @@ import type { DifferentialIcon } from "@/types/differential";
 const icons: Record<DifferentialIcon, LucideIcon> = {
   technology: BrainCircuit,
   "humanized-care": CircleUserRound,
-  journey: Route,
-  modalities: LayoutGrid,
-  "cloud-results": Cloud,
   "patient-portal": FolderHeart,
   preparations: ClipboardCheck,
-  communication: MessagesSquare,
 };
 
 export function Differentials() {

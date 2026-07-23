@@ -1,7 +1,5 @@
-import { siteConfig } from "@/config/site";
 import type { QuickAction } from "@/types/quick-action";
-
-const whatsappNumber = siteConfig.whatsapp.primary.number;
+import { siteConfig } from "@/config/site";
 
 export const quickActions: QuickAction[] = [
   {
@@ -20,44 +18,21 @@ export const quickActions: QuickAction[] = [
     disabled: false,
     href: "/preparos",
   },
-  siteConfig.patientPortal.url
-    ? {
-        id: "results",
-        title: "Acessar exames e resultados",
-        description:
-          "Acesse seus laudos, imagens e exames anteriores pelo Portal de Exames da INNEURO.",
-        icon: "results",
-        featured: true,
-        disabled: false,
-        href: siteConfig.patientPortal.url,
-        external: true,
-      }
-    : {
-        id: "results",
-        title: "Acessar exames e resultados",
-        description:
-          "Acesse seus laudos, imagens e exames anteriores pelo Portal de Exames da INNEURO.",
-        icon: "results",
-        featured: true,
-        disabled: true,
-        disabledReason: "Portal de Exames indisponível no momento",
-      },
-  whatsappNumber
-    ? {
-        id: "whatsapp",
-        title: "Falar com a INNEURO",
-        description: "Tire dúvidas diretamente pelo WhatsApp.",
-        icon: "whatsapp",
-        disabled: false,
-        href: `https://wa.me/${whatsappNumber}`,
-        external: true,
-      }
-    : {
-        id: "whatsapp",
-        title: "Falar com a INNEURO",
-        description: "Tire dúvidas diretamente pelo WhatsApp.",
-        icon: "whatsapp",
-        disabled: true,
-        disabledReason: "WhatsApp indisponível no momento",
-      },
+  {
+    id: "insurance",
+    title: "Ver convênios",
+    description: "Consulte as opções de atendimento disponíveis.",
+    icon: "insurance",
+    disabled: false,
+    href: "/convenios",
+  },
+  {
+    id: "location",
+    title: "Como chegar",
+    description: "Veja a localização da INNEURO em Macapá.",
+    icon: "location",
+    disabled: false,
+    href: siteConfig.mapsUrl,
+    external: true,
+  },
 ];

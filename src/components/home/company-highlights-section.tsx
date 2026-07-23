@@ -1,6 +1,5 @@
 import { Container } from "@/components/layout/container";
 import { publishedCompanyHighlights } from "@/data/company-highlights";
-import { CompanyHighlightsEmptyState } from "./company-highlights-empty-state";
 import { CompanyHighlightsCarousel } from "./company-highlights-carousel";
 
 export function CompanyHighlightsSection() {
@@ -18,14 +17,10 @@ export function CompanyHighlightsSection() {
             Destaques INNEURO
           </h2>
           <p className="text-muted mt-3 max-w-2xl text-base leading-relaxed sm:text-lg">
-            Conheça nossa estrutura, serviços, campanhas e principais novidades.
+            Tecnologia, cuidado e informação para você.
           </p>
         </div>
-        {publishedCompanyHighlights.length ? (
-          <CompanyHighlightsCarousel items={publishedCompanyHighlights} />
-        ) : (
-          <CompanyHighlightsEmptyState />
-        )}
+        <CompanyHighlightsCarousel items={publishedCompanyHighlights} />
       </Container>
     </section>
   );

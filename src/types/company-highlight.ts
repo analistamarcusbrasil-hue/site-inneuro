@@ -3,9 +3,12 @@ export type CompanyHighlight = {
   title: string;
   description: string;
   category: string;
-  image: string;
+  image?: string;
   imageAlt: string;
   focalPosition?: string;
   href?: string;
+  ctaLabel?: string;
+  creditLabel?: string;
+  creditUrl?: string;
   published: boolean;
 };

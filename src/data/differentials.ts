@@ -15,33 +15,6 @@ export const differentials: Differential[] = [
     icon: "humanized-care",
   },
   {
-    id: "journey",
-    title: "Jornada organizada",
-    description:
-      "Informações estruturadas para orientar o paciente em cada etapa.",
-    icon: "journey",
-  },
-  {
-    id: "modalities",
-    title: "Diferentes modalidades",
-    description:
-      "Modalidades de exames reunidas em uma experiência clara e integrada.",
-    icon: "modalities",
-  },
-  {
-    id: "cloud-results",
-    title: "Resultados em nuvem",
-    description: "Laudos e imagens disponíveis online pelo Portal de Exames.",
-    icon: "cloud-results",
-  },
-  {
-    id: "patient-portal",
-    title: "Acesso digital",
-    description:
-      "Acesso externo ao Portal de Exames para consultar informações disponíveis.",
-    icon: "patient-portal",
-  },
-  {
     id: "preparations",
     title: "Orientações claras",
     description:
@@ -49,10 +22,10 @@ export const differentials: Differential[] = [
     icon: "preparations",
   },
   {
-    id: "communication",
-    title: "Comunicação facilitada",
+    id: "patient-portal",
+    title: "Acesso digital aos resultados",
     description:
-      "Canais preparados para aproximar o paciente da equipe de atendimento.",
-    icon: "communication",
+      "Consulta online de laudos e imagens quando estiverem disponíveis.",
+    icon: "patient-portal",
   },
 ];

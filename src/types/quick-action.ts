@@ -1,5 +1,5 @@
 export type QuickActionIcon =
-  "calendar" | "preparations" | "results" | "whatsapp";
+  "calendar" | "preparations" | "insurance" | "location";
 
 type QuickActionBase = {
   id: string;

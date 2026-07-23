@@ -39,11 +39,11 @@ export function Insurance() {
           <div className="p-8 sm:p-10 lg:p-12">
             <p className="text-muted max-w-2xl text-lg leading-relaxed">
               Consulte nossa equipe para confirmar cobertura, autorização e
-              disponibilidade do exame.
+              disponibilidade para o exame desejado.
             </p>
 
             {activeConvenios.length > 0 && (
-              <ul className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3">
+              <ul className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
                 {activeConvenios.map((convenio) => (
                   <li
                     key={convenio.id}

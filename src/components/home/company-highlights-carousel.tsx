@@ -18,7 +18,7 @@ export function CompanyHighlightsCarousel({
   const [interactionPause, setInteractionPause] = useState(false);
   const [pageHidden, setPageHidden] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(true);
-  const touchStartX = useRef<number | null>(null);
+  const pointerStartX = useRef<number | null>(null);
 
   const select = useCallback(
     (index: number) => {
@@ -26,6 +26,14 @@ export function CompanyHighlightsCarousel({
       setActive((index + items.length) % items.length);
     },
     [items.length],
+  );
+
+  const interact = useCallback(
+    (index: number) => {
+      setManualPause(true);
+      select(index);
+    },
+    [select],
   );
 
   useEffect(() => {
@@ -77,29 +85,32 @@ export function CompanyHighlightsCarousel({
       onKeyDown={(event) => {
         if (event.key === "ArrowLeft") {
           event.preventDefault();
-          select(active - 1);
+          interact(active - 1);
         }
         if (event.key === "ArrowRight") {
           event.preventDefault();
-          select(active + 1);
+          interact(active + 1);
         }
       }}
-      onTouchStart={(event) => {
-        touchStartX.current = event.touches[0]?.clientX ?? null;
+      onPointerDown={(event) => {
+        pointerStartX.current = event.clientX;
         setInteractionPause(true);
       }}
-      onTouchEnd={(event) => {
-        if (touchStartX.current !== null) {
-          const endX = event.changedTouches[0]?.clientX ?? touchStartX.current;
-          const delta = endX - touchStartX.current;
+      onPointerUp={(event) => {
+        if (pointerStartX.current !== null) {
+          const delta = event.clientX - pointerStartX.current;
           if (Math.abs(delta) >= SWIPE_THRESHOLD) {
-            select(active + (delta < 0 ? 1 : -1));
+            interact(active + (delta < 0 ? 1 : -1));
           }
         }
-        touchStartX.current = null;
+        pointerStartX.current = null;
         setInteractionPause(false);
       }}
-      className="focus-visible:outline-brand focus-visible:outline-2 focus-visible:outline-offset-4"
+      onPointerCancel={() => {
+        pointerStartX.current = null;
+        setInteractionPause(false);
+      }}
+      className="focus-visible:outline-brand touch-pan-y focus-visible:outline-2 focus-visible:outline-offset-4"
     >
       <CompanyHighlightSlide
         item={items[active]}
@@ -112,10 +123,10 @@ export function CompanyHighlightsCarousel({
           active={active}
           total={items.length}
           paused={manualPause || reducedMotion}
-          onPrevious={() => select(active - 1)}
-          onNext={() => select(active + 1)}
+          onPrevious={() => interact(active - 1)}
+          onNext={() => interact(active + 1)}
           onPauseToggle={() => setManualPause((current) => !current)}
-          onSelect={select}
+          onSelect={interact}
         />
       ) : null}
     </div>

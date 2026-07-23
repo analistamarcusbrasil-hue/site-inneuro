@@ -1,12 +1,5 @@
 export type DifferentialIcon =
-  | "technology"
-  | "humanized-care"
-  | "journey"
-  | "modalities"
-  | "cloud-results"
-  | "patient-portal"
-  | "preparations"
-  | "communication";
+  "technology" | "humanized-care" | "patient-portal" | "preparations";
 
 export type Differential = {
   id: string;
