@@ -1,8 +1,12 @@
 import { Container } from "@/components/layout/container";
-import { publishedCompanyHighlights } from "@/data/company-highlights";
+import type { CompanyHighlight } from "@/types/company-highlight";
 import { CompanyHighlightsCarousel } from "./company-highlights-carousel";
 
-export function CompanyHighlightsSection() {
+export function CompanyHighlightsSection({
+  items,
+}: {
+  items: CompanyHighlight[];
+}) {
   return (
     <section
       className="bg-surface py-10 sm:py-12 lg:py-14"
@@ -20,7 +24,7 @@ export function CompanyHighlightsSection() {
             Tecnologia, cuidado e informação para você.
           </p>
         </div>
-        <CompanyHighlightsCarousel items={publishedCompanyHighlights} />
+        <CompanyHighlightsCarousel items={items} />
       </Container>
     </section>
   );

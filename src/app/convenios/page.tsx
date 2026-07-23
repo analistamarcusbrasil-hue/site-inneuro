@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Container } from "@/components/layout/container";
 import { InternalHero } from "@/components/layout/internal-hero";
-import { convenios } from "@/data/convenios";
+import { getPublicPartners } from "@/lib/cms/public-content";
 import { siteConfig } from "@/config/site";
 import { PartnerLogoCard } from "@/components/partners/partner-logo-card";
 
@@ -12,7 +12,8 @@ export const metadata: Metadata = {
     ? { canonical: `${siteConfig.url}/convenios` }
     : undefined,
 };
-export default function InsurancePage() {
+export default async function InsurancePage() {
+  const convenios = await getPublicPartners();
   return (
     <main id="main-content" tabIndex={-1}>
       <InternalHero

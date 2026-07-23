@@ -1,8 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Manrope, Plus_Jakarta_Sans } from "next/font/google";
-import { Footer } from "@/components/layout/footer";
-import { Header } from "@/components/layout/header";
-import { SkipLink } from "@/components/layout/skip-link";
+import { SiteChrome } from "@/components/layout/site-chrome";
 import { siteConfig } from "@/config/site";
 import "./globals.css";
 
@@ -65,10 +63,7 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" className={`${manrope.variable} ${jakarta.variable}`}>
       <body>
-        <SkipLink />
-        <Header />
-        {children}
-        <Footer />
+        <SiteChrome>{children}</SiteChrome>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{

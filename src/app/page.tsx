@@ -7,18 +7,30 @@ import { NewsAndSocial } from "@/components/sections/news-and-social";
 import { QuickActions } from "@/components/sections/quick-actions";
 import { StructureAndEquipment } from "@/components/sections/structure-and-equipment";
 import { CompanyHighlightsSection } from "@/components/home/company-highlights-section";
+import {
+  getPublicCarousel,
+  getPublicEquipment,
+  getPublicNewsAndSocial,
+  getPublicPartners,
+} from "@/lib/cms/public-content";
 
-export default function Home() {
+export default async function Home() {
+  const [highlights, partners, newsAndSocial, equipment] = await Promise.all([
+    getPublicCarousel(),
+    getPublicPartners(),
+    getPublicNewsAndSocial(),
+    getPublicEquipment(),
+  ]);
   return (
     <main id="main-content" tabIndex={-1}>
       <Hero />
-      <CompanyHighlightsSection />
+      <CompanyHighlightsSection items={highlights} />
       <QuickActions />
       <Modalities />
       <Differentials />
-      <StructureAndEquipment />
-      <NewsAndSocial />
-      <Insurance />
+      <StructureAndEquipment equipment={equipment} />
+      <NewsAndSocial {...newsAndSocial} />
+      <Insurance partners={partners} />
       <Location />
     </main>
   );

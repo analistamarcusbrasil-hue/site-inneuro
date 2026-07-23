@@ -2,7 +2,29 @@ import { ArrowUpRight, AtSign } from "lucide-react";
 import { Container } from "@/components/layout/container";
 import { siteConfig } from "@/config/site";
 
-export function NewsAndSocial() {
+type NewsItem = {
+  id: string;
+  title: string;
+  summary: string;
+  category: string | null;
+  slug: string;
+};
+type SocialItem = {
+  id: string;
+  title: string;
+  callout: string | null;
+  network: string;
+  url: string;
+  cta_label: string | null;
+};
+
+export function NewsAndSocial({
+  news,
+  social,
+}: {
+  news: NewsItem[];
+  social: SocialItem[];
+}) {
   return (
     <section
       aria-labelledby="news-social-title"
@@ -44,6 +66,50 @@ export function NewsAndSocial() {
             <ArrowUpRight aria-hidden="true" size={17} />
           </a>
         </div>
+        {news.length || social.length ? (
+          <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {news.map((item) => (
+              <article
+                key={item.id}
+                className="border-border-light rounded-2xl border bg-white p-5"
+              >
+                <p className="text-brand text-xs font-bold tracking-wide uppercase">
+                  {item.category ?? "Notícia"}
+                </p>
+                <h3 className="font-heading text-brand-dark mt-2 text-lg font-semibold">
+                  {item.title}
+                </h3>
+                <p className="text-muted mt-2 line-clamp-3 text-sm leading-relaxed">
+                  {item.summary}
+                </p>
+              </article>
+            ))}
+            {social.map((item) => (
+              <a
+                key={item.id}
+                href={item.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="border-border-light hover:border-brand rounded-2xl border bg-white p-5 transition-colors"
+              >
+                <p className="text-brand text-xs font-bold tracking-wide uppercase">
+                  {item.network}
+                </p>
+                <h3 className="font-heading text-brand-dark mt-2 text-lg font-semibold">
+                  {item.title}
+                </h3>
+                {item.callout ? (
+                  <p className="text-muted mt-2 line-clamp-3 text-sm leading-relaxed">
+                    {item.callout}
+                  </p>
+                ) : null}
+                <span className="text-brand mt-4 inline-flex text-sm font-bold">
+                  {item.cta_label ?? "Acessar publicação"}
+                </span>
+              </a>
+            ))}
+          </div>
+        ) : null}
       </Container>
     </section>
   );

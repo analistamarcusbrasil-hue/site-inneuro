@@ -21,7 +21,18 @@ const modalities = [
   },
 ] as const;
 
-export function StructureAndEquipment() {
+type EquipmentItem = {
+  id: string;
+  name: string;
+  modality: string;
+  description: string;
+};
+
+export function StructureAndEquipment({
+  equipment,
+}: {
+  equipment: EquipmentItem[];
+}) {
   return (
     <section
       aria-label="Estrutura e equipamentos"
@@ -36,27 +47,51 @@ export function StructureAndEquipment() {
           />
 
           <div className="grid gap-4 sm:grid-cols-3">
-            {modalities.map(({ name, href, icon: Icon }) => (
-              <Link
-                key={href}
-                href={href}
-                className="group border-border-light hover:border-brand/35 focus-visible:ring-brand bg-surface flex min-h-52 flex-col justify-between overflow-hidden rounded-3xl border p-6 transition-colors focus-visible:ring-2 focus-visible:ring-offset-4 focus-visible:outline-none"
-              >
-                <span className="bg-brand-dark text-tech relative grid size-14 place-items-center overflow-hidden rounded-2xl">
-                  <span
-                    aria-hidden="true"
-                    className="border-tech/25 absolute -inset-3 rounded-full border"
-                  />
-                  <Icon aria-hidden="true" size={25} strokeWidth={1.6} />
-                </span>
-                <span className="font-heading text-ink mt-8 text-lg leading-tight font-semibold">
-                  {name}
-                </span>
-                <span className="text-brand mt-3 text-sm font-bold">
-                  Ver informações
-                </span>
-              </Link>
-            ))}
+            {equipment.length
+              ? equipment.map((item) => (
+                  <article
+                    key={item.id}
+                    className="border-border-light bg-surface flex min-h-52 flex-col rounded-3xl border p-6"
+                  >
+                    <span className="bg-brand-dark text-tech grid size-14 place-items-center rounded-2xl">
+                      <ScanLine
+                        aria-hidden="true"
+                        size={25}
+                        strokeWidth={1.6}
+                      />
+                    </span>
+                    <p className="text-brand mt-7 text-xs font-bold tracking-wide uppercase">
+                      {item.modality}
+                    </p>
+                    <h3 className="font-heading text-ink mt-2 text-lg font-semibold">
+                      {item.name}
+                    </h3>
+                    <p className="text-muted mt-3 line-clamp-3 text-sm leading-relaxed">
+                      {item.description}
+                    </p>
+                  </article>
+                ))
+              : modalities.map(({ name, href, icon: Icon }) => (
+                  <Link
+                    key={href}
+                    href={href}
+                    className="group border-border-light hover:border-brand/35 focus-visible:ring-brand bg-surface flex min-h-52 flex-col justify-between overflow-hidden rounded-3xl border p-6 transition-colors focus-visible:ring-2 focus-visible:ring-offset-4 focus-visible:outline-none"
+                  >
+                    <span className="bg-brand-dark text-tech relative grid size-14 place-items-center overflow-hidden rounded-2xl">
+                      <span
+                        aria-hidden="true"
+                        className="border-tech/25 absolute -inset-3 rounded-full border"
+                      />
+                      <Icon aria-hidden="true" size={25} strokeWidth={1.6} />
+                    </span>
+                    <span className="font-heading text-ink mt-8 text-lg leading-tight font-semibold">
+                      {name}
+                    </span>
+                    <span className="text-brand mt-3 text-sm font-bold">
+                      Ver informações
+                    </span>
+                  </Link>
+                ))}
           </div>
         </div>
       </Container>
