@@ -25,21 +25,36 @@ export function AdminPasswordSetup() {
       const code = url.searchParams.get("code");
       const tokenHash = url.searchParams.get("token_hash");
       const type = url.searchParams.get("type") as EmailOtpType | null;
+      const hash = new URLSearchParams(url.hash.slice(1));
+      const accessToken = hash.get("access_token");
+      const refreshToken = hash.get("refresh_token");
 
-      if (url.searchParams.get("error")) {
+      if (url.searchParams.get("error") || hash.get("error")) {
         if (active) setAccessState("invalid");
         return;
       }
 
-      if (code) {
-        await supabase.auth.exchangeCodeForSession(code);
+      let sessionError: Error | null = null;
+      if (accessToken && refreshToken) {
+        const { error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+        sessionError = error;
+      } else if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        sessionError = error;
       } else if (tokenHash && type) {
-        await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
+        const { error } = await supabase.auth.verifyOtp({
+          token_hash: tokenHash,
+          type,
+        });
+        sessionError = error;
       }
 
       const { data, error } = await supabase.auth.getSession();
       if (!active) return;
-      if (error || !data.session) {
+      if (sessionError || error || !data.session) {
         setAccessState("invalid");
         return;
       }
