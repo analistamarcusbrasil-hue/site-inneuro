@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { Convenio } from "@/types/convenio";
 
 export function PartnerLogoCard({ partner }: { partner: Convenio }) {
-  const hasOfficialLogo = partner.logo && partner.logoStatus === "official";
+  const hasLogo = partner.logo && partner.logoStatus !== "pending";
 
   return (
     <li className="border-border-light group hover:border-brand/35 flex min-h-36 flex-col items-center justify-center rounded-3xl border bg-white p-5 text-center transition-colors">
@@ -12,7 +12,7 @@ export function PartnerLogoCard({ partner }: { partner: Convenio }) {
         aria-label={`Consultar atendimento para ${partner.name}`}
         className="focus-visible:ring-brand flex min-h-24 w-full flex-col items-center justify-center gap-3 rounded-2xl focus-visible:ring-2 focus-visible:ring-offset-4 focus-visible:outline-none"
       >
-        {hasOfficialLogo ? (
+        {hasLogo ? (
           <Image
             src={partner.logo!}
             alt={`Logo ${partner.name}`}
@@ -28,7 +28,7 @@ export function PartnerLogoCard({ partner }: { partner: Convenio }) {
         )}
         <span className="text-muted text-[0.68rem] font-bold tracking-[0.12em] uppercase">
           {partner.category === "parceria" ? "Parceria" : "Convênio"}
-          {!hasOfficialLogo ? " · marca pendente" : ""}
+          {!hasLogo ? " · marca pendente" : ""}
         </span>
       </Link>
     </li>

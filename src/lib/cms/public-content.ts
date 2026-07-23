@@ -77,7 +77,7 @@ export async function getPublicCarousel(): Promise<CompanyHighlight[]> {
     .order("sort_order");
   if (error || !data?.length)
     return companyHighlights.filter((item) => item.published);
-  return (data ?? []).map((item) => {
+  const cmsHighlights = (data ?? []).map((item) => {
     const path = mediaPath(item.desktop);
     return {
       id: item.id,
@@ -93,6 +93,11 @@ export async function getPublicCarousel(): Promise<CompanyHighlight[]> {
       published: true,
     };
   });
+  const institutional = companyHighlights[0];
+  return [
+    institutional,
+    ...cmsHighlights.filter((item) => item.title !== institutional.title),
+  ];
 }
 
 export async function getPublicPartners(): Promise<Convenio[]> {
@@ -105,8 +110,9 @@ export async function getPublicPartners(): Promise<Convenio[]> {
     )
     .order("sort_order");
   if (error || !data?.length) return convenios.filter((item) => item.active);
-  return (data ?? []).map((item) => {
+  const cmsPartners = (data ?? []).map((item) => {
     const path = mediaPath(item.logo);
+    const fallback = convenios.find((partner) => partner.slug === item.slug);
     return {
       id: item.id,
       name: item.name,
@@ -114,12 +120,17 @@ export async function getPublicPartners(): Promise<Convenio[]> {
       website: item.website_url ?? undefined,
       logo: path
         ? supabase.storage.from("site-media").getPublicUrl(path).data.publicUrl
-        : undefined,
-      logoStatus: path ? "official" : "pending",
-      active: true,
+        : fallback?.logo,
+      logoStatus: path ? "official" : (fallback?.logoStatus ?? "pending"),
+      active: item.slug !== "capsaude",
       category: item.kind,
-    };
+    } satisfies Convenio;
   });
+  const cmsSlugs = new Set(cmsPartners.map((item) => item.slug));
+  return [
+    ...cmsPartners,
+    ...convenios.filter((item) => item.active && !cmsSlugs.has(item.slug)),
+  ];
 }
 
 export async function getPublicNewsAndSocial(): Promise<{

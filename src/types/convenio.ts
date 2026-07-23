@@ -6,6 +6,6 @@ export type Convenio = {
   website?: string;
   source?: string;
   active: boolean;
-  logoStatus: "official" | "pending";
+  logoStatus: "official" | "provided" | "pending";
   category: "convenio" | "parceria";
 };

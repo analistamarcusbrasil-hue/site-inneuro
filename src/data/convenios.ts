@@ -8,7 +8,8 @@ export const convenios: Convenio[] = [
     website: "https://www.sulamerica.com.br/",
     source: "https://www.sulamerica.com.br/",
     active: true,
-    logoStatus: "pending",
+    logo: "/brands/convenios/sulamerica.png",
+    logoStatus: "provided",
     category: "convenio",
   },
   {
@@ -18,8 +19,8 @@ export const convenios: Convenio[] = [
     website: "https://www.geap.org.br/",
     source: "https://www.geap.org.br/",
     active: true,
-    logo: "/brands/convenios/geap-saude.svg",
-    logoStatus: "official",
+    logo: "/brands/convenios/geap-saude.png",
+    logoStatus: "provided",
     category: "convenio",
   },
   {
@@ -30,7 +31,7 @@ export const convenios: Convenio[] = [
     source: "https://www.unimed.coop.br/",
     active: true,
     logo: "/brands/convenios/unimed.png",
-    logoStatus: "official",
+    logoStatus: "provided",
     category: "convenio",
   },
   {
@@ -41,7 +42,7 @@ export const convenios: Convenio[] = [
     source: "https://www.amil.com.br/",
     active: true,
     logo: "/brands/convenios/amil.png",
-    logoStatus: "official",
+    logoStatus: "provided",
     category: "convenio",
   },
   {
@@ -51,8 +52,8 @@ export const convenios: Convenio[] = [
     website: "https://www.assefaz.org.br/",
     source: "https://www.assefaz.org.br/",
     active: true,
-    logo: "/brands/convenios/assefaz.svg",
-    logoStatus: "official",
+    logo: "/brands/convenios/assefaz.png",
+    logoStatus: "provided",
     category: "convenio",
   },
   {
@@ -62,16 +63,27 @@ export const convenios: Convenio[] = [
     website: "https://www.bradescoseguros.com.br/clientes/produtos/plano-saude",
     source: "https://www.bradescoseguros.com.br/clientes/produtos/plano-saude",
     active: true,
-    logoStatus: "pending",
+    logo: "/brands/convenios/bradesco-saude.png",
+    logoStatus: "provided",
     category: "convenio",
   },
-  // A logo oficial da CAPSAÚDE deve ser fornecida pela INNEURO.
+  // CAPSAÚDE não corresponde à marca CAPE Saúde — CAPESESP recebida.
+  // Mantida separadamente e inativa até confirmação específica da INNEURO.
   {
     id: "capsaude",
     name: "CAPSAÚDE",
     slug: "capsaude",
-    active: true,
+    active: false,
     logoStatus: "pending",
+    category: "convenio",
+  },
+  {
+    id: "cape-saude-capesesp",
+    name: "CAPE Saúde — CAPESESP",
+    slug: "cape-saude-capesesp",
+    active: true,
+    logo: "/brands/convenios/cape-saude-capesesp.png",
+    logoStatus: "provided",
     category: "convenio",
   },
   {
@@ -81,8 +93,8 @@ export const convenios: Convenio[] = [
     website: "https://www.amorsaude.com.br/",
     source: "https://www.amorsaude.com.br/",
     active: true,
-    logo: "/brands/convenios/amorsaude.svg",
-    logoStatus: "official",
+    logo: "/brands/convenios/amorsaude.png",
+    logoStatus: "provided",
     category: "parceria",
   },
 ];

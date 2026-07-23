@@ -1,0 +1,57 @@
+{
+  "receivedAt": "2026-07-23",
+  "source": "Arquivos fornecidos pela INNEURO",
+  "verification": "As marcas não foram verificadas independentemente nas centrais oficiais das operadoras.",
+  "assets": [
+    {
+      "name": "INNEURO",
+      "path": "/brands/inneuro/logo-inneuro.png",
+      "kind": "logo"
+    },
+    {
+      "name": "Fachada INNEURO",
+      "path": "/images/inneuro/fachada-inneuro.webp",
+      "kind": "photo"
+    },
+    {
+      "name": "SulAmérica",
+      "path": "/brands/convenios/sulamerica.png",
+      "kind": "partner-logo"
+    },
+    {
+      "name": "GEAP Saúde",
+      "path": "/brands/convenios/geap-saude.png",
+      "kind": "partner-logo"
+    },
+    {
+      "name": "Unimed",
+      "path": "/brands/convenios/unimed.png",
+      "kind": "partner-logo"
+    },
+    {
+      "name": "Amil",
+      "path": "/brands/convenios/amil.png",
+      "kind": "partner-logo"
+    },
+    {
+      "name": "ASSEFAZ",
+      "path": "/brands/convenios/assefaz.png",
+      "kind": "partner-logo"
+    },
+    {
+      "name": "Bradesco Saúde",
+      "path": "/brands/convenios/bradesco-saude.png",
+      "kind": "partner-logo"
+    },
+    {
+      "name": "CAPE Saúde — CAPESESP",
+      "path": "/brands/convenios/cape-saude-capesesp.png",
+      "kind": "partner-logo"
+    },
+    {
+      "name": "AmorSaúde",
+      "path": "/brands/convenios/amorsaude.png",
+      "kind": "partner-logo"
+    }
+  ]
+}

@@ -7,8 +7,10 @@ export const companyHighlights: CompanyHighlight[] = [
     description:
       "Tecnologia, cuidado e acolhimento em cada etapa do seu atendimento.",
     category: "Institucional",
-    image: "/images/carrossel/inneuro-institucional.webp",
-    imageAlt: "Composição visual institucional da INNEURO",
+    image: "/images/inneuro/fachada-inneuro.webp",
+    imageAlt:
+      "Fachada da INNEURO — Instituto de Neurologia do Amapá, em Macapá.",
+    focalPosition: "center 48%",
     href: "/sobre",
     ctaLabel: "Conhecer a INNEURO",
     published: true,

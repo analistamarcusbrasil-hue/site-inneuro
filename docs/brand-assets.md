@@ -1,6 +1,11 @@
-# Registro de assets de marcas
+# Registro histórico de assets de marcas
 
-Consulta e obtenção realizadas em 22/07/2026. Os arquivos foram copiados dos
+Esta tabela registra a consulta anterior, realizada em 22/07/2026. Ela foi
+substituída visualmente pelos arquivos fornecidos pela INNEURO em 23/07/2026,
+relacionados em `docs/assets-manifest.json`. Os arquivos anteriores foram
+preservados porque podem ter referências históricas no projeto.
+
+Na consulta de 22/07/2026, os arquivos foram copiados dos
 domínios institucionais indicados e são usados apenas para identificação visual,
 sem recorte, recoloração, redesenho ou hotlink. As marcas permanecem de propriedade
 dos respectivos titulares.
@@ -18,9 +23,15 @@ dos respectivos titulares.
 
 ## Identidade INNEURO
 
-Nenhum arquivo da logo oficial da INNEURO foi localizado no repositório, no
-histórico Git ou nos anexos disponíveis. Header e Footer continuam usando o
-fallback textual acessível. Favicon, ícone de aplicativo e imagens sociais usam
-somente os tokens e grafismos aprovados no design system, sem criar ou redesenhar
-uma marca. Esses assets devem ser atualizados quando a clínica fornecer a logo
-oficial em formato adequado.
+Em 23/07/2026, a INNEURO forneceu a logo institucional usada no Header, no menu
+móvel e no Footer. O arquivo foi preservado sem recorte, recoloração ou
+redesenho em `public/brands/inneuro/logo-inneuro.png`. A interface mantém o
+fallback textual acessível caso a imagem não carregue.
+
+Na mesma entrega, a INNEURO forneceu novos PNGs das oito marcas atualmente
+exibidas. Esses arquivos substituem os assets visuais anteriores na interface,
+mas não foram verificados independentemente nas centrais oficiais das
+operadoras. O registro atual está em `docs/assets-manifest.json`.
+
+`CAPE Saúde — CAPESESP` é um cadastro separado. A entrada anterior `CAPSAÚDE`
+permanece pendente e inativa, sem substituição silenciosa.
