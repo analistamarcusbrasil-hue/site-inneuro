@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import { Container } from "@/components/layout/container";
 import { InternalHero } from "@/components/layout/internal-hero";
 import { convenios } from "@/data/convenios";
 import { siteConfig } from "@/config/site";
+import { PartnerLogoCard } from "@/components/partners/partner-logo-card";
 
 export const metadata: Metadata = {
   title: "Convênios | INNEURO",
@@ -22,33 +22,20 @@ export default function InsurancePage() {
       />
       <section className="bg-surface py-16 sm:py-20 lg:py-24">
         <Container>
-          <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <p className="text-muted mb-8 max-w-3xl text-lg leading-relaxed">
+            Consulte nossa equipe para confirmar cobertura, autorização e
+            disponibilidade para o exame desejado.
+          </p>
+          <ul className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
             {convenios
               .filter((item) => item.active)
               .map((item) => (
-                <li
-                  key={item.id}
-                  className="border-border-light grid min-h-32 place-items-center rounded-3xl border bg-white p-6"
-                >
-                  {item.logo ? (
-                    <Image
-                      src={item.logo}
-                      alt={`Logo ${item.name}`}
-                      width={160}
-                      height={70}
-                      className="max-h-16 w-auto object-contain"
-                    />
-                  ) : (
-                    <span className="font-heading text-brand-dark text-center text-lg font-bold">
-                      {item.name}
-                    </span>
-                  )}
-                </li>
+                <PartnerLogoCard key={item.id} partner={item} />
               ))}
           </ul>
           <div className="border-warning/25 mt-8 rounded-3xl border bg-white p-6 text-sm leading-relaxed">
-            A cobertura e a necessidade de autorização podem variar conforme o
-            plano e o exame. Confirme as condições com nossa equipe.
+            A cobertura pode variar conforme o plano, produto contratado e exame
+            solicitado.
           </div>
         </Container>
       </section>

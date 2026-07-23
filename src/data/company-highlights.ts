@@ -7,6 +7,7 @@ export const companyHighlights: CompanyHighlight[] = [
     description:
       "Tecnologia, cuidado e acolhimento em cada etapa do seu atendimento.",
     category: "Institucional",
+    image: "/images/carrossel/inneuro-institucional.webp",
     imageAlt: "Composição visual institucional da INNEURO",
     href: "/sobre",
     ctaLabel: "Conhecer a INNEURO",
@@ -18,7 +19,7 @@ export const companyHighlights: CompanyHighlight[] = [
     description:
       "Imagens detalhadas para auxiliar seu médico com precisão e segurança.",
     category: "Exames",
-    image: "/images/carrossel/ressonancia-magnetica-ilustrativa.webp",
+    image: "/images/carrossel/ressonancia-magnetica.webp",
     imageAlt: "Imagem ilustrativa de equipamento de ressonância magnética",
     focalPosition: "center",
     href: "/exames/ressonancia-magnetica",
@@ -33,7 +34,7 @@ export const companyHighlights: CompanyHighlight[] = [
     description:
       "Tecnologia e agilidade com atendimento cuidadoso em cada etapa.",
     category: "Exames",
-    image: "/images/carrossel/tomografia-ilustrativa.webp",
+    image: "/images/carrossel/tomografia-computadorizada.webp",
     imageAlt: "Imagem ilustrativa de equipamento de tomografia computadorizada",
     focalPosition: "center",
     href: "/exames/tomografia-computadorizada",
@@ -49,7 +50,7 @@ export const companyHighlights: CompanyHighlight[] = [
     description:
       "Atendimento prático para diferentes necessidades de diagnóstico por imagem.",
     category: "Exames",
-    image: "/images/carrossel/raios-x-ilustrativa.webp",
+    image: "/images/carrossel/raios-x.webp",
     imageAlt: "Imagem ilustrativa de sala e equipamento de Raios X",
     focalPosition: "center",
     href: "/exames/raios-x",

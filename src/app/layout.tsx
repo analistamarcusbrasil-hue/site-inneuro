@@ -18,9 +18,7 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  metadataBase: process.env.NEXT_PUBLIC_SITE_URL
-    ? new URL(process.env.NEXT_PUBLIC_SITE_URL)
-    : undefined,
+  metadataBase: new URL(siteConfig.url),
   title: {
     default: "INNEURO | Diagnóstico por Imagem em Macapá",
     template: "%s",
@@ -37,12 +35,21 @@ export const metadata: Metadata = {
     title: "INNEURO | Diagnóstico por Imagem em Macapá",
     description:
       "Diagnóstico por imagem, neurologia e medicina nuclear com tecnologia, precisão e cuidado.",
+    images: [
+      {
+        url: "/opengraph-image.png",
+        width: 1200,
+        height: 630,
+        alt: "INNEURO — Instituto de Neurologia do Amapá",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "INNEURO | Diagnóstico por Imagem em Macapá",
     description:
       "Diagnóstico por imagem, neurologia e medicina nuclear com tecnologia, precisão e cuidado.",
+    images: ["/twitter-image.png"],
   },
 };
 

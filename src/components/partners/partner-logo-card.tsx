@@ -1,0 +1,36 @@
+import Image from "next/image";
+import Link from "next/link";
+import type { Convenio } from "@/types/convenio";
+
+export function PartnerLogoCard({ partner }: { partner: Convenio }) {
+  const hasOfficialLogo = partner.logo && partner.logoStatus === "official";
+
+  return (
+    <li className="border-border-light group hover:border-brand/35 flex min-h-36 flex-col items-center justify-center rounded-3xl border bg-white p-5 text-center transition-colors">
+      <Link
+        href="/#agendamento"
+        aria-label={`Consultar atendimento para ${partner.name}`}
+        className="focus-visible:ring-brand flex min-h-24 w-full flex-col items-center justify-center gap-3 rounded-2xl focus-visible:ring-2 focus-visible:ring-offset-4 focus-visible:outline-none"
+      >
+        {hasOfficialLogo ? (
+          <Image
+            src={partner.logo!}
+            alt={`Logo ${partner.name}`}
+            width={180}
+            height={76}
+            sizes="180px"
+            className="max-h-16 max-w-[85%] object-contain"
+          />
+        ) : (
+          <span className="font-heading text-brand-dark text-lg font-bold">
+            {partner.name}
+          </span>
+        )}
+        <span className="text-muted text-[0.68rem] font-bold tracking-[0.12em] uppercase">
+          {partner.category === "parceria" ? "Parceria" : "Convênio"}
+          {!hasOfficialLogo ? " · marca pendente" : ""}
+        </span>
+      </Link>
+    </li>
+  );
+}

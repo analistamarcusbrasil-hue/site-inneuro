@@ -9,6 +9,7 @@ export const convenios: Convenio[] = [
     source: "https://www.sulamerica.com.br/",
     active: true,
     logoStatus: "pending",
+    category: "convenio",
   },
   {
     id: "geap-saude",
@@ -17,7 +18,9 @@ export const convenios: Convenio[] = [
     website: "https://www.geap.org.br/",
     source: "https://www.geap.org.br/",
     active: true,
-    logoStatus: "pending",
+    logo: "/brands/convenios/geap-saude.svg",
+    logoStatus: "official",
+    category: "convenio",
   },
   {
     id: "unimed",
@@ -26,7 +29,9 @@ export const convenios: Convenio[] = [
     website: "https://www.unimed.coop.br/",
     source: "https://www.unimed.coop.br/",
     active: true,
-    logoStatus: "pending",
+    logo: "/brands/convenios/unimed.png",
+    logoStatus: "official",
+    category: "convenio",
   },
   {
     id: "amil",
@@ -35,7 +40,9 @@ export const convenios: Convenio[] = [
     website: "https://www.amil.com.br/",
     source: "https://www.amil.com.br/",
     active: true,
-    logoStatus: "pending",
+    logo: "/brands/convenios/amil.png",
+    logoStatus: "official",
+    category: "convenio",
   },
   {
     id: "assefaz",
@@ -44,7 +51,9 @@ export const convenios: Convenio[] = [
     website: "https://www.assefaz.org.br/",
     source: "https://www.assefaz.org.br/",
     active: true,
-    logoStatus: "pending",
+    logo: "/brands/convenios/assefaz.svg",
+    logoStatus: "official",
+    category: "convenio",
   },
   {
     id: "bradesco-saude",
@@ -54,6 +63,7 @@ export const convenios: Convenio[] = [
     source: "https://www.bradescoseguros.com.br/clientes/produtos/plano-saude",
     active: true,
     logoStatus: "pending",
+    category: "convenio",
   },
   // A logo oficial da CAPSAÚDE deve ser fornecida pela INNEURO.
   {
@@ -62,6 +72,7 @@ export const convenios: Convenio[] = [
     slug: "capsaude",
     active: true,
     logoStatus: "pending",
+    category: "convenio",
   },
   {
     id: "amorsaude",
@@ -70,6 +81,8 @@ export const convenios: Convenio[] = [
     website: "https://www.amorsaude.com.br/",
     source: "https://www.amorsaude.com.br/",
     active: true,
-    logoStatus: "pending",
+    logo: "/brands/convenios/amorsaude.svg",
+    logoStatus: "official",
+    category: "parceria",
   },
 ];

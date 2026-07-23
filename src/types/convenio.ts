@@ -7,4 +7,5 @@ export type Convenio = {
   source?: string;
   active: boolean;
   logoStatus: "official" | "pending";
+  category: "convenio" | "parceria";
 };

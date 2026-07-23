@@ -1,9 +1,9 @@
 import { ExternalLink, MessageCircle, ShieldCheck } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
 import { Container } from "@/components/layout/container";
 import { convenios } from "@/data/convenios";
 import { siteConfig } from "@/config/site";
+import { PartnerLogoCard } from "@/components/partners/partner-logo-card";
 
 const whatsappNumber = siteConfig.whatsapp.primary.number;
 
@@ -43,34 +43,17 @@ export function Insurance() {
             </p>
 
             {activeConvenios.length > 0 && (
-              <ul className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
+              <ul className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
                 {activeConvenios.map((convenio) => (
-                  <li
-                    key={convenio.id}
-                    className="border-border-light grid min-h-24 place-items-center rounded-2xl border bg-white p-4"
-                  >
-                    {convenio.logo ? (
-                      <Image
-                        src={convenio.logo}
-                        alt={`Logo ${convenio.name}`}
-                        width={150}
-                        height={64}
-                        className="max-h-14 w-auto object-contain"
-                      />
-                    ) : (
-                      <span className="font-heading text-brand-dark text-center font-bold">
-                        {convenio.name}
-                      </span>
-                    )}
-                  </li>
+                  <PartnerLogoCard key={convenio.id} partner={convenio} />
                 ))}
               </ul>
             )}
 
             <div className="mt-9">
               <p className="text-muted mb-6 text-sm">
-                A cobertura e a necessidade de autorização podem variar conforme
-                o plano e o exame. Confirme as condições com nossa equipe.
+                A cobertura pode variar conforme o plano, produto contratado e
+                exame solicitado.
               </p>
               {whatsappNumber ? (
                 <a
