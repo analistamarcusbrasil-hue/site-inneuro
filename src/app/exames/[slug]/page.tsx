@@ -5,8 +5,9 @@ import { notFound } from "next/navigation";
 import { InternalHero } from "@/components/layout/internal-hero";
 import { Container } from "@/components/layout/container";
 import { siteConfig } from "@/config/site";
-import { exames } from "@/data/exames";
+import { exames, hasIndexableExamContent } from "@/data/exames";
 import { normalizeWhatsAppNumber } from "@/lib/whatsapp";
+import { createPageMetadata } from "@/lib/metadata";
 
 type ExamPageProps = { params: Promise<{ slug: string }> };
 
@@ -22,23 +23,12 @@ export async function generateMetadata({
   const { slug } = await params;
   const exam = exames.find((item) => item.slug === slug && item.active);
   if (!exam) return {};
-  const canonical = siteConfig.url
-    ? `${siteConfig.url}/exames/${exam.slug}`
-    : undefined;
-  const hasValidatedDetails = Boolean(
-    exam.purpose || exam.howPerformed || exam.generalGuidance || exam.documents,
-  );
-  return {
-    title: `${exam.name} | INNEURO`,
+  return createPageMetadata({
+    title: `${exam.name} em Macapá | INNEURO`,
     description: exam.shortDescription,
-    alternates: canonical ? { canonical } : undefined,
-    openGraph: {
-      title: `${exam.name} | INNEURO`,
-      description: exam.shortDescription,
-      url: canonical,
-    },
-    robots: { index: hasValidatedDetails, follow: true },
-  };
+    path: `/exames/${exam.slug}`,
+    index: hasIndexableExamContent(exam),
+  });
 }
 
 export default async function ExamPage({ params }: ExamPageProps) {

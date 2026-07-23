@@ -4,6 +4,7 @@ import { Footer } from "@/components/layout/footer";
 import { Header } from "@/components/layout/header";
 import { SkipLink } from "@/components/layout/skip-link";
 import { siteConfig } from "@/config/site";
+import { isPreviewDeployment } from "@/lib/deployment";
 import "./globals.css";
 
 const manrope = Manrope({
@@ -27,7 +28,10 @@ export const metadata: Metadata = {
     "Diagnóstico por imagem, neurologia e medicina nuclear com tecnologia, precisão e cuidado.",
   applicationName: "INNEURO",
   manifest: "/manifest.webmanifest",
-  robots: { index: true, follow: true },
+  robots: {
+    index: !isPreviewDeployment,
+    follow: !isPreviewDeployment,
+  },
   openGraph: {
     type: "website",
     locale: "pt_BR",

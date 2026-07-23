@@ -7,6 +7,15 @@ import { NewsAndSocial } from "@/components/sections/news-and-social";
 import { QuickActions } from "@/components/sections/quick-actions";
 import { StructureAndEquipment } from "@/components/sections/structure-and-equipment";
 import { CompanyHighlightsSection } from "@/components/home/company-highlights-section";
+import { Scheduling } from "@/components/sections/scheduling";
+import { createPageMetadata } from "@/lib/metadata";
+
+export const metadata = createPageMetadata({
+  title: "INNEURO | Diagnóstico por Imagem em Macapá",
+  description:
+    "Conheça exames, preparos, convênios e canais oficiais da INNEURO em Macapá, Amapá.",
+  path: "/",
+});
 
 export default function Home() {
   return (
@@ -19,6 +28,7 @@ export default function Home() {
       <StructureAndEquipment />
       <NewsAndSocial />
       <Insurance />
+      <Scheduling />
       <Location />
     </main>
   );

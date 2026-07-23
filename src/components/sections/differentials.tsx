@@ -41,7 +41,7 @@ export function Differentials() {
                   <span className="text-brand grid h-11 w-11 place-items-center rounded-2xl bg-white">
                     <Icon aria-hidden="true" size={21} strokeWidth={1.7} />
                   </span>
-                  <span className="font-heading text-brand/45 text-xs font-bold tracking-[0.12em]">
+                  <span className="font-heading text-brand text-xs font-bold tracking-[0.12em]">
                     {String(index + 1).padStart(2, "0")}
                   </span>
                 </div>

@@ -8,7 +8,7 @@ export default function NotFound() {
       className="bg-brand-dark grid min-h-screen place-items-center px-5 text-center text-white"
     >
       <div>
-        <p className="text-brand text-sm font-bold tracking-[.12em] uppercase">
+        <p className="text-tech text-sm font-bold tracking-[.12em] uppercase">
           Erro 404
         </p>
         <h1 className="font-heading mt-4 text-4xl font-semibold">

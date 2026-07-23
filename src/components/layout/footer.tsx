@@ -14,6 +14,11 @@ const footerLinks = [
 ] as const;
 const generalMessage =
   "Olá! Acessei o site da INNEURO e gostaria de informações sobre exames.";
+const legalLinks = [
+  { label: "Privacidade", href: "/politica-de-privacidade" },
+  { label: "Termos de uso", href: "/termos-de-uso" },
+  { label: "Cookies", href: "/politica-de-cookies" },
+] as const;
 
 export function Footer() {
   const year = new Date().getFullYear();
@@ -106,9 +111,22 @@ export function Footer() {
         </div>
       </Container>
       <div className="border-t border-white/10">
-        <Container className="flex flex-col gap-2 py-5 text-xs text-white/70 sm:flex-row sm:justify-between">
+        <Container className="flex flex-col gap-4 py-5 text-xs text-white/70 lg:flex-row lg:items-center lg:justify-between">
           <p>© {year} INNEURO — Instituto de Neurologia do Amapá.</p>
-          <p>Tecnologia, precisão e cuidado.</p>
+          <nav
+            aria-label="Informações legais"
+            className="flex flex-wrap gap-x-5 gap-y-2"
+          >
+            {legalLinks.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="inline-flex min-h-11 items-center hover:text-white"
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
         </Container>
       </div>
     </footer>

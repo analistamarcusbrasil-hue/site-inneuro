@@ -10,9 +10,8 @@ import {
   normalizeWhatsAppNumber,
   sanitizePlainText,
 } from "@/lib/whatsapp";
-import { cn } from "@/lib/utils";
 
-type FieldName = "name" | "phone" | "exam" | "attendance" | "period";
+type FieldName = "name" | "phone" | "attendance" | "period";
 type Errors = Partial<Record<FieldName, string>>;
 
 const inputClasses =
@@ -39,36 +38,37 @@ export function Scheduling() {
     event.preventDefault();
     if (!whatsappReady) return;
 
-    const data = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const data = new FormData(form);
     const values = {
       name: sanitizePlainText(String(data.get("name") ?? "")),
       phone: sanitizePlainText(String(data.get("phone") ?? "")),
-      exam: sanitizePlainText(String(data.get("exam") ?? "")),
       attendance: sanitizePlainText(String(data.get("attendance") ?? "")),
       period: sanitizePlainText(String(data.get("period") ?? "")),
-      observation: sanitizePlainText(String(data.get("observation") ?? "")),
     };
 
     const nextErrors: Errors = {};
     if (!values.name) nextErrors.name = "Informe seu nome.";
     if (values.phone.replace(/\D/g, "").length < 10)
       nextErrors.phone = "Informe um telefone válido com DDD.";
-    if (!values.exam) nextErrors.exam = "Informe o exame desejado.";
     if (!values.attendance)
       nextErrors.attendance = "Selecione o tipo de atendimento.";
     if (!values.period) nextErrors.period = "Selecione o melhor período.";
     setErrors(nextErrors);
-    if (Object.keys(nextErrors).length > 0) return;
+    if (Object.keys(nextErrors).length > 0) {
+      window.requestAnimationFrame(() =>
+        form.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus(),
+      );
+      return;
+    }
 
     const message = [
       "Olá! Acessei o site da INNEURO e gostaria de solicitar um agendamento.",
       "",
       `Nome: ${values.name}`,
       `Telefone: ${values.phone}`,
-      `Exame: ${values.exam}`,
       `Atendimento: ${values.attendance}`,
       `Preferência de horário: ${values.period}`,
-      `Observação: ${values.observation || "Não informada"}`,
     ].join("\n");
 
     const url = createWhatsAppUrl(siteConfig.whatsapp[channel].number, message);
@@ -117,6 +117,14 @@ export function Scheduling() {
             onSubmit={handleSubmit}
             className="border-border-light bg-surface rounded-[2rem] border p-6 sm:p-8"
           >
+            {Object.keys(errors).length > 0 ? (
+              <p
+                role="alert"
+                className="bg-error/10 text-error mb-5 rounded-2xl p-4 text-sm font-semibold"
+              >
+                Revise os campos indicados antes de continuar.
+              </p>
+            ) : null}
             <div className="grid gap-5 sm:grid-cols-2">
               <label className="text-ink text-sm font-semibold">
                 Nome{" "}
@@ -126,6 +134,7 @@ export function Scheduling() {
                 <input
                   name="name"
                   autoComplete="name"
+                  required
                   className={inputClasses}
                   {...errorProps("name")}
                 />
@@ -148,6 +157,7 @@ export function Scheduling() {
                   type="tel"
                   inputMode="tel"
                   autoComplete="tel"
+                  required
                   value={phone}
                   onChange={(event) =>
                     setPhone(formatPhone(event.target.value))
@@ -165,25 +175,6 @@ export function Scheduling() {
                   </span>
                 )}
               </label>
-              <label className="text-ink text-sm font-semibold sm:col-span-2">
-                Exame desejado{" "}
-                <span aria-hidden="true" className="text-error">
-                  *
-                </span>
-                <input
-                  name="exam"
-                  className={inputClasses}
-                  {...errorProps("exam")}
-                />
-                {errors.exam && (
-                  <span
-                    id="exam-error"
-                    className="text-error mt-2 block text-sm"
-                  >
-                    {errors.exam}
-                  </span>
-                )}
-              </label>
               <label className="text-ink text-sm font-semibold">
                 Convênio ou particular{" "}
                 <span aria-hidden="true" className="text-error">
@@ -192,6 +183,7 @@ export function Scheduling() {
                 <select
                   name="attendance"
                   defaultValue=""
+                  required
                   className={inputClasses}
                   {...errorProps("attendance")}
                 >
@@ -218,6 +210,7 @@ export function Scheduling() {
                 <select
                   name="period"
                   defaultValue=""
+                  required
                   className={inputClasses}
                   {...errorProps("period")}
                 >
@@ -236,18 +229,6 @@ export function Scheduling() {
                     {errors.period}
                   </span>
                 )}
-              </label>
-              <label className="text-ink text-sm font-semibold sm:col-span-2">
-                Observação{" "}
-                <span className="text-muted font-normal">(opcional)</span>
-                <textarea
-                  name="observation"
-                  rows={4}
-                  className={cn(inputClasses, "resize-y py-3")}
-                />
-                <span className="text-muted mt-2 block text-xs">
-                  Evite inserir informações clínicas detalhadas neste campo.
-                </span>
               </label>
               <label className="text-ink text-sm font-semibold sm:col-span-2">
                 Canal de WhatsApp
@@ -278,7 +259,8 @@ export function Scheduling() {
                   size={16}
                 />
                 Os dados são usados apenas para montar a mensagem no seu
-                dispositivo. Nada é armazenado pelo site.
+                dispositivo. Nada é armazenado pelo site e nenhum dado clínico é
+                solicitado.
               </p>
               <button
                 type="submit"

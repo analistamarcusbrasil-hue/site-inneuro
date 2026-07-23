@@ -1,19 +1,16 @@
-import type { Metadata } from "next";
 import { ArrowRight, CalendarPlus } from "lucide-react";
 import Link from "next/link";
 import { InternalHero } from "@/components/layout/internal-hero";
 import { Container } from "@/components/layout/container";
 import { modalities } from "@/data/modalidades";
-import { siteConfig } from "@/config/site";
+import { createPageMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = {
+export const metadata = createPageMetadata({
   title: "Sobre a INNEURO | Instituto de Neurologia do Amapá",
-  description: "Conheça a estrutura institucional da INNEURO.",
-  alternates: siteConfig.url
-    ? { canonical: `${siteConfig.url}/sobre` }
-    : undefined,
-  robots: { index: false, follow: true },
-};
+  description: "Conheça as modalidades apresentadas pela INNEURO em Macapá.",
+  path: "/sobre",
+  index: false,
+});
 
 export default function AboutPage() {
   return (
