@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { CmsModule } from "@/lib/cms/modules";
+import type { CmsModuleFormConfig } from "@/lib/cms/modules";
 import { saveContentAction } from "@/app/admin/actions";
 
 type MediaOption = { id: string; label: string; url: string };
@@ -12,7 +12,7 @@ export function AdminContentForm({
   media = [],
   canPublish,
 }: {
-  module: CmsModule;
+  module: CmsModuleFormConfig;
   initial?: Record<string, unknown>;
   media?: MediaOption[];
   canPublish: boolean;

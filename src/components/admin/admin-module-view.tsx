@@ -37,6 +37,13 @@ export async function AdminModuleView({
   }));
   const canPublish = profile.role !== "editor";
   const supportsActive = module.fields.some((field) => field.name === "active");
+  const formModule = {
+    key: module.key,
+    label: module.label,
+    singular: module.singular,
+    table: module.table,
+    fields: module.fields,
+  };
 
   return (
     <>
@@ -144,7 +151,7 @@ export async function AdminModuleView({
             ) : null}
           </div>
           <AdminContentForm
-            module={module}
+            module={formModule}
             initial={selected}
             media={media}
             canPublish={canPublish}

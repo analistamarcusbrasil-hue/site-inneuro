@@ -33,6 +33,8 @@ export type CmsModule = {
   fields: CmsField[];
 };
 
+export type CmsModuleFormConfig = Omit<CmsModule, "icon">;
+
 export const cmsModules: CmsModule[] = [
   {
     key: "carrossel",
