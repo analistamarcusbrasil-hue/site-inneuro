@@ -38,16 +38,18 @@ export function AdminShell({
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  const contentLinks = cmsModules.map((item) => ({
+    href: `/admin/${item.key}`,
+    label: item.label,
+    icon: item.icon,
+  }));
+  const managementLinks = extraLinks.filter(
+    (item) => !item.superOnly || profile.role === "super_admin",
+  );
   const links = [
-    { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
-    ...cmsModules.map((item) => ({
-      href: `/admin/${item.key}`,
-      label: item.label,
-      icon: item.icon,
-    })),
-    ...extraLinks.filter(
-      (item) => !item.superOnly || profile.role === "super_admin",
-    ),
+    { href: "/admin", label: "Visão geral", icon: LayoutDashboard },
+    ...contentLinks,
+    ...managementLinks,
   ];
 
   return (
@@ -100,7 +102,48 @@ export function AdminShell({
         </div>
         <nav aria-label="Administração" className="flex-1 overflow-y-auto p-3">
           <ul className="space-y-1">
-            {links.map(({ href, label, icon: Icon }) => (
+            <li>
+              <p className="px-3 pt-2 pb-1 text-[0.65rem] font-bold tracking-widest text-white/45 uppercase">
+                Comece aqui
+              </p>
+            </li>
+            {[links[0]].map(({ href, label, icon: Icon }) => (
+              <li key={href}>
+                <Link
+                  href={href}
+                  onClick={() => setOpen(false)}
+                  aria-current={pathname === href ? "page" : undefined}
+                  className={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold ${pathname === href ? "bg-tech text-brand-dark" : "text-white/80 hover:bg-white/10 hover:text-white"}`}
+                >
+                  <Icon size={18} aria-hidden="true" />
+                  {label}
+                </Link>
+              </li>
+            ))}
+            <li>
+              <p className="px-3 pt-5 pb-1 text-[0.65rem] font-bold tracking-widest text-white/45 uppercase">
+                Conteúdo do site
+              </p>
+            </li>
+            {contentLinks.map(({ href, label, icon: Icon }) => (
+              <li key={href}>
+                <Link
+                  href={href}
+                  onClick={() => setOpen(false)}
+                  aria-current={pathname === href ? "page" : undefined}
+                  className={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold ${pathname === href ? "bg-tech text-brand-dark" : "text-white/80 hover:bg-white/10 hover:text-white"}`}
+                >
+                  <Icon size={18} aria-hidden="true" />
+                  {label}
+                </Link>
+              </li>
+            ))}
+            <li>
+              <p className="px-3 pt-5 pb-1 text-[0.65rem] font-bold tracking-widest text-white/45 uppercase">
+                Organização e segurança
+              </p>
+            </li>
+            {managementLinks.map(({ href, label, icon: Icon }) => (
               <li key={href}>
                 <Link
                   href={href}

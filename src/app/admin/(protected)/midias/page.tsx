@@ -4,9 +4,9 @@ import { ConfirmCommandForm } from "@/components/admin/confirm-command-form";
 import {
   mediaCommandAction,
   updateMediaMetadataAction,
-  uploadMediaAction,
 } from "@/app/admin/actions";
 import { requireAdmin } from "@/lib/cms/auth";
+import { AdminMediaUploadForm } from "@/components/admin/admin-media-upload-form";
 
 export default async function MediaPage({
   searchParams,
@@ -73,54 +73,7 @@ export default async function MediaPage({
       <div className="grid gap-8 xl:grid-cols-[24rem_1fr]">
         <section>
           <h2 className="font-heading text-xl font-semibold">Enviar arquivo</h2>
-          <form
-            action={uploadMediaAction}
-            className="border-border-light mt-4 space-y-4 rounded-3xl border bg-white p-5"
-          >
-            <label className="block text-sm font-bold">
-              Arquivo
-              <input
-                name="file"
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                required
-                className="mt-2 block w-full text-sm"
-              />
-            </label>
-            <label className="block text-sm font-bold">
-              Tipo
-              <select
-                name="kind"
-                className="border-border-light mt-2 min-h-12 w-full rounded-xl border px-3"
-              >
-                <option value="photo">Fotografia · 8 MB</option>
-                <option value="logo">Logo · 2 MB</option>
-                <option value="thumbnail">Miniatura · 4 MB</option>
-              </select>
-            </label>
-            {[
-              ["alt_text", "Texto alternativo"],
-              ["caption", "Legenda"],
-              ["credit", "Crédito"],
-              ["license", "Licença"],
-            ].map(([name, label]) => (
-              <label key={name} className="block text-sm font-bold">
-                {label}
-                <input
-                  name={name}
-                  required={name === "alt_text"}
-                  className="border-border-light mt-2 min-h-12 w-full rounded-xl border px-3"
-                />
-              </label>
-            ))}
-            <p className="text-muted text-xs leading-relaxed">
-              Formatos aceitos: JPEG, PNG e WebP. SVG enviado por usuários não é
-              aceito.
-            </p>
-            <button className="bg-brand min-h-11 rounded-full px-5 text-sm font-bold text-white">
-              Enviar mídia
-            </button>
-          </form>
+          <AdminMediaUploadForm />
         </section>
         <section>
           <h2 className="font-heading text-xl font-semibold">

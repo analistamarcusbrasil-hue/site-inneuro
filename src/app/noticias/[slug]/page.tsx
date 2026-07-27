@@ -5,6 +5,7 @@ import { Container } from "@/components/layout/container";
 import { InternalHero } from "@/components/layout/internal-hero";
 import { getPublicNewsBySlug } from "@/lib/cms/public-content";
 import { createPageMetadata } from "@/lib/metadata";
+import { SimpleRichText } from "@/components/content/simple-rich-text";
 
 type PageProps = { params: Promise<{ slug: string }> };
 
@@ -51,6 +52,7 @@ export default async function NewsDetailPage({ params }: PageProps) {
   const item = await getPublicNewsBySlug(slug);
   if (!item) notFound();
   const paragraphs = contentParagraphs(item.content);
+  const content = paragraphs.join("\n\n") || item.summary;
 
   return (
     <main id="main-content" tabIndex={-1}>
@@ -75,12 +77,8 @@ export default async function NewsDetailPage({ params }: PageProps) {
               </div>
             </figure>
           ) : null}
-          <div className="text-ink space-y-6 font-sans text-base leading-8 sm:text-lg">
-            {(paragraphs.length ? paragraphs : [item.summary]).map(
-              (paragraph, index) => (
-                <p key={index}>{paragraph}</p>
-              ),
-            )}
+          <div className="text-ink font-sans text-base leading-8 sm:text-lg">
+            <SimpleRichText content={content} />
           </div>
         </Container>
       </article>

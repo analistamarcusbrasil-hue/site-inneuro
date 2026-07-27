@@ -17,9 +17,9 @@ export default async function AdminDashboardPage() {
   return (
     <>
       <AdminPageHeading
-        eyebrow="Visão geral"
-        title="Dashboard"
-        description="Acompanhe os conteúdos e acesse rapidamente cada módulo editorial."
+        eyebrow="Painel administrativo"
+        title="O que você quer atualizar?"
+        description="Escolha uma área abaixo. Você poderá salvar, visualizar e confirmar antes de publicar no site."
       />
       <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {cards.map(({ key, label, count, icon: Icon }) => (
@@ -34,6 +34,9 @@ export default async function AdminDashboardPage() {
               <p className="text-muted mt-6 text-sm">{label}</p>
               <p className="font-heading text-brand-dark mt-1 text-3xl font-semibold">
                 {count}
+              </p>
+              <p className="text-muted mt-2 text-xs">
+                conteúdo(s) cadastrado(s)
               </p>
             </Link>
           </li>

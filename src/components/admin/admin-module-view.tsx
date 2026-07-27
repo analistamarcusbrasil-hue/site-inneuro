@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AdminContentForm } from "@/components/admin/admin-content-form";
 import { AdminPageHeading } from "@/components/admin/admin-page-heading";
+import { ConfirmCommandForm } from "@/components/admin/confirm-command-form";
 import { contentCommandAction } from "@/app/admin/actions";
 import { requireAdmin } from "@/lib/cms/auth";
 import type { CmsModule } from "@/lib/cms/modules";
@@ -56,7 +57,7 @@ export async function AdminModuleView({
           role="status"
           className="bg-mint text-brand mb-6 rounded-xl p-4 font-bold"
         >
-          Alteração salva com sucesso.
+          Pronto! A alteração foi salva com sucesso.
         </p>
       ) : null}
       {query.error ? (
@@ -64,7 +65,11 @@ export async function AdminModuleView({
           role="alert"
           className="bg-error/10 text-error mb-6 rounded-xl p-4 font-bold"
         >
-          Não foi possível concluir. Verifique os campos e sua permissão.
+          {query.error === "validation"
+            ? "Revise os campos destacados e tente novamente. Os campos obrigatórios precisam estar preenchidos."
+            : query.error === "permission"
+              ? "Sua conta pode salvar rascunhos, mas não tem permissão para publicar."
+              : "Não foi possível concluir esta ação. Tente novamente ou peça ajuda ao administrador."}
         </p>
       ) : null}
       <div className="grid gap-8 xl:grid-cols-[minmax(0,1.05fr)_minmax(25rem,.95fr)]">
@@ -104,7 +109,21 @@ export async function AdminModuleView({
                         ? [item.active ? "deactivate" : "activate"]
                         : []),
                     ].map((command) => (
-                      <form key={command} action={contentCommandAction}>
+                      <ConfirmCommandForm
+                        key={command}
+                        action={contentCommandAction}
+                        message={
+                          command === "publish"
+                            ? "Publicar este conteúdo no site agora? Ele ficará visível para o público."
+                            : command === "archive"
+                              ? "Arquivar este conteúdo? Ele deixará de aparecer no site e poderá ser restaurado pela lixeira."
+                              : command === "duplicate"
+                                ? "Criar uma cópia deste conteúdo como rascunho?"
+                                : command === "deactivate"
+                                  ? "Ocultar este conteúdo do site?"
+                                  : "Exibir este conteúdo no site?"
+                        }
+                      >
                         <input type="hidden" name="module" value={module.key} />
                         <input type="hidden" name="id" value={item.id} />
                         <button
@@ -122,7 +141,7 @@ export async function AdminModuleView({
                             }[command]
                           }
                         </button>
-                      </form>
+                      </ConfirmCommandForm>
                     ))}
                   </div>
                 </article>
@@ -141,14 +160,6 @@ export async function AdminModuleView({
                 ? `Editar ${module.singular}`
                 : `Novo ${module.singular}`}
             </h2>
-            {selected ? (
-              <Link
-                href={`/admin/${module.key}`}
-                className="text-brand text-sm font-bold"
-              >
-                Cancelar edição
-              </Link>
-            ) : null}
           </div>
           <AdminContentForm
             module={formModule}
