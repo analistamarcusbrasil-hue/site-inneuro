@@ -24,7 +24,7 @@ export function CompanyHighlightControls({
   const compact = variant === "hero";
   return (
     <div
-      className={`flex flex-wrap items-center justify-between ${compact ? "mt-3 gap-2 rounded-2xl bg-[#03251b]/24 p-2.5 shadow-[0_10px_28px_rgba(3,37,27,.08)] ring-1 ring-white/12 backdrop-blur-xl" : "mt-5 gap-4"}`}
+      className={`flex flex-wrap items-center justify-between ${compact ? "mt-2 gap-2 px-1 py-1.5" : "mt-5 gap-4"}`}
     >
       <p
         className={`px-1 text-sm font-semibold tabular-nums ${compact ? "text-white/75" : "text-muted"}`}
@@ -67,7 +67,7 @@ export function CompanyHighlightControls({
               ? "Retomar reprodução automática"
               : "Pausar reprodução automática"
           }
-          className={`focus-visible:outline-brand grid place-items-center rounded-full border focus-visible:outline-2 focus-visible:outline-offset-2 ${compact ? "size-10 border-white/12 bg-white/12 text-white" : "border-border-light text-brand size-12 bg-white"}`}
+          className={`focus-visible:outline-brand grid place-items-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 ${compact ? "size-10 bg-white/12 text-white" : "border-border-light text-brand size-12 border bg-white"}`}
         >
           {paused ? (
             <Play aria-hidden="true" size={19} />
@@ -79,7 +79,7 @@ export function CompanyHighlightControls({
           type="button"
           onClick={onPrevious}
           aria-label="Imagem anterior"
-          className={`focus-visible:outline-brand grid place-items-center rounded-full border focus-visible:outline-2 focus-visible:outline-offset-2 ${compact ? "size-10 border-white/12 bg-white/12 text-white" : "border-border-light text-brand size-12 bg-white"}`}
+          className={`focus-visible:outline-brand grid place-items-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 ${compact ? "size-10 bg-white/12 text-white" : "border-border-light text-brand size-12 border bg-white"}`}
         >
           <ChevronLeft aria-hidden="true" />
         </button>

@@ -53,14 +53,19 @@ export function Header() {
 
   const closeMenu = () => dialogRef.current?.close();
   const lightHeader = !isScrolled && !isMenuOpen;
+  const isHome = pathname === "/";
 
   return (
     <header
       className={cn(
-        "fixed inset-x-0 top-0 z-50 border-b transition-[background-color,border-color,box-shadow] duration-300",
+        "fixed inset-x-0 top-0 z-50 transition-[background-color,border-color,box-shadow] duration-300",
         lightHeader
-          ? "border-white/10 bg-transparent text-white"
-          : "border-border-light/80 text-ink bg-white/92 shadow-[0_10px_35px_rgba(3,37,27,0.06)] backdrop-blur-xl",
+          ? isHome
+            ? "bg-transparent text-white"
+            : "border-b border-white/10 bg-transparent text-white"
+          : isHome
+            ? "text-ink bg-white/92 shadow-[0_10px_35px_rgba(3,37,27,0.06)] backdrop-blur-xl"
+            : "border-border-light/80 text-ink border-b bg-white/92 shadow-[0_10px_35px_rgba(3,37,27,0.06)] backdrop-blur-xl",
       )}
     >
       <Container className="flex min-h-20 items-center justify-between gap-4 xl:min-h-24">
