@@ -1,49 +1,59 @@
 import { CalendarCheck } from "lucide-react";
 import Link from "next/link";
 import { ScanVisual } from "@/components/brand/scan-visual";
+import { CompanyHighlightsCarousel } from "@/components/home/company-highlights-carousel";
 import { Container } from "@/components/layout/container";
 import { Badge } from "@/components/ui/badge";
+import type { CompanyHighlight } from "@/types/company-highlight";
 
-export function Hero() {
+export function Hero({ highlights }: { highlights: CompanyHighlight[] }) {
   return (
     <section
       aria-labelledby="hero-title"
-      className="hero-shell bg-brand-dark relative min-h-[700px] overflow-hidden pt-20 text-white sm:min-h-[760px] sm:pt-24 lg:min-h-[clamp(520px,65vh,680px)]"
+      className="hero-shell relative overflow-hidden bg-[linear-gradient(155deg,#03251b_0%,#064b36_62%,#eaf7f0_100%)] pt-20 text-white md:min-h-[clamp(580px,70vh,680px)] md:bg-[linear-gradient(105deg,#03251b_0%,#063d2d_50%,#eaf7f0_100%)] xl:pt-24"
     >
       <div
-        className="hero-grid absolute inset-0 opacity-25"
+        className="hero-grid absolute inset-0 opacity-15"
         aria-hidden="true"
       />
-      <div className="hero-halo" aria-hidden="true" />
-      <Container className="relative grid min-h-[620px] items-center gap-8 pt-12 pb-12 sm:min-h-[660px] sm:pt-14 sm:pb-14 lg:min-h-[calc(clamp(520px,65vh,680px)-6rem)] lg:grid-cols-[1.04fr_.96fr] lg:gap-6 lg:py-7 xl:gap-10">
-        <div className="hero-content mx-auto max-w-3xl text-center lg:mx-0 lg:text-left">
-          <Badge className="text-mint border-white/15 bg-white/8">
-            Diagnóstico com propósito
-          </Badge>
-          <h1
-            id="hero-title"
-            className="hero-title font-heading mt-6 max-w-3xl text-[clamp(3.15rem,6vw,5.5rem)] leading-[0.92] font-semibold tracking-[-0.065em]"
+      <div className="hero-halo opacity-45" aria-hidden="true" />
+      <Container className="relative grid items-center gap-8 py-10 sm:py-12 md:min-h-[calc(clamp(580px,70vh,680px)-5rem)] md:grid-cols-2 md:gap-5 md:py-6 lg:gap-7 xl:min-h-[calc(clamp(580px,70vh,680px)-6rem)] xl:grid-cols-[1.1fr_.9fr] xl:gap-10">
+        <div className="hero-content relative mx-auto max-w-3xl text-center md:mx-0 md:text-left">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute top-1/2 left-1/2 z-0 w-[min(88vw,430px)] -translate-x-1/2 -translate-y-1/2 opacity-[0.11] sm:w-[440px] md:left-[38%] md:w-[460px] md:opacity-[0.13] lg:w-[500px]"
           >
-            Tecnologia que <span className="text-tech">enxerga além.</span>
-          </h1>
-          <p className="hero-copy mx-auto mt-7 max-w-xl text-lg leading-relaxed text-white/72 sm:text-xl lg:mx-0">
-            Diagnóstico por imagem com precisão, confiança e cuidado em cada
-            etapa.
-          </p>
-
-          <div className="hero-actions mt-7 flex flex-col justify-center gap-3 min-[440px]:flex-row lg:justify-start">
-            <Link
-              href="/#agendamento"
-              className="bg-tech text-brand-dark hover:bg-mint focus-visible:ring-tech focus-visible:ring-offset-brand-dark inline-flex min-h-13 items-center justify-center gap-2 rounded-full px-7 text-base font-bold transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+            <ScanVisual />
+          </div>
+          <div className="relative z-[1]">
+            <Badge className="text-mint border-white/15 bg-white/8">
+              Diagnóstico com propósito
+            </Badge>
+            <h1
+              id="hero-title"
+              className="hero-title font-heading mt-5 max-w-3xl text-[clamp(2.7rem,5.2vw,4.9rem)] leading-[0.94] font-semibold tracking-[-0.06em]"
             >
-              <CalendarCheck aria-hidden="true" size={19} />
-              Agendar meu exame
-            </Link>
+              Tecnologia que <span className="text-tech">enxerga além.</span>
+            </h1>
+            <p className="hero-copy mx-auto mt-5 max-w-xl text-base leading-relaxed text-white/74 sm:text-lg md:mx-0 lg:text-xl">
+              Diagnóstico por imagem com precisão, confiança e cuidado em cada
+              etapa.
+            </p>
+
+            <div className="hero-actions mt-6 flex flex-col justify-center gap-3 min-[440px]:flex-row md:justify-start">
+              <Link
+                href="/#agendamento"
+                className="bg-tech text-brand-dark hover:bg-mint focus-visible:ring-tech focus-visible:ring-offset-brand-dark inline-flex min-h-13 items-center justify-center gap-2 rounded-full px-7 text-base font-bold transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+              >
+                <CalendarCheck aria-hidden="true" size={19} />
+                Agendar meu exame
+              </Link>
+            </div>
           </div>
         </div>
 
-        <div className="hero-visual-entry mx-auto flex w-full max-w-[480px] items-center justify-center lg:mr-0 lg:justify-end">
-          <ScanVisual />
+        <div className="hero-visual-entry mx-auto w-full max-w-[590px] md:mr-0 md:max-w-none">
+          <CompanyHighlightsCarousel items={highlights} variant="hero" />
         </div>
       </Container>
       <div className="hero-edge" aria-hidden="true" />

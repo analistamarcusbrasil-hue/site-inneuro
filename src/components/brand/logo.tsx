@@ -4,9 +4,17 @@ import Image from "next/image";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 
-type LogoProps = { inverse?: boolean; className?: string };
+type LogoProps = {
+  inverse?: boolean;
+  className?: string;
+  wordmark?: boolean;
+};
 
-export function Logo({ inverse = false, className }: LogoProps) {
+export function Logo({
+  inverse = false,
+  className,
+  wordmark = false,
+}: LogoProps) {
   const [imageFailed, setImageFailed] = useState(false);
 
   return (
@@ -14,7 +22,7 @@ export function Logo({ inverse = false, className }: LogoProps) {
       className={cn("inline-flex min-h-12 items-center", className)}
       aria-label="INNEURO"
     >
-      {imageFailed ? (
+      {wordmark || imageFailed ? (
         <span
           className={cn(
             "font-heading text-xl font-bold tracking-[0.16em]",

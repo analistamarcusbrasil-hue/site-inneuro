@@ -6,7 +6,6 @@ import { Location } from "@/components/sections/location";
 import { NewsAndSocial } from "@/components/sections/news-and-social";
 import { QuickActions } from "@/components/sections/quick-actions";
 import { StructureAndEquipment } from "@/components/sections/structure-and-equipment";
-import { CompanyHighlightsSection } from "@/components/home/company-highlights-section";
 import { Scheduling } from "@/components/sections/scheduling";
 import {
   getPublicCarousel,
@@ -32,8 +31,7 @@ export default async function Home() {
   ]);
   return (
     <main id="main-content" tabIndex={-1}>
-      <Hero />
-      <CompanyHighlightsSection items={highlights} />
+      <Hero highlights={highlights} />
       <QuickActions />
       <Modalities />
       <Differentials />

@@ -8,6 +8,7 @@ type CompanyHighlightControlsProps = {
   onNext: () => void;
   onPauseToggle: () => void;
   onSelect: (index: number) => void;
+  variant?: "section" | "hero";
 };
 
 export function CompanyHighlightControls({
@@ -18,10 +19,14 @@ export function CompanyHighlightControls({
   onNext,
   onPauseToggle,
   onSelect,
+  variant = "section",
 }: CompanyHighlightControlsProps) {
+  const compact = variant === "hero";
   return (
-    <div className="mt-5 flex flex-wrap items-center justify-between gap-4">
-      <p className="text-muted text-sm font-semibold tabular-nums">
+    <div
+      className={`flex flex-wrap items-center justify-between ${compact ? "mt-3 gap-2 rounded-2xl bg-white/92 p-2.5 shadow-[0_10px_30px_rgba(3,37,27,.12)] backdrop-blur" : "mt-5 gap-4"}`}
+    >
+      <p className="text-muted px-1 text-sm font-semibold tabular-nums">
         <span className="sr-only">Slide </span>
         {active + 1} de {total}
       </p>
@@ -38,7 +43,11 @@ export function CompanyHighlightControls({
           >
             <span
               className={`h-2 rounded-full transition-[width,background-color] motion-reduce:transition-none ${
-                index === active ? "bg-brand w-7" : "bg-border-light w-2"
+                index === active
+                  ? compact
+                    ? "bg-tech w-6"
+                    : "bg-brand w-7"
+                  : "bg-border-light w-2"
               }`}
             />
           </button>
@@ -54,7 +63,7 @@ export function CompanyHighlightControls({
               ? "Retomar reprodução automática"
               : "Pausar reprodução automática"
           }
-          className="border-border-light text-brand focus-visible:outline-brand grid size-12 place-items-center rounded-full border bg-white focus-visible:outline-2 focus-visible:outline-offset-2"
+          className={`border-border-light text-brand focus-visible:outline-brand grid place-items-center rounded-full border bg-white focus-visible:outline-2 focus-visible:outline-offset-2 ${compact ? "size-10" : "size-12"}`}
         >
           {paused ? (
             <Play aria-hidden="true" size={19} />
@@ -66,7 +75,7 @@ export function CompanyHighlightControls({
           type="button"
           onClick={onPrevious}
           aria-label="Imagem anterior"
-          className="border-border-light text-brand focus-visible:outline-brand grid size-12 place-items-center rounded-full border bg-white focus-visible:outline-2 focus-visible:outline-offset-2"
+          className={`border-border-light text-brand focus-visible:outline-brand grid place-items-center rounded-full border bg-white focus-visible:outline-2 focus-visible:outline-offset-2 ${compact ? "size-10" : "size-12"}`}
         >
           <ChevronLeft aria-hidden="true" />
         </button>
@@ -74,7 +83,7 @@ export function CompanyHighlightControls({
           type="button"
           onClick={onNext}
           aria-label="Próxima imagem"
-          className="bg-brand focus-visible:outline-brand grid size-12 place-items-center rounded-full text-white focus-visible:outline-2 focus-visible:outline-offset-2"
+          className={`bg-brand focus-visible:outline-brand grid place-items-center rounded-full text-white focus-visible:outline-2 focus-visible:outline-offset-2 ${compact ? "size-10" : "size-12"}`}
         >
           <ChevronRight aria-hidden="true" />
         </button>

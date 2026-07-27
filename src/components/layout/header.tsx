@@ -69,7 +69,7 @@ export function Header() {
           aria-label="INNEURO — página inicial"
           className="focus-visible:ring-tech shrink-0 rounded-md focus-visible:ring-2 focus-visible:ring-offset-4 focus-visible:outline-none"
         >
-          <Logo inverse={lightHeader} />
+          <Logo inverse={lightHeader} wordmark={pathname === "/"} />
         </Link>
 
         <nav
