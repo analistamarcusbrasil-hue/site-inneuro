@@ -6,9 +6,9 @@ export function PartnerLogoCard({ partner }: { partner: Convenio }) {
   const hasLogo = partner.logo && partner.logoStatus !== "pending";
 
   return (
-    <li className="border-border-light group hover:border-brand/35 flex min-h-36 flex-col items-center justify-center rounded-3xl border bg-white p-5 text-center transition-colors">
+    <li className="border-brand/10 group hover:border-brand/30 flex min-h-36 flex-col items-center justify-center rounded-3xl border bg-white/75 p-5 text-center shadow-[0_12px_35px_rgba(3,37,27,0.04)] transition-colors">
       <Link
-        href="/#agendamento"
+        href="/contato#agendamento"
         aria-label={`Consultar atendimento para ${partner.name}`}
         className="focus-visible:ring-brand flex min-h-24 w-full flex-col items-center justify-center gap-3 rounded-2xl focus-visible:ring-2 focus-visible:ring-offset-4 focus-visible:outline-none"
       >
@@ -19,7 +19,7 @@ export function PartnerLogoCard({ partner }: { partner: Convenio }) {
             width={180}
             height={76}
             sizes="180px"
-            className="max-h-16 max-w-[85%] object-contain"
+            className="max-h-16 max-w-[82%] object-contain"
           />
         ) : (
           <span className="font-heading text-brand-dark text-lg font-bold">

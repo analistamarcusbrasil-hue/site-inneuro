@@ -74,7 +74,7 @@ export function Header() {
           aria-label="INNEURO — página inicial"
           className="focus-visible:ring-tech shrink-0 rounded-md focus-visible:ring-2 focus-visible:ring-offset-4 focus-visible:outline-none"
         >
-          <Logo inverse={lightHeader} wordmark={pathname === "/"} />
+          <Logo inverse={lightHeader} wordmark />
         </Link>
 
         <nav
@@ -136,7 +136,7 @@ export function Header() {
             </button>
           )}
           <Link
-            href="/#agendamento"
+            href="/contato#agendamento"
             className="bg-tech text-brand-dark hover:bg-mint focus-visible:ring-tech focus-visible:ring-offset-brand-dark inline-flex min-h-11 items-center justify-center rounded-full px-5 text-sm font-bold transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
           >
             Agendar exame
@@ -259,7 +259,7 @@ export function Header() {
               </button>
             )}
             <Link
-              href="/#agendamento"
+              href="/contato#agendamento"
               onClick={closeMenu}
               className="bg-brand focus-visible:ring-tech inline-flex min-h-12 items-center justify-center rounded-full px-5 text-sm font-bold text-white focus-visible:ring-2 focus-visible:outline-none"
             >

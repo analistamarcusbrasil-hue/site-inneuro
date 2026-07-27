@@ -47,7 +47,7 @@ export default function AboutPage() {
               Entrar em contato <ArrowRight aria-hidden="true" size={17} />
             </Link>
             <Link
-              href="/#agendamento"
+              href="/contato#agendamento"
               className="bg-brand inline-flex min-h-12 items-center gap-2 rounded-full px-6 text-sm font-bold text-white"
             >
               <CalendarPlus aria-hidden="true" size={17} /> Agendar exame

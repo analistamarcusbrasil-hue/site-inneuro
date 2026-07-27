@@ -8,7 +8,7 @@ export const quickActions: QuickAction[] = [
     description: "Envie seu pedido e fale com nossa equipe.",
     icon: "calendar",
     disabled: false,
-    href: "/#agendamento",
+    href: "/contato#agendamento",
   },
   {
     id: "preparations",

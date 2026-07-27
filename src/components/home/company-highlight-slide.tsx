@@ -47,6 +47,7 @@ export function CompanyHighlightSlide({
             </div>
             <Logo
               inverse
+              wordmark
               className="absolute top-7 left-7 sm:top-10 sm:left-10"
             />
           </div>

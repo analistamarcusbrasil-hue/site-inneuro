@@ -57,7 +57,7 @@ export function ModalityCard({ modality }: ModalityCardProps) {
             Conhecer exames <ArrowRight aria-hidden="true" size={16} />
           </Link>
           <Link
-            href="/#agendamento"
+            href="/contato#agendamento"
             aria-label={`Agendar ${modality.name}`}
             className="border-brand/22 text-brand-dark hover:bg-mint focus-visible:ring-tech inline-flex min-h-11 items-center justify-center gap-2 rounded-full border px-4 text-sm font-bold transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
           >

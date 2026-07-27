@@ -32,7 +32,7 @@ export function Footer() {
     <footer className="bg-brand-dark text-white">
       <Container className="grid gap-12 py-14 sm:grid-cols-2 lg:grid-cols-[1.1fr_.7fr_1.2fr] lg:py-18">
         <div className="max-w-sm">
-          <Logo inverse />
+          <Logo inverse wordmark />
           <p className="font-heading mt-5 text-lg font-semibold">
             {siteConfig.fullName}
           </p>
@@ -129,22 +129,27 @@ export function Footer() {
               href={vegaWhatsAppUrl}
               target="_blank"
               rel="noopener noreferrer"
-              aria-label="Falar com a VEGA pelo WhatsApp"
-              className="group focus-visible:ring-tech inline-flex cursor-pointer items-center gap-1.5 rounded-md focus-visible:ring-2 focus-visible:ring-offset-4 focus-visible:ring-offset-[#03251b] focus-visible:outline-none"
+              aria-label="Falar com a VEGA Tecnologia pelo WhatsApp"
+              className="group focus-visible:ring-tech inline-flex cursor-pointer flex-col items-center rounded-md focus-visible:ring-2 focus-visible:ring-offset-4 focus-visible:ring-offset-[#03251b] focus-visible:outline-none"
             >
-              <Image
-                src="/images/vega-logo-footer.webp"
-                alt="VEGA — Tecnologia que transforma negócios e impulsiona grandes resultados"
-                width={1322}
-                height={606}
-                sizes="(max-width: 639px) 125px, (max-width: 1023px) 140px, 150px"
-                className="h-auto w-[125px] transition-[opacity,transform] duration-200 group-hover:scale-[1.02] group-hover:opacity-90 sm:w-[140px] lg:w-[150px]"
-              />
-              <ExternalLink
-                aria-hidden="true"
-                size={12}
-                className="text-white/45"
-              />
+              <span className="inline-flex items-center gap-1.5">
+                <Image
+                  src="/images/vega-logo-footer.webp"
+                  alt="VEGA Tecnologia"
+                  width={1322}
+                  height={606}
+                  sizes="(max-width: 639px) 125px, (max-width: 1023px) 140px, 150px"
+                  className="h-auto w-[125px] transition-[opacity,transform] duration-200 group-hover:scale-[1.02] group-hover:opacity-90 sm:w-[140px] lg:w-[150px]"
+                />
+                <ExternalLink
+                  aria-hidden="true"
+                  size={12}
+                  className="text-white/45"
+                />
+              </span>
+              <span className="-mt-1 text-[0.62rem] font-medium tracking-[0.18em] text-white/50">
+                Tecnologia
+              </span>
             </a>
             <a
               href={vegaEmailUrl}

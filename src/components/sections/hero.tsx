@@ -33,7 +33,7 @@ export function Hero() {
 
           <div className="hero-actions mt-4 flex flex-col justify-center gap-3 min-[440px]:flex-row md:justify-start">
             <Link
-              href="/#agendamento"
+              href="/contato#agendamento"
               className="bg-tech text-brand-dark hover:bg-mint focus-visible:ring-tech focus-visible:ring-offset-brand-dark inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-6 text-sm font-bold transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
             >
               <CalendarCheck aria-hidden="true" size={19} />
