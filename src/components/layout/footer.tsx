@@ -1,4 +1,5 @@
 import { AtSign, ExternalLink, MapPin, MessageCircle } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { Logo } from "@/components/brand/logo";
 import { Container } from "@/components/layout/container";
@@ -20,6 +21,10 @@ const legalLinks = [
   { label: "Termos de uso", href: "/termos-de-uso" },
   { label: "Cookies", href: "/politica-de-cookies" },
 ] as const;
+const vegaWhatsAppUrl =
+  "https://wa.me/5596991493854?text=Ol%C3%A1%2C%20Marcus.%20Conheci%20seu%20trabalho%20pelo%20site%20da%20INNEURO%20e%20gostaria%20de%20conversar%20sobre%20uma%20solu%C3%A7%C3%A3o%20em%20tecnologia.";
+const vegaEmailUrl =
+  "mailto:analista.marcusbrasil@gmail.com?subject=Contato%20pelo%20site%20da%20INNEURO";
 
 export function Footer() {
   const year = new Date().getFullYear();
@@ -112,11 +117,45 @@ export function Footer() {
         </div>
       </Container>
       <div className="border-t border-white/10">
-        <Container className="flex flex-col gap-4 py-5 text-xs text-white/70 lg:flex-row lg:items-center lg:justify-between">
-          <p>© {year} INNEURO — Instituto de Neurologia do Amapá.</p>
+        <Container className="grid justify-items-center gap-5 py-5 text-center text-xs text-white/70 lg:grid-cols-[1fr_auto_1fr] lg:items-center lg:text-left">
+          <p className="lg:justify-self-start">
+            © {year} INNEURO — Instituto de Neurologia do Amapá.
+          </p>
+          <div className="flex flex-col items-center gap-1.5">
+            <span className="text-[0.68rem] font-medium tracking-wide text-white/55">
+              Desenvolvido por
+            </span>
+            <a
+              href={vegaWhatsAppUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Falar com a VEGA pelo WhatsApp"
+              className="group focus-visible:ring-tech inline-flex cursor-pointer items-center gap-1.5 rounded-md focus-visible:ring-2 focus-visible:ring-offset-4 focus-visible:ring-offset-[#03251b] focus-visible:outline-none"
+            >
+              <Image
+                src="/images/vega-logo-footer.webp"
+                alt="VEGA — Tecnologia que transforma negócios e impulsiona grandes resultados"
+                width={1322}
+                height={606}
+                sizes="(max-width: 639px) 125px, (max-width: 1023px) 140px, 150px"
+                className="h-auto w-[125px] transition-[opacity,transform] duration-200 group-hover:scale-[1.02] group-hover:opacity-90 sm:w-[140px] lg:w-[150px]"
+              />
+              <ExternalLink
+                aria-hidden="true"
+                size={12}
+                className="text-white/45"
+              />
+            </a>
+            <a
+              href={vegaEmailUrl}
+              className="focus-visible:ring-tech inline-flex min-h-7 items-center rounded px-1 text-[0.68rem] text-white/55 underline decoration-white/25 underline-offset-4 hover:text-white focus-visible:ring-2 focus-visible:outline-none"
+            >
+              E-mail
+            </a>
+          </div>
           <nav
             aria-label="Informações legais"
-            className="flex flex-wrap gap-x-5 gap-y-2"
+            className="flex flex-wrap justify-center gap-x-5 gap-y-2 lg:justify-self-end"
           >
             {legalLinks.map((item) => (
               <Link
