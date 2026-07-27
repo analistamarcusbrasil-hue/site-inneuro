@@ -361,6 +361,9 @@ a {
     transparent 68%
   );
 }
+.hero-shell .hero-visual-entry .scan-visual {
+  width: 100%;
+}
 .scan-frame {
   position: absolute;
   inset: 0;
