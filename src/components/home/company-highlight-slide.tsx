@@ -9,7 +9,6 @@ type CompanyHighlightSlideProps = {
   position: number;
   total: number;
   priority: boolean;
-  variant?: "section" | "hero";
 };
 
 export function CompanyHighlightSlide({
@@ -17,17 +16,13 @@ export function CompanyHighlightSlide({
   position,
   total,
   priority,
-  variant = "section",
 }: CompanyHighlightSlideProps) {
-  const compact = variant === "hero";
   return (
     <article
       aria-label={`Slide ${position} de ${total}: ${item.title}`}
-      className={`bg-brand-dark relative overflow-hidden text-white ${compact ? "rounded-[1.25rem]" : "rounded-[1.75rem]"}`}
+      className="bg-brand-dark relative overflow-hidden rounded-[1.75rem] text-white"
     >
-      <div
-        className={`relative ${compact ? "aspect-[4/3] md:aspect-[16/11]" : "aspect-[4/3] sm:aspect-video"}`}
-      >
+      <div className="relative aspect-[4/3] sm:aspect-video">
         {item.image ? (
           <Image
             src={item.image}
@@ -35,11 +30,7 @@ export function CompanyHighlightSlide({
             fill
             priority={priority}
             loading={priority ? "eager" : "lazy"}
-            sizes={
-              compact
-                ? "(max-width: 767px) calc(100vw - 2.5rem), (max-width: 1279px) 48vw, 560px"
-                : "(max-width: 1024px) calc(100vw - 2rem), 1280px"
-            }
+            sizes="(max-width: 1024px) calc(100vw - 2rem), 1280px"
             className="object-cover"
             style={{ objectPosition: item.focalPosition ?? "center" }}
           />
@@ -62,11 +53,7 @@ export function CompanyHighlightSlide({
         )}
         <div
           aria-hidden="true"
-          className={
-            compact
-              ? "absolute inset-0 bg-[linear-gradient(to_top,rgba(3,37,27,.94)_0%,rgba(3,55,40,.46)_52%,rgba(9,111,76,.2)_100%),linear-gradient(90deg,rgba(3,37,27,.56)_0%,transparent_32%)]"
-              : "absolute inset-0 bg-gradient-to-t from-[#03251b] via-[#03251b]/35 to-transparent"
-          }
+          className="absolute inset-0 bg-gradient-to-t from-[#03251b] via-[#03251b]/35 to-transparent"
         />
         {item.creditLabel && item.creditUrl ? (
           <a
@@ -81,26 +68,20 @@ export function CompanyHighlightSlide({
         ) : null}
       </div>
 
-      <div
-        className={`absolute inset-x-0 bottom-0 ${compact ? "p-5 md:p-5 lg:p-6" : "p-5 sm:p-8 lg:p-10"}`}
-      >
+      <div className="absolute inset-x-0 bottom-0 p-5 sm:p-8 lg:p-10">
         <p className="text-mint text-xs font-bold tracking-[0.14em] uppercase">
           {item.category}
         </p>
-        <h3
-          className={`font-heading mt-2 max-w-3xl leading-tight font-semibold ${compact ? "text-xl sm:text-2xl lg:text-3xl" : "text-2xl sm:text-4xl"}`}
-        >
+        <h3 className="font-heading mt-2 max-w-3xl text-2xl leading-tight font-semibold sm:text-4xl">
           {item.title}
         </h3>
-        <p
-          className={`mt-3 max-w-2xl text-sm leading-relaxed text-white/80 ${compact ? "line-clamp-2" : "line-clamp-3 sm:text-base"}`}
-        >
+        <p className="mt-3 line-clamp-3 max-w-2xl text-sm leading-relaxed text-white/80 sm:text-base">
           {item.description}
         </p>
         {item.href ? (
           <Link
             href={item.href}
-            className={`focus-visible:ring-tech text-brand-dark inline-flex items-center gap-2 rounded-full bg-white text-sm font-bold focus-visible:ring-2 focus-visible:ring-offset-2 ${compact ? "mt-4 min-h-10 px-4" : "mt-5 min-h-12 px-5"}`}
+            className="focus-visible:ring-tech text-brand-dark mt-5 inline-flex min-h-12 items-center gap-2 rounded-full bg-white px-5 text-sm font-bold focus-visible:ring-2 focus-visible:ring-offset-2"
           >
             {item.ctaLabel ?? "Saiba mais"}{" "}
             <ArrowUpRight aria-hidden="true" size={17} />

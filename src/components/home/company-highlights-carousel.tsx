@@ -10,10 +10,8 @@ const SWIPE_THRESHOLD = 45;
 
 export function CompanyHighlightsCarousel({
   items,
-  variant = "section",
 }: {
   items: CompanyHighlight[];
-  variant?: "section" | "hero";
 }) {
   const [active, setActive] = useState(0);
   const [manualPause, setManualPause] = useState(false);
@@ -119,7 +117,6 @@ export function CompanyHighlightsCarousel({
         position={active + 1}
         total={items.length}
         priority={active === 0}
-        variant={variant}
       />
       {items.length > 1 ? (
         <CompanyHighlightControls
@@ -130,7 +127,6 @@ export function CompanyHighlightsCarousel({
           onNext={() => interact(active + 1)}
           onPauseToggle={() => setManualPause((current) => !current)}
           onSelect={interact}
-          variant={variant}
         />
       ) : null}
     </div>

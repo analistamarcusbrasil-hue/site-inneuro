@@ -1,4 +1,5 @@
 import { Differentials } from "@/components/sections/differentials";
+import { CompanyHighlightsSection } from "@/components/home/company-highlights-section";
 import { Hero } from "@/components/sections/hero";
 import { Insurance } from "@/components/sections/insurance";
 import { Modalities } from "@/components/sections/modalities";
@@ -31,7 +32,8 @@ export default async function Home() {
   ]);
   return (
     <main id="main-content" tabIndex={-1}>
-      <Hero highlights={highlights} />
+      <Hero />
+      <CompanyHighlightsSection items={highlights} />
       <QuickActions />
       <Modalities />
       <Differentials />
