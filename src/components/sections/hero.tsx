@@ -10,18 +10,22 @@ export function Hero({ highlights }: { highlights: CompanyHighlight[] }) {
   return (
     <section
       aria-labelledby="hero-title"
-      className="hero-shell relative overflow-hidden bg-[linear-gradient(155deg,#03251b_0%,#064b36_62%,#eaf7f0_100%)] pt-20 text-white md:min-h-[clamp(580px,70vh,680px)] md:bg-[linear-gradient(105deg,#03251b_0%,#063d2d_50%,#eaf7f0_100%)] xl:pt-24"
+      className="hero-shell relative overflow-hidden bg-[linear-gradient(155deg,#03251b_0%,#064b36_62%,#16805a_100%)] pt-20 text-white md:min-h-[clamp(580px,70vh,680px)] md:bg-[linear-gradient(105deg,#03251b_0%,#043d2d_46%,#0b6847_74%,#72ba9b_115%)] xl:pt-24"
     >
       <div
         className="hero-grid absolute inset-0 opacity-15"
         aria-hidden="true"
       />
       <div className="hero-halo opacity-45" aria-hidden="true" />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_58%_50%,rgba(33,199,122,.16),transparent_28%),radial-gradient(circle_at_94%_18%,rgba(218,247,232,.3),transparent_34%)]"
+      />
       <Container className="relative grid items-center gap-8 py-10 sm:py-12 md:min-h-[calc(clamp(580px,70vh,680px)-5rem)] md:grid-cols-2 md:gap-5 md:py-6 lg:gap-7 xl:min-h-[calc(clamp(580px,70vh,680px)-6rem)] xl:grid-cols-[1.1fr_.9fr] xl:gap-10">
         <div className="hero-content relative mx-auto max-w-3xl text-center md:mx-0 md:text-left">
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute top-1/2 left-1/2 z-0 w-[min(88vw,430px)] -translate-x-1/2 -translate-y-1/2 opacity-[0.11] sm:w-[440px] md:left-[38%] md:w-[460px] md:opacity-[0.13] lg:w-[500px]"
+            className="pointer-events-none absolute top-1/2 left-1/2 z-0 w-[min(88vw,430px)] -translate-x-1/2 -translate-y-1/2 opacity-[0.08] sm:w-[460px] md:left-[45%] md:w-[510px] md:opacity-[0.09] lg:w-[560px]"
           >
             <ScanVisual />
           </div>
@@ -52,7 +56,7 @@ export function Hero({ highlights }: { highlights: CompanyHighlight[] }) {
           </div>
         </div>
 
-        <div className="hero-visual-entry mx-auto w-full max-w-[590px] md:mr-0 md:max-w-none">
+        <div className="hero-visual-entry relative mx-auto w-full max-w-[590px] before:pointer-events-none before:absolute before:-inset-6 before:-z-10 before:rounded-[2.5rem] before:bg-[radial-gradient(circle,rgba(215,247,230,.18),transparent_68%)] md:mr-0 md:max-w-none">
           <CompanyHighlightsCarousel items={highlights} variant="hero" />
         </div>
       </Container>

@@ -23,7 +23,7 @@ export function CompanyHighlightSlide({
   return (
     <article
       aria-label={`Slide ${position} de ${total}: ${item.title}`}
-      className={`bg-brand-dark relative overflow-hidden text-white ${compact ? "rounded-[1.5rem] shadow-[0_20px_55px_rgba(3,37,27,.22)] ring-1 ring-white/20" : "rounded-[1.75rem]"}`}
+      className={`bg-brand-dark relative overflow-hidden text-white ${compact ? "rounded-[1.4rem] shadow-[0_16px_42px_rgba(3,37,27,.14)] ring-1 ring-white/10" : "rounded-[1.75rem]"}`}
     >
       <div
         className={`relative ${compact ? "aspect-[4/3] md:aspect-[5/4]" : "aspect-[4/3] sm:aspect-video"}`}
@@ -62,7 +62,11 @@ export function CompanyHighlightSlide({
         )}
         <div
           aria-hidden="true"
-          className="absolute inset-0 bg-gradient-to-t from-[#03251b] via-[#03251b]/35 to-transparent"
+          className={
+            compact
+              ? "absolute inset-0 bg-[linear-gradient(to_top,rgba(3,37,27,.94)_0%,rgba(3,55,40,.46)_52%,rgba(9,111,76,.2)_100%),linear-gradient(110deg,rgba(3,37,27,.16),rgba(33,199,122,.12))]"
+              : "absolute inset-0 bg-gradient-to-t from-[#03251b] via-[#03251b]/35 to-transparent"
+          }
         />
         {item.creditLabel && item.creditUrl ? (
           <a
