@@ -14,3 +14,4 @@ npm-debug.log*
 *.tsbuildinfo
 .DS_Store
 site-inneuro-auditoria.zip
+supabase/.temp/
