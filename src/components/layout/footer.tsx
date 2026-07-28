@@ -121,8 +121,8 @@ export function Footer() {
           <p className="lg:justify-self-start">
             © {year} INNEURO — Instituto de Neurologia do Amapá.
           </p>
-          <div className="flex flex-col items-center gap-1.5">
-            <span className="text-[0.68rem] font-medium tracking-wide text-white/55">
+          <div className="flex flex-col items-center">
+            <span className="mb-2 text-center text-[0.68rem] font-medium tracking-wide text-white/55">
               Desenvolvido por
             </span>
             <a
@@ -130,30 +130,28 @@ export function Footer() {
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Falar com a VEGA Tecnologia pelo WhatsApp"
-              className="group focus-visible:ring-tech inline-flex cursor-pointer flex-col items-center rounded-md focus-visible:ring-2 focus-visible:ring-offset-4 focus-visible:ring-offset-[#03251b] focus-visible:outline-none"
+              className="group focus-visible:ring-tech relative inline-flex cursor-pointer flex-col items-center rounded-md focus-visible:ring-2 focus-visible:ring-offset-4 focus-visible:ring-offset-[#03251b] focus-visible:outline-none"
             >
-              <span className="inline-flex items-center gap-1.5">
-                <Image
-                  src="/images/vega-logo-footer.webp"
-                  alt="VEGA Tecnologia"
-                  width={1322}
-                  height={606}
-                  sizes="(max-width: 639px) 125px, (max-width: 1023px) 140px, 150px"
-                  className="h-auto w-[125px] transition-[opacity,transform] duration-200 group-hover:scale-[1.02] group-hover:opacity-90 sm:w-[140px] lg:w-[150px]"
-                />
-                <ExternalLink
-                  aria-hidden="true"
-                  size={12}
-                  className="text-white/45"
-                />
-              </span>
-              <span className="-mt-1 text-[0.62rem] font-medium tracking-[0.18em] text-white/50">
+              <Image
+                src="/images/vega-logo-footer.webp"
+                alt="VEGA Tecnologia"
+                width={1322}
+                height={606}
+                sizes="(max-width: 639px) 145px, (max-width: 1023px) 170px, 205px"
+                className="h-auto w-[145px] object-contain transition-[opacity,transform] duration-200 group-hover:scale-[1.015] group-hover:opacity-90 sm:w-[170px] lg:w-[205px]"
+              />
+              <span className="-mt-2 text-center text-[0.62rem] font-light tracking-[0.12em] text-[#91c5a7] sm:-mt-2.5 sm:text-[0.66rem] lg:-mt-3 lg:text-[0.7rem]">
                 Tecnologia
               </span>
+              <ExternalLink
+                aria-hidden="true"
+                size={11}
+                className="absolute -top-0.5 -right-4 text-[#91c5a7]/70 transition-colors group-hover:text-[#b7dec6]"
+              />
             </a>
             <a
               href={vegaEmailUrl}
-              className="focus-visible:ring-tech inline-flex min-h-7 items-center rounded px-1 text-[0.68rem] text-white/55 underline decoration-white/25 underline-offset-4 hover:text-white focus-visible:ring-2 focus-visible:outline-none"
+              className="focus-visible:ring-tech mt-1 inline-flex min-h-7 items-center rounded px-1 text-[0.68rem] text-white/55 underline decoration-white/25 underline-offset-4 transition-colors hover:text-white focus-visible:ring-2 focus-visible:outline-none"
             >
               E-mail
             </a>
