@@ -8,7 +8,7 @@ export function PartnerLogoCard({ partner }: { partner: Convenio }) {
   return (
     <li className="border-brand/10 group hover:border-brand/30 flex min-h-36 flex-col items-center justify-center rounded-3xl border bg-white/75 p-5 text-center shadow-[0_12px_35px_rgba(3,37,27,0.04)] transition-colors">
       <Link
-        href="/contato#agendamento"
+        href="/contato#pre-agendamento"
         aria-label={`Consultar atendimento para ${partner.name}`}
         className="focus-visible:ring-brand flex min-h-24 w-full flex-col items-center justify-center gap-3 rounded-2xl focus-visible:ring-2 focus-visible:ring-offset-4 focus-visible:outline-none"
       >

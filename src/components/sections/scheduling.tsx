@@ -318,9 +318,9 @@ export function Scheduling() {
 
   return (
     <section
-      id="agendamento"
+      id="pre-agendamento"
       aria-labelledby="scheduling-title"
-      className="bg-white py-16 sm:py-20 lg:py-28"
+      className="scroll-mt-24 bg-white pt-[6.5rem] pb-16 sm:pt-[6.75rem] sm:pb-20 lg:pb-28 xl:scroll-mt-28 xl:pt-32"
     >
       <Container>
         <div className="grid gap-10 lg:grid-cols-[.68fr_1.32fr] lg:gap-16">

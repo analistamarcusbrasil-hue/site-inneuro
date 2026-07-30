@@ -45,7 +45,7 @@ export function ServiceOverview() {
                 </Link>
                 {service.slug === "ressonancia-magnetica" && (
                   <Link
-                    href="/contato#agendamento"
+                    href="/contato#pre-agendamento"
                     className="text-brand inline-flex min-h-11 items-center text-sm font-bold"
                   >
                     Solicitar agendamento

@@ -52,7 +52,7 @@ export function Header() {
   }, [isMenuOpen]);
 
   const closeMenu = () => dialogRef.current?.close();
-  const lightHeader = !isScrolled && !isMenuOpen;
+  const lightHeader = !isScrolled && !isMenuOpen && pathname !== "/contato";
   const isHome = pathname === "/";
 
   return (
@@ -136,7 +136,7 @@ export function Header() {
             </button>
           )}
           <Link
-            href="/contato#agendamento"
+            href="/contato#pre-agendamento"
             className="bg-tech text-brand-dark hover:bg-mint focus-visible:ring-tech focus-visible:ring-offset-brand-dark inline-flex min-h-11 items-center justify-center rounded-full px-5 text-sm font-bold transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
           >
             Agendar exame
@@ -259,7 +259,7 @@ export function Header() {
               </button>
             )}
             <Link
-              href="/contato#agendamento"
+              href="/contato#pre-agendamento"
               onClick={closeMenu}
               className="bg-brand focus-visible:ring-tech inline-flex min-h-12 items-center justify-center rounded-full px-5 text-sm font-bold text-white focus-visible:ring-2 focus-visible:outline-none"
             >

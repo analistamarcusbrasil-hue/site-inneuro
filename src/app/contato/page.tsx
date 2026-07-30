@@ -1,6 +1,5 @@
 import { AtSign, ExternalLink, MapPin, MessageCircle } from "lucide-react";
 import { Container } from "@/components/layout/container";
-import { InternalHero } from "@/components/layout/internal-hero";
 import { QuickActions } from "@/components/sections/quick-actions";
 import { Scheduling } from "@/components/sections/scheduling";
 import { siteConfig } from "@/config/site";
@@ -20,11 +19,7 @@ export const metadata = createPageMetadata({
 export default function ContactPage() {
   return (
     <main id="main-content" tabIndex={-1}>
-      <InternalHero
-        eyebrow="Contato"
-        title="Canais oficiais da INNEURO."
-        description="Fale com nossa equipe ou consulte a localização e os horários específicos de cada modalidade."
-      />
+      <Scheduling />
       <QuickActions />
       <section className="bg-surface py-16 sm:py-20 lg:py-24">
         <Container>
@@ -135,7 +130,6 @@ export default function ContactPage() {
           </section>
         </Container>
       </section>
-      <Scheduling />
     </main>
   );
 }

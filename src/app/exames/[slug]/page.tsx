@@ -100,7 +100,7 @@ export default async function ExamPage({ params }: ExamPageProps) {
           )}
           <div className="mt-8 flex flex-wrap gap-3">
             <Link
-              href="/contato#agendamento"
+              href="/contato#pre-agendamento"
               className="bg-brand focus-visible:ring-tech inline-flex min-h-12 items-center gap-2 rounded-full px-6 text-sm font-bold text-white focus-visible:ring-2 focus-visible:outline-none"
             >
               <CalendarPlus aria-hidden="true" size={18} /> Agendar exame
