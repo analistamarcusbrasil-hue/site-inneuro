@@ -4,7 +4,7 @@ import { createPageMetadata } from "@/lib/metadata";
 export const metadata = createPageMetadata({
   title: "Termos de Uso | INNEURO",
   description:
-    "Condições informativas de uso do site institucional da INNEURO.",
+    "Condições de uso do site, do pré-agendamento e dos links externos da INNEURO.",
   path: "/termos-de-uso",
 });
 
@@ -13,7 +13,7 @@ export default function TermsPage() {
     <LegalPage
       eyebrow="Uso do site"
       title="Termos de Uso"
-      description="Orientações para utilização responsável das informações e dos links disponíveis."
+      description="Orientações para utilizar as informações, o pré-agendamento e os links disponíveis."
       sections={[
         {
           title: "Finalidade",
@@ -22,30 +22,29 @@ export default function TermsPage() {
           ],
         },
         {
-          title: "Agendamento e cobertura",
+          title: "Pré-agendamento e cobertura",
           paragraphs: [
-            "O envio de uma mensagem não confirma agendamento, autorização ou cobertura. Essas condições dependem da confirmação da equipe e, quando aplicável, do plano contratado.",
+            "O envio de dados e documentos organiza uma solicitação e não confirma data, horário, autorização ou cobertura. Essas condições dependem da confirmação da equipe e, quando aplicável, do plano contratado.",
           ],
         },
         {
-          title: "Portal de Exames",
+          title: "Preparos e orientações",
           paragraphs: [
-            "O Portal de Exames é externo. O site da INNEURO apenas oferece o link de acesso e não armazena credenciais, laudos ou imagens disponibilizados nesse serviço.",
+            "As orientações publicadas devem ser conferidas para o exame solicitado. Em caso de dúvida ou de orientação individual recebida pela equipe, prevalece a instrução específica fornecida para o procedimento.",
+          ],
+        },
+        {
+          title: "Serviços externos",
+          paragraphs: [
+            "O WhatsApp, o Google Maps, o Instagram e o Portal de Exames são serviços externos. Este site oferece os links de acesso, mas o uso desses ambientes também está sujeito aos termos e políticas de seus fornecedores.",
           ],
         },
         {
           title: "Responsabilidade do visitante",
           items: [
+            "Fornecer informações corretas e documentos legíveis no pré-agendamento.",
             "Verificar se está usando os canais oficiais apresentados no site.",
-            "Não inserir dados clínicos detalhados no formulário de pré-atendimento.",
             "Confirmar diretamente com a equipe informações que dependam de avaliação individual.",
-          ],
-        },
-        {
-          title: "Revisão necessária",
-          items: [
-            "Definir foro, responsabilidades e versão formal com assessoria jurídica.",
-            "Confirmar a data de vigência após aprovação institucional.",
           ],
         },
       ]}

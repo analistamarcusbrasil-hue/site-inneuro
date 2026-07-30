@@ -16,14 +16,32 @@ export const metadata = createPageMetadata({
   path: "/contato",
 });
 
-export default function ContactPage() {
+type ContactPageProps = {
+  searchParams: Promise<{ exame?: string | string[] }>;
+};
+
+export default async function ContactPage({ searchParams }: ContactPageProps) {
+  const requestedExam = (await searchParams).exame;
+  const initialExam = (
+    Array.isArray(requestedExam) ? requestedExam[0] : (requestedExam ?? "")
+  ).slice(0, 160);
+
   return (
     <main id="main-content" tabIndex={-1}>
-      <Scheduling />
-      <QuickActions />
+      <Scheduling initialExam={initialExam} />
+      <QuickActions
+        eyebrow="Canais de atendimento"
+        title="Acesse os serviços e canais oficiais."
+      />
       <section className="bg-surface py-16 sm:py-20 lg:py-24">
         <Container>
-          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+          <h2 className="font-heading text-ink text-3xl font-semibold">
+            Telefone e WhatsApp
+          </h2>
+          <p className="text-muted mt-3">
+            Escolha um dos canais oficiais para falar com a INNEURO.
+          </p>
+          <div className="mt-6 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
             {Object.values(siteConfig.whatsapp).map((channel) => (
               <a
                 key={channel.number}
@@ -68,31 +86,6 @@ export default function ContactPage() {
               />
             </a>
           </div>
-          <div className="border-border-light mt-8 rounded-3xl border bg-white p-7">
-            <MapPin aria-hidden="true" className="text-brand" />
-            <h2 className="font-heading mt-5 text-2xl font-semibold">
-              Endereço
-            </h2>
-            <p className="text-muted mt-3">
-              {siteConfig.address.street}, {siteConfig.address.number}
-              <br />
-              {siteConfig.address.neighborhood}
-              <br />
-              {siteConfig.address.city} — {siteConfig.address.state}
-            </p>
-            <p className="text-ink mt-4 text-sm font-semibold">
-              Referência: {siteConfig.address.reference}
-            </p>
-            <a
-              href={siteConfig.mapsUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Como chegar pelo Google Maps — abre em nova aba"
-              className="bg-brand mt-6 inline-flex min-h-12 items-center gap-2 rounded-full px-6 text-sm font-bold text-white"
-            >
-              Como chegar <ExternalLink aria-hidden="true" size={15} />
-            </a>
-          </div>
           <section className="mt-10">
             <h2 className="font-heading text-ink text-3xl font-semibold">
               Horários por modalidade
@@ -127,6 +120,31 @@ export default function ContactPage() {
                 </article>
               ))}
             </div>
+          </section>
+          <section className="border-border-light mt-10 rounded-3xl border bg-white p-7">
+            <MapPin aria-hidden="true" className="text-brand" />
+            <h2 className="font-heading mt-5 text-2xl font-semibold">
+              Endereço e mapa
+            </h2>
+            <p className="text-muted mt-3">
+              {siteConfig.address.street}, {siteConfig.address.number}
+              <br />
+              {siteConfig.address.neighborhood}
+              <br />
+              {siteConfig.address.city} — {siteConfig.address.state}
+            </p>
+            <p className="text-ink mt-4 text-sm font-semibold">
+              Referência: {siteConfig.address.reference}
+            </p>
+            <a
+              href={siteConfig.mapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Como chegar pelo Google Maps — abre em nova aba"
+              className="bg-brand mt-6 inline-flex min-h-12 items-center gap-2 rounded-full px-6 text-sm font-bold text-white"
+            >
+              Abrir mapa <ExternalLink aria-hidden="true" size={15} />
+            </a>
           </section>
         </Container>
       </section>

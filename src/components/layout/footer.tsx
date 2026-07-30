@@ -23,8 +23,6 @@ const legalLinks = [
 ] as const;
 const vegaWhatsAppUrl =
   "https://wa.me/5596991493854?text=Ol%C3%A1%2C%20Marcus.%20Conheci%20seu%20trabalho%20pelo%20site%20da%20INNEURO%20e%20gostaria%20de%20conversar%20sobre%20uma%20solu%C3%A7%C3%A3o%20em%20tecnologia.";
-const vegaEmailUrl =
-  "mailto:analista.marcusbrasil@gmail.com?subject=Contato%20pelo%20site%20da%20INNEURO";
 
 export function Footer() {
   const year = new Date().getFullYear();
@@ -137,8 +135,8 @@ export function Footer() {
                 alt="VEGA Tecnologia"
                 width={1322}
                 height={606}
-                sizes="(max-width: 639px) 145px, (max-width: 1023px) 170px, 205px"
-                className="h-auto w-[145px] object-contain transition-[opacity,transform] duration-200 group-hover:scale-[1.015] group-hover:opacity-90 sm:w-[170px] lg:w-[205px]"
+                sizes="(max-width: 639px) 135px, (max-width: 1023px) 155px, 175px"
+                className="h-auto w-[135px] object-contain transition-[opacity,transform] duration-200 group-hover:scale-[1.015] group-hover:opacity-90 sm:w-[155px] lg:w-[175px]"
               />
               <span className="-mt-2 text-center text-[0.62rem] font-light tracking-[0.12em] text-[#91c5a7] sm:-mt-2.5 sm:text-[0.66rem] lg:-mt-3 lg:text-[0.7rem]">
                 Tecnologia
@@ -148,12 +146,6 @@ export function Footer() {
                 size={11}
                 className="absolute -top-0.5 -right-4 text-[#91c5a7]/70 transition-colors group-hover:text-[#b7dec6]"
               />
-            </a>
-            <a
-              href={vegaEmailUrl}
-              className="focus-visible:ring-tech mt-1 inline-flex min-h-7 items-center rounded px-1 text-[0.68rem] text-white/55 underline decoration-white/25 underline-offset-4 transition-colors hover:text-white focus-visible:ring-2 focus-visible:outline-none"
-            >
-              E-mail
             </a>
           </div>
           <nav

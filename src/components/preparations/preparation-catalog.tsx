@@ -4,6 +4,7 @@ import { CalendarClock, Search, X } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { clinicalServices } from "@/data/clinical-services";
+import { modalities } from "@/data/modalidades";
 
 const filters = [
   ["todos", "Todos"],
@@ -11,7 +12,16 @@ const filters = [
   ["raios-x", "Raios X"],
   ["mapeamento-cerebral", "Mapeamento Cerebral"],
   ["ressonancia-magnetica", "Ressonância Magnética"],
+  ["medicina-nuclear", "Medicina Nuclear"],
+  ["cintilografia", "Cintilografia"],
 ] as const;
+
+const catalogItems = modalities
+  .filter((modality) => modality.active)
+  .map((modality) => ({
+    modality,
+    service: clinicalServices.find((service) => service.slug === modality.slug),
+  }));
 
 function normalize(value: string) {
   return value
@@ -20,15 +30,17 @@ function normalize(value: string) {
     .toLowerCase();
 }
 
-function searchableText(service: (typeof clinicalServices)[number]) {
+function searchableText(item: (typeof catalogItems)[number]) {
+  const { modality, service } = item;
   return [
-    service.name,
-    ...service.searchTerms,
-    ...service.preparationGroups.flatMap((group) => [
+    modality.name,
+    modality.shortDescription,
+    ...(service?.searchTerms ?? []),
+    ...(service?.preparationGroups.flatMap((group) => [
       group.title,
       ...group.appliesTo,
       ...group.instructions,
-    ]),
+    ]) ?? []),
   ].join(" ");
 }
 
@@ -37,11 +49,10 @@ export function PreparationCatalog() {
   const [filter, setFilter] = useState("todos");
   const results = useMemo(
     () =>
-      clinicalServices.filter(
-        (service) =>
-          service.validatedByClinic &&
-          (filter === "todos" || service.slug === filter) &&
-          normalize(searchableText(service)).includes(normalize(query)),
+      catalogItems.filter(
+        (item) =>
+          (filter === "todos" || item.modality.slug === filter) &&
+          normalize(searchableText(item)).includes(normalize(query)),
       ),
     [filter, query],
   );
@@ -98,45 +109,58 @@ export function PreparationCatalog() {
 
       {results.length ? (
         <div className="mt-6 grid gap-5 md:grid-cols-2">
-          {results.map((service) => (
+          {results.map(({ modality, service }) => (
             <article
-              key={service.slug}
+              key={modality.slug}
               className="border-border-light flex flex-col rounded-3xl border bg-white p-7"
             >
               <span className="bg-mint text-brand-dark w-fit rounded-full px-3 py-1 text-xs font-bold">
-                {service.attendanceLabel}
+                {service?.attendanceLabel ?? "Orientação pela equipe"}
               </span>
               <h2 className="font-heading text-ink mt-4 text-2xl font-semibold">
-                {service.name}
+                {modality.name}
               </h2>
-              <div className="text-muted mt-5 flex items-start gap-2 text-sm">
-                <CalendarClock
-                  aria-hidden="true"
-                  className="text-brand shrink-0"
-                  size={18}
-                />
-                <span>
-                  {service.schedules
-                    .map(
-                      (item) =>
-                        `${item.days}: ${item.periods.map((period) => `${period.start} às ${period.end}`).join(" e ")}`,
-                    )
-                    .join(" · ")}
-                </span>
-              </div>
-              <p className="text-muted mt-5 text-sm">
-                {service.preparationGroups
-                  .map((group) => group.title)
-                  .join(" · ")}
-              </p>
-              <p className="text-muted mt-3 text-xs">
-                Última revisão: 21/07/2026
-              </p>
+              {service ? (
+                <>
+                  <div className="text-muted mt-5 flex items-start gap-2 text-sm">
+                    <CalendarClock
+                      aria-hidden="true"
+                      className="text-brand shrink-0"
+                      size={18}
+                    />
+                    <span>
+                      {service.schedules
+                        .map(
+                          (item) =>
+                            `${item.days}: ${item.periods.map((period) => `${period.start} às ${period.end}`).join(" e ")}`,
+                        )
+                        .join(" · ")}
+                    </span>
+                  </div>
+                  <p className="text-muted mt-5 text-sm">
+                    {service.preparationGroups
+                      .map((group) => group.title)
+                      .join(" · ")}
+                  </p>
+                  <p className="text-muted mt-3 text-xs">
+                    Última revisão:{" "}
+                    {new Date(service.lastReviewedAt).toLocaleDateString(
+                      "pt-BR",
+                      { timeZone: "UTC" },
+                    )}
+                  </p>
+                </>
+              ) : (
+                <p className="text-muted mt-5 text-sm leading-relaxed">
+                  As orientações específicas deste exame são informadas pela
+                  nossa equipe durante a confirmação do agendamento.
+                </p>
+              )}
               <Link
-                href={`/preparos/${service.slug}`}
+                href={`/preparos/${modality.slug}`}
                 className="bg-brand mt-6 inline-flex min-h-11 w-fit items-center rounded-full px-5 text-sm font-bold text-white"
               >
-                Ver horários e preparo
+                Ver orientações
               </Link>
             </article>
           ))}

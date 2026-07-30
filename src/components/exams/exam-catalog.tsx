@@ -144,7 +144,7 @@ export function ExamCatalog() {
                   Ver detalhes <ArrowRight aria-hidden="true" size={16} />
                 </Link>
                 <Link
-                  href="/contato#pre-agendamento"
+                  href={`/contato?exame=${encodeURIComponent(exam.name)}#pre-agendamento`}
                   className="border-brand/25 text-brand-dark hover:bg-mint focus-visible:ring-tech inline-flex min-h-11 items-center justify-center gap-2 rounded-full border px-4 text-sm font-bold focus-visible:ring-2 focus-visible:outline-none"
                 >
                   <CalendarPlus aria-hidden="true" size={16} /> Agendar

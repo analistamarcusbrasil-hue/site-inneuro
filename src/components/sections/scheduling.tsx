@@ -111,7 +111,7 @@ function uploadFileToSignedUrl(
   });
 }
 
-export function Scheduling() {
+export function Scheduling({ initialExam = "" }: { initialExam?: string }) {
   const [errors, setErrors] = useState<Errors>({});
   const [formError, setFormError] = useState("");
   const [phone, setPhone] = useState("");
@@ -320,18 +320,18 @@ export function Scheduling() {
     <section
       id="pre-agendamento"
       aria-labelledby="scheduling-title"
-      className="scroll-mt-24 bg-white pt-[6.5rem] pb-16 sm:pt-[6.75rem] sm:pb-20 lg:pb-28 xl:scroll-mt-28 xl:pt-32"
+      className="scroll-mt-24 bg-white pt-[6.5rem] pb-14 sm:pt-[6.75rem] sm:pb-18 lg:pb-20 xl:scroll-mt-28 xl:pt-32"
     >
       <Container>
-        <div className="grid gap-10 lg:grid-cols-[.68fr_1.32fr] lg:gap-16">
+        <div className="grid items-start gap-10 lg:grid-cols-[.85fr_1.15fr] lg:gap-12">
           <div>
             <Badge>Pré-agendamento</Badge>
-            <h2
+            <h1
               id="scheduling-title"
-              className="font-heading text-ink mt-5 text-3xl leading-tight font-semibold tracking-[-0.045em] sm:text-4xl lg:text-5xl"
+              className="font-heading text-ink mt-5 text-[clamp(2.25rem,4.5vw,4rem)] leading-[1.02] font-semibold tracking-[-0.05em]"
             >
               Organize sua solicitação de exame.
-            </h2>
+            </h1>
             <p className="text-muted mt-5 text-lg leading-relaxed">
               Preencha os dados e envie os documentos para abrir o WhatsApp com
               sua solicitação pronta.
@@ -521,6 +521,7 @@ export function Scheduling() {
                 </span>
                 <input
                   name="exam"
+                  defaultValue={initialExam}
                   required
                   maxLength={160}
                   placeholder="Ex.: Ressonância magnética"

@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 import { siteConfig } from "@/config/site";
 import { exames, hasIndexableExamContent } from "@/data/exames";
-import { clinicalServices } from "@/data/clinical-services";
+import { modalities } from "@/data/modalidades";
 import { isPreviewDeployment } from "@/lib/deployment";
 import { getPublicNews } from "@/lib/cms/public-content";
 
@@ -13,6 +13,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     "/exames",
     "/preparos",
     "/convenios",
+    "/sobre",
     "/contato",
     "/politica-de-privacidade",
     "/termos-de-uso",
@@ -30,10 +31,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         url: `${siteConfig.url}/exames/${exam.slug}`,
         changeFrequency: "monthly" as const,
       })),
-    ...clinicalServices.map((service) => ({
-      url: `${siteConfig.url}/preparos/${service.slug}`,
-      changeFrequency: "monthly" as const,
-    })),
+    ...modalities
+      .filter((item) => item.active)
+      .map((modality) => ({
+        url: `${siteConfig.url}/preparos/${modality.slug}`,
+        changeFrequency: "monthly" as const,
+      })),
     ...news.map((item) => ({
       url: `${siteConfig.url}/noticias/${item.slug}`,
       lastModified: item.publishedAt ?? undefined,

@@ -1,8 +1,9 @@
-import { CalendarCheck } from "lucide-react";
+import { CalendarCheck, ExternalLink, FolderHeart } from "lucide-react";
 import Link from "next/link";
 import { ScanVisual } from "@/components/brand/scan-visual";
 import { Container } from "@/components/layout/container";
 import { Badge } from "@/components/ui/badge";
+import { siteConfig } from "@/config/site";
 
 export function Hero() {
   return (
@@ -39,6 +40,17 @@ export function Hero() {
               <CalendarCheck aria-hidden="true" size={19} />
               Agendar meu exame
             </Link>
+            <a
+              href={siteConfig.patientPortal.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Acessar resultados no Portal de Exames — abre em nova aba"
+              className="focus-visible:ring-tech focus-visible:ring-offset-brand-dark inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-white/24 px-6 text-sm font-bold text-white transition-colors hover:bg-white/8 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+            >
+              <FolderHeart aria-hidden="true" size={18} />
+              Acessar resultados
+              <ExternalLink aria-hidden="true" size={14} />
+            </a>
           </div>
         </div>
 

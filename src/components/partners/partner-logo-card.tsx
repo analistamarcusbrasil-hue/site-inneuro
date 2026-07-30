@@ -28,7 +28,6 @@ export function PartnerLogoCard({ partner }: { partner: Convenio }) {
         )}
         <span className="text-muted text-[0.68rem] font-bold tracking-[0.12em] uppercase">
           {partner.category === "parceria" ? "Parceria" : "Convênio"}
-          {!hasLogo ? " · marca pendente" : ""}
         </span>
       </Link>
     </li>

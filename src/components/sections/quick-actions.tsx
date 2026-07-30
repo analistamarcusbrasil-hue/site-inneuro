@@ -2,7 +2,13 @@ import { Container } from "@/components/layout/container";
 import { QuickActionCard } from "@/components/ui/quick-action-card";
 import { quickActions } from "@/data/quick-actions";
 
-export function QuickActions() {
+export function QuickActions({
+  eyebrow = "Acesso rápido",
+  title = "Como podemos ajudar?",
+}: {
+  eyebrow?: string;
+  title?: string;
+} = {}) {
   return (
     <section
       aria-labelledby="quick-actions-title"
@@ -12,13 +18,13 @@ export function QuickActions() {
         <div className="flex items-end justify-between gap-6">
           <div>
             <p className="text-brand text-xs font-bold tracking-[0.14em] uppercase">
-              Acesso rápido
+              {eyebrow}
             </p>
             <h2
               id="quick-actions-title"
               className="font-heading text-ink mt-3 text-2xl font-semibold tracking-[-0.035em] sm:text-3xl"
             >
-              Como podemos ajudar?
+              {title}
             </h2>
           </div>
           <span

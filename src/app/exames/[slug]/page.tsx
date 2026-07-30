@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { InternalHero } from "@/components/layout/internal-hero";
 import { Container } from "@/components/layout/container";
 import { siteConfig } from "@/config/site";
+import { getClinicalService } from "@/data/clinical-services";
 import { exames, hasIndexableExamContent } from "@/data/exames";
 import { normalizeWhatsAppNumber } from "@/lib/whatsapp";
 import { createPageMetadata } from "@/lib/metadata";
@@ -35,6 +36,7 @@ export default async function ExamPage({ params }: ExamPageProps) {
   const { slug } = await params;
   const exam = exames.find((item) => item.slug === slug && item.active);
   if (!exam) notFound();
+  const service = getClinicalService(exam.slug);
   const whatsappNumber = normalizeWhatsAppNumber(
     siteConfig.whatsapp.primary.number,
   );
@@ -42,7 +44,7 @@ export default async function ExamPage({ params }: ExamPageProps) {
     ["Para que serve", exam.purpose],
     ["Como é realizado", exam.howPerformed],
     ["Orientações gerais", exam.generalGuidance],
-    ["Documentos", exam.documents],
+    ["Documentos", exam.documents ?? service?.documents?.join(" · ")],
   ] as const;
 
   return (
@@ -91,16 +93,51 @@ export default async function ExamPage({ params }: ExamPageProps) {
                 Preparo
               </h2>
               <Link
-                href={`/preparos?exame=${exam.preparationSlug}`}
+                href={`/preparos/${exam.preparationSlug}`}
                 className="text-brand mt-4 inline-flex min-h-11 items-center text-sm font-bold"
               >
                 Consultar preparo
               </Link>
             </section>
           )}
+          {service?.schedules.length ? (
+            <section className="border-border-light mt-5 rounded-3xl border bg-white p-7">
+              <h2 className="font-heading text-ink text-xl font-semibold">
+                Horários da modalidade
+              </h2>
+              <p className="text-brand mt-2 text-sm font-bold">
+                {service.attendanceLabel}
+              </p>
+              <ul className="text-muted mt-4 space-y-2 text-sm">
+                {service.schedules.map((schedule, index) => (
+                  <li key={`${schedule.days}-${index}`}>
+                    <strong>{schedule.days}:</strong>{" "}
+                    {schedule.periods
+                      .map((period) => `${period.start} às ${period.end}`)
+                      .join(" · ")}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+          <section className="border-border-light mt-5 rounded-3xl border bg-white p-7">
+            <h2 className="font-heading text-ink text-xl font-semibold">
+              Convênios
+            </h2>
+            <p className="text-muted mt-3 text-sm leading-relaxed">
+              A cobertura varia conforme o plano, o produto contratado e o
+              procedimento solicitado.
+            </p>
+            <Link
+              href="/convenios"
+              className="text-brand mt-3 inline-flex min-h-11 items-center text-sm font-bold"
+            >
+              Consultar convênios e confirmar cobertura
+            </Link>
+          </section>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link
-              href="/contato#pre-agendamento"
+              href={`/contato?exame=${encodeURIComponent(exam.name)}#pre-agendamento`}
               className="bg-brand focus-visible:ring-tech inline-flex min-h-12 items-center gap-2 rounded-full px-6 text-sm font-bold text-white focus-visible:ring-2 focus-visible:outline-none"
             >
               <CalendarPlus aria-hidden="true" size={18} /> Agendar exame

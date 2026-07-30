@@ -1,8 +1,15 @@
+import { CalendarPlus, ExternalLink, MessageCircle } from "lucide-react";
+import Link from "next/link";
 import { Container } from "@/components/layout/container";
 import { InternalHero } from "@/components/layout/internal-hero";
 import { getPublicPartners } from "@/lib/cms/public-content";
 import { PartnerLogoCard } from "@/components/partners/partner-logo-card";
+import { siteConfig } from "@/config/site";
 import { createPageMetadata } from "@/lib/metadata";
+import { createWhatsAppUrl } from "@/lib/whatsapp";
+
+const coverageMessage =
+  "Olá! Acessei o site da INNEURO e gostaria de confirmar a cobertura do meu plano para um exame.";
 
 export const metadata = createPageMetadata({
   title: "Convênios e parcerias da INNEURO | Macapá",
@@ -36,6 +43,28 @@ export default async function InsurancePage() {
           <div className="border-warning/25 mt-8 rounded-3xl border bg-white p-6 text-sm leading-relaxed">
             A cobertura pode variar conforme o plano, produto contratado e exame
             solicitado.
+          </div>
+          <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+            <a
+              href={createWhatsAppUrl(
+                siteConfig.whatsapp.primary.number,
+                coverageMessage,
+              )}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-brand focus-visible:ring-tech inline-flex min-h-12 items-center justify-center gap-2 rounded-full px-6 text-sm font-bold text-white focus-visible:ring-2 focus-visible:outline-none"
+            >
+              <MessageCircle aria-hidden="true" size={18} />
+              Confirmar cobertura pelo WhatsApp
+              <ExternalLink aria-hidden="true" size={14} />
+            </a>
+            <Link
+              href="/contato#pre-agendamento"
+              className="border-brand/25 text-brand-dark focus-visible:ring-tech inline-flex min-h-12 items-center justify-center gap-2 rounded-full border bg-white px-6 text-sm font-bold focus-visible:ring-2 focus-visible:outline-none"
+            >
+              <CalendarPlus aria-hidden="true" size={18} />
+              Solicitar pré-agendamento
+            </Link>
           </div>
         </Container>
       </section>

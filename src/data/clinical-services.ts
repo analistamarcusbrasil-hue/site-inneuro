@@ -199,7 +199,6 @@ export const clinicalServices: ClinicalService[] = [
   },
 ];
 
-// Confirmar com a INNEURO a grafia comercial “Ducolax” antes da publicação definitiva.
 export function getClinicalService(slug: string) {
   return clinicalServices.find((service) => service.slug === slug);
 }

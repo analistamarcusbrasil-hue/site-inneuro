@@ -25,12 +25,7 @@ export function LegalPage({
       <section className="bg-surface py-14 sm:py-20 lg:py-24">
         <Container className="max-w-4xl">
           <div className="border-border-light rounded-3xl border bg-white p-6 sm:p-9">
-            <p className="bg-mint text-brand-dark rounded-2xl p-4 text-sm leading-relaxed">
-              Este texto descreve o funcionamento técnico atual do site e deve
-              ser revisado pela assessoria jurídica da INNEURO antes da adoção
-              como documento jurídico definitivo.
-            </p>
-            <div className="mt-8 space-y-9">
+            <div className="space-y-9">
               {sections.map((section) => (
                 <section key={section.title}>
                   <h2 className="font-heading text-ink text-2xl font-semibold">

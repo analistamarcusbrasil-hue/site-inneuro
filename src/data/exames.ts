@@ -8,18 +8,12 @@ export const exames: Exame[] = modalities.map((modality) => ({
   modalitySlug: modality.slug,
   shortDescription: modality.shortDescription,
   active: modality.active,
-  preparationSlug: [
-    "tomografia-computadorizada",
-    "raios-x",
-    "mapeamento-cerebral",
-    "ressonancia-magnetica",
-  ].includes(modality.slug)
-    ? modality.slug
-    : undefined,
+  preparationSlug: modality.slug,
 }));
 
 export function hasIndexableExamContent(exam: Exame) {
   return Boolean(
+    exam.shortDescription ||
     exam.purpose ||
     exam.howPerformed ||
     exam.generalGuidance ||

@@ -1,15 +1,22 @@
-import { ArrowRight, CalendarPlus } from "lucide-react";
+import {
+  ArrowRight,
+  BrainCircuit,
+  CalendarPlus,
+  MapPin,
+  ScanLine,
+} from "lucide-react";
 import Link from "next/link";
 import { InternalHero } from "@/components/layout/internal-hero";
 import { Container } from "@/components/layout/container";
+import { siteConfig } from "@/config/site";
 import { modalities } from "@/data/modalidades";
 import { createPageMetadata } from "@/lib/metadata";
 
 export const metadata = createPageMetadata({
   title: "Sobre a INNEURO | Instituto de Neurologia do Amapá",
-  description: "Conheça as modalidades apresentadas pela INNEURO em Macapá.",
+  description:
+    "Conheça a INNEURO, suas modalidades de exames e os canais de atendimento em Macapá.",
   path: "/sobre",
-  index: false,
 });
 
 export default function AboutPage() {
@@ -18,11 +25,52 @@ export default function AboutPage() {
       <InternalHero
         eyebrow="Sobre a INNEURO"
         title="Tecnologia, precisão e cuidado."
-        description="Conheça a estrutura preparada para apresentar a identidade institucional da INNEURO."
+        description="O Instituto de Neurologia do Amapá reúne diagnóstico por imagem, neurologia e medicina nuclear em Macapá."
       />
       <section className="bg-surface py-16 sm:py-20 lg:py-28">
         <Container>
-          <section className="bg-brand-dark rounded-[2rem] p-8 text-white sm:p-10">
+          <div className="grid gap-5 lg:grid-cols-3">
+            <article className="border-border-light rounded-3xl border bg-white p-7">
+              <ScanLine aria-hidden="true" className="text-brand" />
+              <h2 className="font-heading text-ink mt-5 text-2xl font-semibold">
+                Propósito
+              </h2>
+              <p className="text-muted mt-3 leading-relaxed">
+                Facilitar o acesso a informações sobre exames, preparos,
+                convênios e canais oficiais da INNEURO.
+              </p>
+            </article>
+            <article className="border-border-light rounded-3xl border bg-white p-7">
+              <BrainCircuit aria-hidden="true" className="text-brand" />
+              <h2 className="font-heading text-ink mt-5 text-2xl font-semibold">
+                Atendimento e tecnologia
+              </h2>
+              <p className="text-muted mt-3 leading-relaxed">
+                Tecnologia, comunicação clara e acesso digital aos resultados
+                apoiam a jornada de atendimento.
+              </p>
+            </article>
+            <article className="border-border-light rounded-3xl border bg-white p-7">
+              <MapPin aria-hidden="true" className="text-brand" />
+              <h2 className="font-heading text-ink mt-5 text-2xl font-semibold">
+                Localização
+              </h2>
+              <p className="text-muted mt-3 leading-relaxed">
+                {siteConfig.address.formatted}
+                <br />
+                Referência: {siteConfig.address.reference}
+              </p>
+              <a
+                href={siteConfig.mapsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-brand mt-4 inline-flex min-h-11 items-center text-sm font-bold"
+              >
+                Como chegar
+              </a>
+            </article>
+          </div>
+          <section className="bg-brand-dark mt-8 rounded-[2rem] p-8 text-white sm:p-10">
             <h2 className="font-heading text-3xl font-semibold">
               Modalidades oferecidas
             </h2>

@@ -12,32 +12,25 @@ export default function CookiePolicyPage() {
     <LegalPage
       eyebrow="Navegação"
       title="Política de Cookies"
-      description="Informações sobre tecnologias de navegação utilizadas na versão atual do site."
+      description="Informações sobre as tecnologias necessárias ao funcionamento do site e de serviços externos."
       sections={[
         {
-          title: "Versão atual",
+          title: "Uso atual",
           paragraphs: [
-            "Na auditoria desta versão não foram identificados scripts de publicidade, rastreamento comportamental ou analytics adicionados pela INNEURO. Recursos técnicos da plataforma de hospedagem podem usar mecanismos estritamente necessários para segurança e entrega do site.",
+            "A versão atual não inclui ferramentas próprias de publicidade, analytics ou rastreamento comportamental. Por isso, o site não apresenta um painel de consentimento para cookies opcionais que não são utilizados.",
+            "Recursos técnicos estritamente necessários podem ser utilizados para segurança, autenticação da área administrativa e entrega do site.",
           ],
         },
         {
           title: "Serviços externos",
           paragraphs: [
-            "WhatsApp, Google Maps, Instagram e Portal de Exames somente são acessados após uma ação do visitante. Ao abrir esses serviços, cookies e tecnologias semelhantes podem ser utilizados conforme as políticas de cada fornecedor.",
+            "WhatsApp, Google Maps, Instagram e Portal de Exames somente são abertos após uma ação do visitante. Nesses ambientes, cookies e tecnologias semelhantes podem ser utilizados conforme as políticas de cada fornecedor.",
           ],
         },
         {
           title: "Controle pelo navegador",
           paragraphs: [
-            "O visitante pode consultar, bloquear ou remover cookies nas configurações do navegador. O bloqueio de recursos essenciais pode afetar o funcionamento de alguns serviços externos.",
-          ],
-        },
-        {
-          title: "Revisão necessária",
-          items: [
-            "Reavaliar esta política se forem instaladas ferramentas de analytics, marketing, chat ou consentimento.",
-            "Validar a classificação dos cookies da hospedagem antes da publicação no domínio oficial.",
-            "Submeter o texto à revisão jurídica.",
+            "O visitante pode consultar, bloquear ou remover cookies nas configurações do navegador. O bloqueio de recursos essenciais pode afetar a autenticação administrativa ou a abertura de serviços externos.",
           ],
         },
       ]}

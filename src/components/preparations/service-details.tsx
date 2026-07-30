@@ -1,4 +1,9 @@
-import { ExternalLink, MessageCircle, ShieldAlert } from "lucide-react";
+import {
+  CalendarPlus,
+  ExternalLink,
+  MessageCircle,
+  ShieldAlert,
+} from "lucide-react";
 import Link from "next/link";
 import { siteConfig } from "@/config/site";
 import { createWhatsAppUrl } from "@/lib/whatsapp";
@@ -17,7 +22,10 @@ export function ServiceDetails({ service }: { service: ClinicalService }) {
             {service.attendanceLabel}
           </span>
           <span className="text-muted text-sm">
-            Orientações validadas pela INNEURO · revisão em 21/07/2026
+            Orientações validadas pela INNEURO · revisão em{" "}
+            {new Date(service.lastReviewedAt).toLocaleDateString("pt-BR", {
+              timeZone: "UTC",
+            })}
           </span>
         </div>
         <h2 className="font-heading text-ink mt-7 text-2xl font-semibold">
@@ -101,13 +109,23 @@ export function ServiceDetails({ service }: { service: ClinicalService }) {
           </p>
         </section>
       ) : null}
+      <p className="border-brand/20 bg-mint/45 text-ink rounded-2xl border p-5 text-sm leading-relaxed">
+        Siga a orientação específica fornecida pela equipe para o seu exame. Em
+        caso de dúvida, confirme o preparo antes de comparecer à INNEURO.
+      </p>
       <div className="flex flex-wrap gap-3">
+        <Link
+          href={`/contato?exame=${encodeURIComponent(service.name)}#pre-agendamento`}
+          className="bg-brand inline-flex min-h-12 items-center gap-2 rounded-full px-6 text-sm font-bold text-white"
+        >
+          <CalendarPlus aria-hidden="true" size={18} /> Agendar exame
+        </Link>
         <a
           href={whatsappUrl}
           target="_blank"
           rel="noopener noreferrer"
           aria-label="Falar com a equipe antes do exame pelo WhatsApp — abre em nova aba"
-          className="bg-brand inline-flex min-h-12 items-center gap-2 rounded-full px-6 text-sm font-bold text-white"
+          className="border-brand/25 text-brand-dark inline-flex min-h-12 items-center gap-2 rounded-full border px-6 text-sm font-bold"
         >
           <MessageCircle aria-hidden="true" size={18} /> Falar com a equipe
           antes do exame <ExternalLink aria-hidden="true" size={15} />

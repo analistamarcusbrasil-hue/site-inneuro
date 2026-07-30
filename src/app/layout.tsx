@@ -78,6 +78,14 @@ export default function RootLayout({
               description: siteConfig.description,
               ...(siteConfig.url ? { url: siteConfig.url } : {}),
               ...(siteConfig.phone ? { telephone: siteConfig.phone } : {}),
+              ...(siteConfig.url
+                ? {
+                    logo: new URL(
+                      "/apple-touch-icon.png",
+                      siteConfig.url,
+                    ).toString(),
+                  }
+                : {}),
               address: {
                 "@type": "PostalAddress",
                 streetAddress: `${siteConfig.address.street}, ${siteConfig.address.number}`,

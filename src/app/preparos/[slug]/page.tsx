@@ -1,37 +1,86 @@
 import type { Metadata } from "next";
+import { CalendarPlus, ExternalLink, MessageCircle } from "lucide-react";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Container } from "@/components/layout/container";
 import { InternalHero } from "@/components/layout/internal-hero";
 import { ServiceDetails } from "@/components/preparations/service-details";
-import { clinicalServices, getClinicalService } from "@/data/clinical-services";
+import { getClinicalService } from "@/data/clinical-services";
+import { modalities } from "@/data/modalidades";
+import { siteConfig } from "@/config/site";
 import { createPageMetadata } from "@/lib/metadata";
+import { createWhatsAppUrl } from "@/lib/whatsapp";
 
 type Props = { params: Promise<{ slug: string }> };
 export function generateStaticParams() {
-  return clinicalServices.map(({ slug }) => ({ slug }));
+  return modalities.filter((item) => item.active).map(({ slug }) => ({ slug }));
 }
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const service = getClinicalService((await params).slug);
-  if (!service) return {};
+  const slug = (await params).slug;
+  const service = getClinicalService(slug);
+  const modality = modalities.find((item) => item.slug === slug && item.active);
+  if (!modality) return {};
   return createPageMetadata({
-    title: `Preparo para ${service.name} | INNEURO Macapá`,
-    description: `Consulte horários e orientações de preparo validadas para ${service.name} na INNEURO.`,
-    path: `/preparos/${service.slug}`,
+    title: `Preparo para ${modality.name} | INNEURO Macapá`,
+    description: service
+      ? `Consulte horários e orientações de preparo validadas para ${modality.name} na INNEURO.`
+      : `Saiba como confirmar com a equipe da INNEURO as orientações específicas para ${modality.name}.`,
+    path: `/preparos/${modality.slug}`,
   });
 }
 export default async function PreparationPage({ params }: Props) {
-  const service = getClinicalService((await params).slug);
-  if (!service) notFound();
+  const slug = (await params).slug;
+  const service = getClinicalService(slug);
+  const modality = modalities.find((item) => item.slug === slug && item.active);
+  if (!modality) notFound();
+  const whatsappUrl = createWhatsAppUrl(
+    siteConfig.whatsapp.primary.number,
+    `Olá! Gostaria de confirmar as orientações para ${modality.name} na INNEURO.`,
+  );
   return (
     <main id="main-content" tabIndex={-1}>
       <InternalHero
         eyebrow="Preparo validado"
-        title={service.name}
-        description="Consulte os horários específicos, a forma de atendimento e as orientações fornecidas pela INNEURO."
+        title={modality.name}
+        description={
+          service
+            ? "Consulte os horários específicos, a forma de atendimento e as orientações fornecidas pela INNEURO."
+            : "Confirme as orientações específicas desta modalidade diretamente com a equipe da INNEURO."
+        }
       />
       <section className="bg-surface py-14 sm:py-20 lg:py-24">
         <Container>
-          <ServiceDetails service={service} />
+          {service ? (
+            <ServiceDetails service={service} />
+          ) : (
+            <div className="border-border-light rounded-3xl border bg-white p-7 sm:p-9">
+              <h2 className="font-heading text-ink text-2xl font-semibold">
+                Orientação individual
+              </h2>
+              <p className="text-muted mt-4 max-w-3xl leading-relaxed">
+                As orientações específicas deste exame são informadas pela nossa
+                equipe durante a confirmação do agendamento. Siga sempre a
+                orientação específica fornecida para o seu procedimento.
+              </p>
+              <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+                <Link
+                  href={`/contato?exame=${encodeURIComponent(modality.name)}#pre-agendamento`}
+                  className="bg-brand inline-flex min-h-12 items-center justify-center gap-2 rounded-full px-6 text-sm font-bold text-white"
+                >
+                  <CalendarPlus aria-hidden="true" size={18} /> Agendar exame
+                </Link>
+                <a
+                  href={whatsappUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="border-brand/25 text-brand-dark inline-flex min-h-12 items-center justify-center gap-2 rounded-full border px-6 text-sm font-bold"
+                >
+                  <MessageCircle aria-hidden="true" size={18} /> Falar com a
+                  equipe <ExternalLink aria-hidden="true" size={14} />
+                </a>
+              </div>
+            </div>
+          )}
         </Container>
       </section>
     </main>
