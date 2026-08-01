@@ -13,20 +13,20 @@ export function InternalHero({
   description,
 }: InternalHeroProps) {
   return (
-    <section className="bg-brand-dark relative overflow-hidden pt-36 pb-16 text-white sm:pt-40 sm:pb-20 lg:pt-48 lg:pb-24">
+    <section className="bg-brand-dark relative flex min-h-0 items-center overflow-hidden pt-24 pb-10 text-white sm:min-h-[clamp(360px,40vw,440px)] sm:pt-24 sm:pb-10 lg:pt-24 lg:pb-12">
       <div
         className="hero-grid absolute inset-0 opacity-25"
         aria-hidden="true"
       />
       <div className="internal-hero-ring" aria-hidden="true" />
-      <Container className="relative">
+      <Container className="relative py-2 sm:py-0">
         <Badge className="text-mint border-white/15 bg-white/8">
           {eyebrow}
         </Badge>
-        <h1 className="font-heading mt-6 max-w-4xl text-4xl leading-[1.02] font-semibold tracking-[-0.055em] sm:text-5xl lg:text-6xl">
+        <h1 className="font-heading mt-4 max-w-4xl text-[clamp(2.15rem,5vw,4rem)] leading-[1.02] font-semibold tracking-[-0.055em]">
           {title}
         </h1>
-        <p className="mt-5 max-w-2xl text-lg leading-relaxed text-white/68 sm:text-xl">
+        <p className="mt-3 max-w-2xl text-base leading-relaxed text-white/68 sm:text-lg">
           {description}
         </p>
       </Container>

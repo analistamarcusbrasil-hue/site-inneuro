@@ -86,15 +86,32 @@ a {
 }
 .internal-hero-ring {
   position: absolute;
-  top: -65%;
-  right: -8%;
-  width: min(58vw, 760px);
+  top: 18%;
+  right: -38%;
+  width: min(82vw, 360px);
   aspect-ratio: 1;
   border: 1px solid rgba(33, 199, 122, 0.14);
   border-radius: 50%;
   box-shadow:
-    0 0 0 70px rgba(33, 199, 122, 0.025),
-    0 0 0 140px rgba(33, 199, 122, 0.018);
+    0 0 0 44px rgba(33, 199, 122, 0.025),
+    0 0 0 88px rgba(33, 199, 122, 0.018);
+}
+@media (min-width: 640px) {
+  .internal-hero-ring {
+    top: -35%;
+    right: -10%;
+    width: min(62vw, 640px);
+    box-shadow:
+      0 0 0 60px rgba(33, 199, 122, 0.025),
+      0 0 0 120px rgba(33, 199, 122, 0.018);
+  }
+}
+@media (min-width: 1024px) {
+  .internal-hero-ring {
+    top: -60%;
+    right: -6%;
+    width: min(52vw, 720px);
+  }
 }
 .hero-grid {
   background-image:
