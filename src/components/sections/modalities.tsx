@@ -4,7 +4,7 @@ import { SectionHeader } from "@/components/sections/section-header";
 import { ModalityCard } from "@/components/ui/modality-card";
 import { modalities } from "@/data/modalidades";
 
-export function Modalities() {
+export function Modalities({ compactTop = false }: { compactTop?: boolean }) {
   const featuredSlugs = new Set([
     "ressonancia-magnetica",
     "tomografia-computadorizada",
@@ -16,7 +16,14 @@ export function Modalities() {
   );
 
   return (
-    <Section aria-label="Modalidades de exames" className="bg-surface">
+    <Section
+      aria-label="Modalidades de exames"
+      className={
+        compactTop
+          ? "bg-surface pt-10 pb-16 sm:pt-12 sm:pb-20 lg:pt-14 lg:pb-28"
+          : "bg-surface"
+      }
+    >
       <Container>
         <SectionHeader
           eyebrow="Modalidades"

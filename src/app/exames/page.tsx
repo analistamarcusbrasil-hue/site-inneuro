@@ -21,7 +21,7 @@ export default function ExamsPage() {
         title="Encontre a modalidade que você procura."
         description="Pesquise e filtre as modalidades de exames confirmadas da INNEURO."
       />
-      <Modalities />
+      <Modalities compactTop />
       <section className="bg-surface py-14 sm:py-18 lg:py-24">
         <Container>
           <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">

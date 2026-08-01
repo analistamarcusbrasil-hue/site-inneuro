@@ -320,29 +320,29 @@ export function Scheduling({ initialExam = "" }: { initialExam?: string }) {
     <section
       id="pre-agendamento"
       aria-labelledby="scheduling-title"
-      className="scroll-mt-24 bg-white pt-24 pb-12 sm:pt-24 sm:pb-14 lg:pb-16 xl:scroll-mt-28 xl:pt-28"
+      className="scroll-mt-24 bg-white pt-20 pb-10 sm:pt-24 sm:pb-12 lg:pb-14 xl:scroll-mt-28"
     >
       <Container>
-        <div className="grid items-start gap-8 lg:grid-cols-[.85fr_1.15fr] lg:gap-12">
+        <div className="grid items-start gap-6 lg:grid-cols-[.85fr_1.15fr] lg:gap-10">
           <div>
             <Badge>Pré-agendamento</Badge>
             <h1
               id="scheduling-title"
-              className="font-heading text-ink mt-4 text-[clamp(2.25rem,4.25vw,3.5rem)] leading-[1.02] font-semibold tracking-[-0.05em]"
+              className="font-heading text-ink mt-3 text-[clamp(2.05rem,4vw,3rem)] leading-[1.01] font-semibold tracking-[-0.05em]"
             >
               Organize sua solicitação de exame.
             </h1>
-            <p className="text-muted mt-3 text-base leading-relaxed sm:text-lg">
+            <p className="text-muted mt-2 text-base leading-relaxed sm:text-lg">
               Preencha os dados e envie os documentos para abrir o WhatsApp com
               sua solicitação pronta.
             </p>
-            <div className="bg-mint mt-5 rounded-3xl p-5">
+            <div className="bg-mint mt-4 rounded-3xl p-4">
               <CalendarCheck
                 aria-hidden="true"
                 className="text-brand"
                 size={22}
               />
-              <p className="text-ink mt-3 font-semibold">
+              <p className="text-ink mt-2 font-semibold">
                 O horário será confirmado pela equipe após o contato.
               </p>
             </div>

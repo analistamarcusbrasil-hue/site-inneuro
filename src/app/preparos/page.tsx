@@ -18,7 +18,7 @@ export default function PreparationsPage() {
         title="Orientações reunidas com responsabilidade."
         description="Consulte conteúdos validados e confirme dúvidas específicas com a equipe da INNEURO."
       />
-      <section className="bg-surface py-14 sm:py-18 lg:py-24">
+      <section className="bg-surface pt-10 pb-14 sm:pt-12 sm:pb-18 lg:pt-14 lg:pb-24">
         <Container>
           <PreparationCatalog />
         </Container>

@@ -27,7 +27,7 @@ export default async function InsurancePage() {
         title="Convênios confirmados pela INNEURO."
         description="Consulte as condições do seu plano antes do exame."
       />
-      <section className="bg-surface py-16 sm:py-20 lg:py-24">
+      <section className="bg-surface pt-10 pb-16 sm:pt-12 sm:pb-20 lg:pt-14 lg:pb-24">
         <Container>
           <p className="text-muted mb-8 max-w-3xl text-lg leading-relaxed">
             Consulte nossa equipe para confirmar cobertura, autorização e

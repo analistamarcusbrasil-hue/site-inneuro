@@ -27,7 +27,7 @@ export default function AboutPage() {
         title="Tecnologia, precisão e cuidado."
         description="O Instituto de Neurologia do Amapá reúne diagnóstico por imagem, neurologia e medicina nuclear em Macapá."
       />
-      <section className="bg-surface py-16 sm:py-20 lg:py-28">
+      <section className="bg-surface pt-10 pb-16 sm:pt-12 sm:pb-20 lg:pt-14 lg:pb-28">
         <Container>
           <div className="grid gap-5 lg:grid-cols-3">
             <article className="border-border-light rounded-3xl border bg-white p-7">
