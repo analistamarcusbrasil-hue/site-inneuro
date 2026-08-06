@@ -304,6 +304,9 @@ export async function contentCommandAction(formData: FormData) {
   if (!cmsModule || !id) throw new Error("Comando inválido.");
 
   const { supabase, user, profile } = await requireAdmin();
+  const supportsActive = cmsModule.fields.some(
+    (field) => field.name === "active",
+  );
   const managerOnly = ["publish", "activate", "deactivate"];
   if (managerOnly.includes(command) && profile.role === "editor") {
     redirect(`/admin/${moduleKey}?error=permission`);
@@ -321,12 +324,12 @@ export async function contentCommandAction(formData: FormData) {
         ...original,
         id: undefined,
         status: "draft",
-        active: false,
         created_by: user.id,
         updated_by: user.id,
         created_at: undefined,
         updated_at: undefined,
       };
+      if (supportsActive) copy.active = false;
       if ("slug" in copy) copy.slug = `${copy.slug}-copia-${Date.now()}`;
       if ("title" in copy) copy.title = `${copy.title} (cópia)`;
       const { error } = await supabase.from(cmsModule.table).insert(copy);
@@ -338,7 +341,7 @@ export async function contentCommandAction(formData: FormData) {
       Object.assign(updates, {
         status: "archived",
         archived_at: new Date().toISOString(),
-        active: false,
+        ...(supportsActive ? { active: false } : {}),
       });
     if (command === "restore")
       Object.assign(updates, { status: "draft", archived_at: null });
