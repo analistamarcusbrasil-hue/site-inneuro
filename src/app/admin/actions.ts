@@ -100,14 +100,16 @@ async function audit(
   });
 }
 
-export async function saveContentAction(formData: FormData) {
+export async function saveContentAction(
+  formData: FormData,
+): Promise<SaveContentResult> {
   const moduleKey = String(formData.get("module")) as CmsModuleKey;
   const cmsModule = getCmsModule(moduleKey);
   if (!cmsModule) throw new Error("Módulo inválido.");
   const { supabase, user, profile } = await requireAdmin();
 
   const failure = (
-    code: SaveContentResult["code"],
+    code: SaveContentErrorCode,
     message: string,
     error?: { code?: string; message?: string; details?: string; hint?: string },
     stage?: string,
@@ -365,19 +367,27 @@ export async function saveContentAction(formData: FormData) {
     revalidatePath(`/noticias/${String(raw.slug ?? "")}`);
   }
   revalidatePath(`/admin/${moduleKey}`);
-  redirect(`/admin/${moduleKey}?success=saved`);
+  return {
+    ok: true,
+    message: "Pronto! A alteração foi salva com sucesso.",
+    id: savedId,
+  };
 }
 
-export type SaveContentResult = {
-  ok: false;
-  code:
-    | "validation"
-    | "permission"
-    | "image-required"
-    | "save";
-  message: string;
-  errorId?: string;
-};
+type SaveContentErrorCode =
+  | "validation"
+  | "permission"
+  | "image-required"
+  | "save";
+
+export type SaveContentResult =
+  | { ok: true; message: string; id: string }
+  | {
+      ok: false;
+      code: SaveContentErrorCode;
+      message: string;
+      errorId?: string;
+    };
 
 export async function contentCommandAction(formData: FormData) {
   const moduleKey = String(formData.get("module")) as CmsModuleKey;

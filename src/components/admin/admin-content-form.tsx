@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { CalendarClock, Eye, ImagePlus, Save, Send, X } from "lucide-react";
 import type { CmsModuleFormConfig } from "@/lib/cms/modules";
 import {
@@ -138,6 +139,7 @@ export function AdminContentForm({
   media?: MediaOption[];
   canPublish: boolean;
 }) {
+  const router = useRouter();
   const initialValues = useMemo(
     () =>
       Object.fromEntries(
@@ -221,7 +223,14 @@ export function AdminContentForm({
     setSaveResult(null);
     try {
       const result = await saveContentAction(formData);
-      if (result) setSaveResult(result);
+      if (result.ok) {
+        setDirty(false);
+        setSaveResult(result);
+        router.replace(`/admin/${module.key}?success=saved`);
+        router.refresh();
+      } else {
+        setSaveResult(result);
+      }
     } catch {
       setSaveResult({
         ok: false,
@@ -359,11 +368,15 @@ export function AdminContentForm({
 
         {saveResult ? (
           <p
-            role="alert"
-            className="bg-error/10 text-error mt-6 rounded-xl p-4 text-sm font-bold"
+            role={saveResult.ok ? "status" : "alert"}
+            className={`mt-6 rounded-xl p-4 text-sm font-bold ${
+              saveResult.ok
+                ? "bg-mint text-brand"
+                : "bg-error/10 text-error"
+            }`}
           >
             {saveResult.message}
-            {saveResult.errorId ? (
+            {!saveResult.ok && saveResult.errorId ? (
               <span className="mt-1 block text-xs font-normal">
                 Código do erro: {saveResult.errorId}
               </span>
