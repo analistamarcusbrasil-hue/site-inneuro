@@ -38,9 +38,9 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   experimental: {
     serverActions: {
-      // O CMS aceita imagens de até 8 MB. O limite padrão de Server Actions
+      // O CMS aceita imagens de até 10 MB. O limite padrão de Server Actions
       // interrompia o envio antes de a validação e do Supabase Storage.
-      bodySizeLimit: "10mb",
+      bodySizeLimit: "12mb",
     },
   },
   async headers() {

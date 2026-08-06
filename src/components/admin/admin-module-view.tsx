@@ -6,6 +6,13 @@ import { contentCommandAction } from "@/app/admin/actions";
 import { requireAdmin } from "@/lib/cms/auth";
 import type { CmsModule } from "@/lib/cms/modules";
 
+const statusLabels: Record<string, string> = {
+  draft: "Rascunho",
+  scheduled: "Agendado",
+  published: "Publicado",
+  archived: "Arquivado",
+};
+
 export async function AdminModuleView({
   module,
   searchParams,
@@ -153,8 +160,11 @@ export async function AdminModuleView({
                       <h3 className="font-heading font-bold">
                         {item.title ?? item.name ?? item.network}
                       </h3>
-                      <p className="text-muted mt-1 text-xs font-bold tracking-wide uppercase">
-                        {item.status} {item.active ? "· ativo" : ""}
+                      <p className="text-muted mt-1 text-xs font-bold tracking-wide">
+                        {statusLabels[item.status] ?? item.status}
+                        {supportsActive
+                          ? ` · ${item.active ? "Ativo" : "Inativo"}`
+                          : ""}
                       </p>
                     </div>
                     <Link

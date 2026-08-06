@@ -106,6 +106,28 @@ export async function saveContentAction(formData: FormData) {
   if (!cmsModule) throw new Error("Módulo inválido.");
   const { supabase, user, profile } = await requireAdmin();
 
+  const failure = (
+    code: SaveContentResult["code"],
+    message: string,
+    error?: { code?: string; message?: string; details?: string; hint?: string },
+    stage?: string,
+  ): SaveContentResult => {
+    const errorId = crypto.randomUUID().slice(0, 8).toUpperCase();
+    if (error) {
+      console.error("Falha ao salvar conteúdo do CMS", {
+        errorId,
+        module: moduleKey,
+        stage,
+        actorId: user.id,
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      });
+    }
+    return { ok: false, code, message, errorId: error ? errorId : undefined };
+  };
+
   const raw = Object.fromEntries(
     cmsModule.fields.map((field) => [
       field.name,
@@ -113,15 +135,31 @@ export async function saveContentAction(formData: FormData) {
     ]),
   );
   const parsed = moduleSchemas[moduleKey].safeParse(raw);
-  if (!parsed.success) redirect(`/admin/${moduleKey}?error=validation`);
+  if (!parsed.success) {
+    const firstField = parsed.error.issues[0]?.path[0];
+    return failure(
+      "validation",
+      firstField === "title"
+        ? "O título principal é obrigatório."
+        : firstField === "image_alt"
+          ? "A descrição da imagem é obrigatória."
+          : "Revise os campos destacados e tente novamente.",
+    );
+  }
 
   const intent = String(formData.get("intent") || "draft");
   const id = String(formData.get("id") || "");
   if (["publish", "schedule"].includes(intent) && profile.role === "editor") {
-    redirect(`/admin/${moduleKey}?error=permission`);
+    return failure(
+      "permission",
+      "Sua conta pode salvar rascunhos, mas não tem permissão para publicar.",
+    );
   }
   if (intent === "schedule" && !String(formData.get("publish_at") || "")) {
-    redirect(`/admin/${moduleKey}?error=validation`);
+    return failure(
+      "validation",
+      "Escolha a data e o horário antes de agendar.",
+    );
   }
 
   const payload: Record<string, unknown> = {
@@ -157,9 +195,18 @@ export async function saveContentAction(formData: FormData) {
       .select("slug")
       .eq("id", String(payload.linked_news_id))
       .maybeSingle();
-    if (!linkedNews) redirect(`/admin/${moduleKey}?error=validation`);
+    if (!linkedNews)
+      return failure(
+        "validation",
+        "A matéria vinculada não foi encontrada. Escolha outra opção.",
+      );
     payload.cta_url = `/noticias/${linkedNews.slug}`;
     payload.open_in_new_tab = false;
+  }
+  if (moduleKey === "carrossel") {
+    // Selects HTML enviam a opção vazia como "". A coluna é UUID e precisa
+    // receber null quando nenhuma matéria estiver vinculada.
+    payload.linked_news_id = payload.linked_news_id || null;
   }
   if (moduleKey === "preparos") {
     payload.search_terms = nonEmptyLines(raw.search_terms_text);
@@ -200,7 +247,10 @@ export async function saveContentAction(formData: FormData) {
       );
     }
     if (!payload.desktop_media_id && !hasPersistedImage)
-      redirect(`/admin/${moduleKey}?error=image-required`);
+      return failure(
+        "image-required",
+        "Escolha uma imagem principal antes de publicar o slide.",
+      );
   }
   if (intent === "publish" && moduleKey === "noticias") {
     payload.published_at = new Date().toISOString();
@@ -212,7 +262,15 @@ export async function saveContentAction(formData: FormData) {
       .from(cmsModule.table)
       .update(payload)
       .eq("id", id);
-    if (error) redirect(`/admin/${moduleKey}?error=save`);
+    if (error)
+      return failure(
+        "save",
+        moduleKey === "carrossel"
+          ? "Não foi possível salvar o slide. Tente novamente."
+          : "Não foi possível salvar o conteúdo. Tente novamente.",
+        error,
+        "database-update",
+      );
   } else {
     payload.created_by = user.id;
     const { data, error } = await supabase
@@ -220,7 +278,15 @@ export async function saveContentAction(formData: FormData) {
       .insert(payload)
       .select("id")
       .single();
-    if (error) redirect(`/admin/${moduleKey}?error=save`);
+    if (error)
+      return failure(
+        "save",
+        moduleKey === "carrossel"
+          ? "A imagem está pronta, mas não foi possível salvar o slide."
+          : "Não foi possível salvar o conteúdo. Tente novamente.",
+        error,
+        "database-insert",
+      );
     savedId = String(data.id);
   }
 
@@ -265,7 +331,13 @@ export async function saveContentAction(formData: FormData) {
             sort_order: 999,
             created_by: user.id,
           });
-      if (carouselError) redirect(`/admin/${moduleKey}?error=carousel-link`);
+      if (carouselError)
+        return failure(
+          "save",
+          "A notícia foi salva, mas não foi possível atualizar o carrossel.",
+          carouselError,
+          "carousel-link",
+        );
     } else {
       await supabase
         .from("carousel_slides")
@@ -295,6 +367,17 @@ export async function saveContentAction(formData: FormData) {
   revalidatePath(`/admin/${moduleKey}`);
   redirect(`/admin/${moduleKey}?success=saved`);
 }
+
+export type SaveContentResult = {
+  ok: false;
+  code:
+    | "validation"
+    | "permission"
+    | "image-required"
+    | "save";
+  message: string;
+  errorId?: string;
+};
 
 export async function contentCommandAction(formData: FormData) {
   const moduleKey = String(formData.get("module")) as CmsModuleKey;
@@ -421,11 +504,18 @@ export async function uploadMediaAction(
       message: "Preencha a descrição e escolha uma imagem válida.",
     };
 
-  if (file.size > 8 * 1024 * 1024)
+  if (file.size === 0)
+    return {
+      ok: false,
+      code: "file",
+      message: "O arquivo selecionado está vazio.",
+    };
+
+  if (file.size > 10 * 1024 * 1024)
     return {
       ok: false,
       code: "size",
-      message: "A imagem excede o limite de 8 MB.",
+      message: "A imagem excede o limite de 10 MB.",
     };
 
   const bytes = new Uint8Array(await file.arrayBuffer());

@@ -185,12 +185,12 @@ export function AdminMediaUploadForm() {
         </select>
         <p className="text-muted mt-2 text-xs">
           Recomendação: {recommendation.size}. Formatos aceitos: JPG, PNG e
-          WebP. Tamanho recomendado: até 2 MB. Limite máximo: 8 MB.
+          WebP. Tamanho recomendado: até 2 MB. Limite máximo: 10 MB.
         </p>
       </div>
 
       <label className="block text-sm font-bold">
-        Escolha uma imagem
+        {image ? "Substituir imagem" : "Escolha uma imagem"}
         <input
           name="file-original"
           type="file"
@@ -200,12 +200,22 @@ export function AdminMediaUploadForm() {
             const file = event.target.files?.[0];
             if (!file) return;
             setResult(null);
-            if (file.size > 8 * 1024 * 1024) {
+            if (file.size === 0) {
+              setImage(null);
+              setResult({
+                ok: false,
+                code: "file",
+                message: "O arquivo selecionado está vazio.",
+              });
+              event.currentTarget.value = "";
+              return;
+            }
+            if (file.size > 10 * 1024 * 1024) {
               setImage(null);
               setResult({
                 ok: false,
                 code: "size",
-                message: "A imagem excede o limite de 8 MB.",
+                message: "A imagem excede o limite de 10 MB.",
               });
               event.currentTarget.value = "";
               return;
@@ -252,6 +262,17 @@ export function AdminMediaUploadForm() {
             Arquivo: {image.width} × {image.height} px ·{" "}
             {(image.file.size / 1024 / 1024).toFixed(2)} MB
           </p>
+          <button
+            type="button"
+            onClick={() => {
+              URL.revokeObjectURL(image.url);
+              setImage(null);
+              setResult(null);
+            }}
+            className="text-error mt-3 min-h-9 rounded-full px-3 text-xs font-bold"
+          >
+            Remover imagem
+          </button>
 
           {kind !== "logo" ? (
             <div className="mt-4 grid gap-4">
@@ -368,7 +389,7 @@ export function AdminMediaUploadForm() {
         className="bg-brand inline-flex min-h-11 items-center gap-2 rounded-full px-5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
       >
         <ImageUp size={17} aria-hidden="true" />{" "}
-        {processing ? "Preparando imagem..." : "Enviar imagem"}
+        {processing ? "Enviando imagem..." : "Enviar imagem"}
       </button>
     </form>
   );

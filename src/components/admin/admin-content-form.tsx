@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { CalendarClock, Eye, ImagePlus, Save, Send, X } from "lucide-react";
 import type { CmsModuleFormConfig } from "@/lib/cms/modules";
-import { saveContentAction } from "@/app/admin/actions";
+import {
+  saveContentAction,
+  type SaveContentResult,
+} from "@/app/admin/actions";
 import { AdminGuidedField } from "@/components/admin/admin-guided-field";
 import { AdminContentPreview } from "@/components/admin/admin-content-preview";
 import { AdminMediaUploadForm } from "@/components/admin/admin-media-upload-form";
@@ -148,6 +151,9 @@ export function AdminContentForm({
   const [values, setValues] = useState(initialValues);
   const [dirty, setDirty] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [savingIntent, setSavingIntent] = useState<string | null>(null);
+  const [saveResult, setSaveResult] = useState<SaveContentResult | null>(null);
+  const submittingRef = useRef(false);
   const [selectedMedia, setSelectedMedia] = useState<Record<string, string>>(
     Object.fromEntries(
       mediaFieldConfig[module.key].map((field) => [
@@ -205,13 +211,34 @@ export function AdminContentForm({
         return;
       }
     }
-    setDirty(false);
+  }
+
+  async function submitContent(formData: FormData) {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    const intent = String(formData.get("intent") || "draft");
+    setSavingIntent(intent);
+    setSaveResult(null);
+    try {
+      const result = await saveContentAction(formData);
+      if (result) setSaveResult(result);
+    } catch {
+      setSaveResult({
+        ok: false,
+        code: "save",
+        message:
+          "A conexão foi interrompida durante o salvamento. Tente novamente.",
+      });
+    } finally {
+      submittingRef.current = false;
+      setSavingIntent(null);
+    }
   }
 
   return (
     <>
       <form
-        action={saveContentAction}
+        action={submitContent}
         onSubmit={confirmSubmission}
         className="border-border-light rounded-3xl border bg-white p-5 sm:p-7"
       >
@@ -330,13 +357,31 @@ export function AdminContentForm({
           </p>
         ) : null}
 
+        {saveResult ? (
+          <p
+            role="alert"
+            className="bg-error/10 text-error mt-6 rounded-xl p-4 text-sm font-bold"
+          >
+            {saveResult.message}
+            {saveResult.errorId ? (
+              <span className="mt-1 block text-xs font-normal">
+                Código do erro: {saveResult.errorId}
+              </span>
+            ) : null}
+          </p>
+        ) : null}
+
         <div className="border-border-light mt-7 flex flex-wrap gap-3 border-t pt-6">
           <button
             name="intent"
             value="draft"
+            disabled={savingIntent !== null}
             className="border-brand text-brand inline-flex min-h-11 items-center gap-2 rounded-full border px-5 text-sm font-bold"
           >
-            <Save size={17} aria-hidden="true" /> Salvar sem publicar
+            <Save size={17} aria-hidden="true" />{" "}
+            {savingIntent === "draft"
+              ? `Salvando ${module.singular}...`
+              : "Salvar sem publicar"}
           </button>
           <button
             type="button"
@@ -349,9 +394,13 @@ export function AdminContentForm({
             <button
               name="intent"
               value="publish"
+              disabled={savingIntent !== null}
               className="bg-brand inline-flex min-h-11 items-center gap-2 rounded-full px-5 text-sm font-bold text-white"
             >
-              <Send size={17} aria-hidden="true" /> Publicar no site
+              <Send size={17} aria-hidden="true" />{" "}
+              {savingIntent === "publish"
+                ? `Publicando ${module.singular}...`
+                : "Publicar no site"}
             </button>
           ) : null}
           {canPublish &&
@@ -359,9 +408,11 @@ export function AdminContentForm({
             <button
               name="intent"
               value="schedule"
+              disabled={savingIntent !== null}
               className="bg-brand-dark inline-flex min-h-11 items-center gap-2 rounded-full px-5 text-sm font-bold text-white"
             >
-              <CalendarClock size={17} aria-hidden="true" /> Agendar
+              <CalendarClock size={17} aria-hidden="true" />{" "}
+              {savingIntent === "schedule" ? "Agendando..." : "Agendar"}
             </button>
           ) : null}
           <Link
