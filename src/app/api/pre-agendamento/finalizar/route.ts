@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { siteConfig } from "@/config/site";
+import { getPublicInstitutionalContent } from "@/lib/cms/public-content";
 import { createWhatsAppUrl } from "@/lib/whatsapp";
 import {
   createManifestExpiration,
@@ -124,8 +124,9 @@ export async function POST(request: NextRequest) {
       expiresAt,
     };
     await saveSchedulingManifest(admin, session.accessToken, manifest);
+    const { config } = await getPublicInstitutionalContent();
 
-    const protectedUrl = `${siteConfig.url.replace(/\/$/, "")}/solicitacao/${session.accessToken}`;
+    const protectedUrl = `${config.url.replace(/\/$/, "")}/solicitacao/${session.accessToken}`;
     const hasInsuranceCard = documents.some(
       (document) => document.kind === "insuranceCard",
     );
@@ -160,7 +161,7 @@ export async function POST(request: NextRequest) {
       "Aguardo a confirmação da data e do horário. Obrigado(a)!",
     ].join("\n");
     const whatsappUrl = createWhatsAppUrl(
-      siteConfig.whatsapp[channel].number,
+      config.whatsapp[channel].number,
       message,
     );
     return json({ protocol: session.protocol, protectedUrl, whatsappUrl });

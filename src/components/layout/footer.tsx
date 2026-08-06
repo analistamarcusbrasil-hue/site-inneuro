@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Logo } from "@/components/brand/logo";
 import { Container } from "@/components/layout/container";
-import { siteConfig } from "@/config/site";
+import type { SiteConfig } from "@/config/site";
 import { createWhatsAppUrl } from "@/lib/whatsapp";
 
 const footerLinks = [
@@ -24,7 +24,7 @@ const legalLinks = [
 const vegaWhatsAppUrl =
   "https://wa.me/5596991493854?text=Ol%C3%A1%2C%20Marcus.%20Conheci%20seu%20trabalho%20pelo%20site%20da%20INNEURO%20e%20gostaria%20de%20conversar%20sobre%20uma%20solu%C3%A7%C3%A3o%20em%20tecnologia.";
 
-export function Footer() {
+export function Footer({ config }: { config: SiteConfig }) {
   const year = new Date().getFullYear();
   return (
     <footer className="bg-brand-dark text-white">
@@ -32,14 +32,14 @@ export function Footer() {
         <div className="max-w-sm">
           <Logo inverse wordmark />
           <p className="font-heading mt-5 text-lg font-semibold">
-            {siteConfig.fullName}
+            {config.fullName}
           </p>
           <p className="mt-3 text-sm leading-relaxed text-white/68">
-            {siteConfig.description}
+            {config.description}
           </p>
           <p className="mt-5 flex gap-2 text-sm leading-relaxed text-white/72">
             <MapPin aria-hidden="true" size={16} className="shrink-0" />
-            {siteConfig.address.formatted}
+            {config.address.formatted}
           </p>
         </div>
         <div>
@@ -63,7 +63,7 @@ export function Footer() {
             Canais oficiais
           </h2>
           <div className="mt-4 flex flex-col">
-            {Object.values(siteConfig.whatsapp).map((channel) => (
+            {Object.values(config.whatsapp).map((channel) => (
               <a
                 key={channel.number}
                 href={createWhatsAppUrl(channel.number, generalMessage)}
@@ -78,18 +78,18 @@ export function Footer() {
               </a>
             ))}
             <a
-              href={siteConfig.instagram.url}
+              href={config.instagram.url}
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Instagram da INNEURO — abre em nova aba"
               className="inline-flex min-h-11 items-center gap-2 text-sm text-white/72 hover:text-white"
             >
               <AtSign aria-hidden="true" size={16} />
-              {siteConfig.instagram.handle}
+              {config.instagram.handle}
               <ExternalLink aria-hidden="true" size={13} />
             </a>
             <a
-              href={siteConfig.mapsUrl}
+              href={config.mapsUrl}
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Como chegar pelo Google Maps — abre em nova aba"
@@ -99,9 +99,9 @@ export function Footer() {
               Como chegar
               <ExternalLink aria-hidden="true" size={13} />
             </a>
-            {siteConfig.patientPortal.url && (
+            {config.patientPortal.url && (
               <a
-                href={siteConfig.patientPortal.url}
+                href={config.patientPortal.url}
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="Portal de Exames — abre em uma nova aba"

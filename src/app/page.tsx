@@ -6,7 +6,13 @@ import { Insurance } from "@/components/sections/insurance";
 import { Location } from "@/components/sections/location";
 import { Modalities } from "@/components/sections/modalities";
 import { QuickActions } from "@/components/sections/quick-actions";
-import { getPublicCarousel, getPublicPartners } from "@/lib/cms/public-content";
+import {
+  getPublicCarousel,
+  getPublicExams,
+  getPublicInstitutionalContent,
+  getPublicPartners,
+  getPublicPreparations,
+} from "@/lib/cms/public-content";
 import { createPageMetadata } from "@/lib/metadata";
 
 export const metadata = createPageMetadata({
@@ -17,20 +23,31 @@ export const metadata = createPageMetadata({
 });
 
 export default async function Home() {
-  const [highlights, partners] = await Promise.all([
-    getPublicCarousel(),
-    getPublicPartners(),
-  ]);
+  const [highlights, partners, examContent, services, institutional] =
+    await Promise.all([
+      getPublicCarousel(),
+      getPublicPartners(),
+      getPublicExams(),
+      getPublicPreparations(),
+      getPublicInstitutionalContent(),
+    ]);
   return (
     <main id="main-content" tabIndex={-1}>
-      <Hero />
-      <CompanyHighlightsSection items={highlights} />
+      <Hero patientPortalUrl={institutional.config.patientPortal.url} />
+      {highlights.length ? (
+        <CompanyHighlightsSection items={highlights} />
+      ) : null}
       <QuickActions />
-      <Modalities />
-      <Insurance partners={partners} />
+      <Modalities items={examContent.modalities} />
+      <Insurance
+        partners={partners}
+        whatsappNumber={institutional.config.whatsapp.primary.number}
+      />
       <Differentials />
-      <Location />
-      <FinalSchedulingCta />
+      <Location config={institutional.config} services={services} />
+      <FinalSchedulingCta
+        whatsappNumber={institutional.config.whatsapp.primary.number}
+      />
     </main>
   );
 }

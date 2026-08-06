@@ -10,8 +10,8 @@ import {
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
-import { exames } from "@/data/exames";
-import { modalities } from "@/data/modalidades";
+import type { Exame } from "@/types/exame";
+import type { Modality } from "@/types/modality";
 
 function normalize(value: string) {
   return value
@@ -20,7 +20,13 @@ function normalize(value: string) {
     .toLowerCase();
 }
 
-export function ExamCatalog() {
+export function ExamCatalog({
+  exams,
+  modalities,
+}: {
+  exams: Exame[];
+  modalities: Modality[];
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialModality = searchParams.get("modalidade") ?? "todos";
@@ -33,7 +39,7 @@ export function ExamCatalog() {
 
   const filteredExams = useMemo(() => {
     const normalizedQuery = normalize(query.trim());
-    return exames.filter((exam) => {
+    return exams.filter((exam) => {
       const matchesModality =
         modality === "todos" || exam.modalitySlug === modality;
       const searchable = normalize(
@@ -43,7 +49,7 @@ export function ExamCatalog() {
         exam.active && matchesModality && searchable.includes(normalizedQuery)
       );
     });
-  }, [modality, query]);
+  }, [exams, modality, query]);
 
   function selectModality(value: string) {
     setModality(value);

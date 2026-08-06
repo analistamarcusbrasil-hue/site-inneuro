@@ -8,6 +8,7 @@ export type CompanyHighlight = {
   focalPosition?: string;
   href?: string;
   ctaLabel?: string;
+  openInNewTab?: boolean;
   creditLabel?: string;
   creditUrl?: string;
   published: boolean;

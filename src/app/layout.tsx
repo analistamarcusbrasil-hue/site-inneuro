@@ -3,6 +3,7 @@ import { Manrope, Plus_Jakarta_Sans } from "next/font/google";
 import { SiteChrome } from "@/components/layout/site-chrome";
 import { siteConfig } from "@/config/site";
 import { isPreviewDeployment } from "@/lib/deployment";
+import { getPublicInstitutionalContent } from "@/lib/cms/public-content";
 import "./globals.css";
 
 const manrope = Manrope({
@@ -61,47 +62,46 @@ export const viewport: Viewport = {
   themeColor: "#03251B",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  const { config } = await getPublicInstitutionalContent();
   return (
     <html lang="pt-BR" className={`${manrope.variable} ${jakarta.variable}`}>
       <body>
-        <SiteChrome>{children}</SiteChrome>
+        <SiteChrome config={config}>{children}</SiteChrome>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
             __html: JSON.stringify({
               "@context": "https://schema.org",
               "@type": "MedicalClinic",
-              name: siteConfig.fullName,
-              description: siteConfig.description,
-              ...(siteConfig.url ? { url: siteConfig.url } : {}),
-              ...(siteConfig.phone ? { telephone: siteConfig.phone } : {}),
-              ...(siteConfig.url
+              name: config.fullName,
+              description: config.description,
+              ...(config.url ? { url: config.url } : {}),
+              ...(config.phone ? { telephone: config.phone } : {}),
+              ...(config.url
                 ? {
                     logo: new URL(
                       "/apple-touch-icon.png",
-                      siteConfig.url,
+                      config.url,
                     ).toString(),
                   }
                 : {}),
               address: {
                 "@type": "PostalAddress",
-                streetAddress: `${siteConfig.address.street}, ${siteConfig.address.number}`,
-                addressLocality: siteConfig.address.city,
-                addressRegion: siteConfig.address.state,
+                streetAddress: `${config.address.street}, ${config.address.number}`,
+                addressLocality: config.address.city,
+                addressRegion: config.address.state,
                 addressCountry: "BR",
               },
-              hasMap: siteConfig.mapsUrl,
-              sameAs: [siteConfig.instagram.url],
-              contactPoint: Object.values(siteConfig.whatsapp).map(
-                (channel) => ({
-                  "@type": "ContactPoint",
-                  telephone: `+${channel.number}`,
-                  contactType: "customer service",
-                }),
-              ),
+              hasMap: config.mapsUrl,
+              sameAs: [config.instagram.url],
+              contactPoint: Object.values(config.whatsapp).map((channel) => ({
+                "@type": "ContactPoint",
+                telephone: `+${channel.number}`,
+                contactType: "customer service",
+              })),
               knowsAbout: [
                 "Ressonância Magnética",
                 "Tomografia Computadorizada",

@@ -1,13 +1,20 @@
 import type { MetadataRoute } from "next";
-import { siteConfig } from "@/config/site";
-import { exames, hasIndexableExamContent } from "@/data/exames";
-import { modalities } from "@/data/modalidades";
+import { hasIndexableExamContent } from "@/data/exames";
 import { isPreviewDeployment } from "@/lib/deployment";
-import { getPublicNews } from "@/lib/cms/public-content";
+import {
+  getPublicExams,
+  getPublicInstitutionalContent,
+  getPublicNews,
+} from "@/lib/cms/public-content";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  if (!siteConfig.url || isPreviewDeployment) return [];
-  const news = await getPublicNews(500);
+  const [news, examContent, institutional] = await Promise.all([
+    getPublicNews(500),
+    getPublicExams(),
+    getPublicInstitutionalContent(),
+  ]);
+  const siteUrl = institutional.config.url;
+  if (!siteUrl || isPreviewDeployment) return [];
   const routes = [
     "",
     "/exames",
@@ -22,23 +29,23 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
   return [
     ...routes.map((route) => ({
-      url: `${siteConfig.url}${route}`,
+      url: `${siteUrl}${route}`,
       changeFrequency: "monthly" as const,
     })),
-    ...exames
+    ...examContent.exams
       .filter((exam) => exam.active && hasIndexableExamContent(exam))
       .map((exam) => ({
-        url: `${siteConfig.url}/exames/${exam.slug}`,
+        url: `${siteUrl}/exames/${exam.slug}`,
         changeFrequency: "monthly" as const,
       })),
-    ...modalities
+    ...examContent.modalities
       .filter((item) => item.active)
       .map((modality) => ({
-        url: `${siteConfig.url}/preparos/${modality.slug}`,
+        url: `${siteUrl}/preparos/${modality.slug}`,
         changeFrequency: "monthly" as const,
       })),
     ...news.map((item) => ({
-      url: `${siteConfig.url}/noticias/${item.slug}`,
+      url: `${siteUrl}/noticias/${item.slug}`,
       lastModified: item.publishedAt ?? undefined,
       changeFrequency: "monthly" as const,
     })),

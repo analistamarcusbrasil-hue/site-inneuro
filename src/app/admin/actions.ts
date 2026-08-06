@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { isCmsConfigured } from "@/lib/cms/config";
-import { requireAdmin } from "@/lib/cms/auth";
+import { getAdminSession, requireAdmin } from "@/lib/cms/auth";
 import { getCmsModule, type CmsModuleKey } from "@/lib/cms/modules";
 import { moduleSchemas } from "@/lib/cms/schemas";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -35,6 +35,52 @@ function formValue(formData: FormData, name: string, type?: string) {
   if (type === "checkbox") return formData.get(name) === "on";
   if (type === "number") return Number(formData.get(name) || 0);
   return String(formData.get(name) ?? "").trim();
+}
+
+function nonEmptyLines(value: unknown) {
+  return String(value ?? "")
+    .split(/\r?\n/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function parseSchedules(value: unknown) {
+  return nonEmptyLines(value).flatMap((line) => {
+    const [label, days, periodsValue] = line
+      .split("|")
+      .map((item) => item.trim());
+    if (!label || !days || !periodsValue) return [];
+    const periods = periodsValue.split(";").flatMap((period) => {
+      const [start, end] = period
+        .split(/\s*[-–—]\s*/)
+        .map((item) => item.trim());
+      return start && end ? [{ start, end }] : [];
+    });
+    return periods.length ? [{ label, days, periods }] : [];
+  });
+}
+
+function parsePreparationGroups(value: unknown) {
+  return nonEmptyLines(value).flatMap((line) => {
+    const [title, appliesToValue, instructionsValue, warning] = line
+      .split("|")
+      .map((item) => item.trim());
+    if (!title || !appliesToValue || !instructionsValue) return [];
+    return [
+      {
+        title,
+        appliesTo: appliesToValue
+          .split(";")
+          .map((item) => item.trim())
+          .filter(Boolean),
+        instructions: instructionsValue
+          .split(";")
+          .map((item) => item.trim())
+          .filter(Boolean),
+        ...(warning ? { warning } : {}),
+      },
+    ];
+  });
 }
 
 async function audit(
@@ -88,6 +134,7 @@ export async function saveContentAction(formData: FormData) {
     convenios: ["logo_media_id"],
     "redes-sociais": ["thumbnail_media_id"],
     equipamentos: ["cover_media_id"],
+    exames: ["cover_media_id"],
   };
   for (const field of mediaFieldNames[moduleKey] ?? []) {
     payload[field] = String(formData.get(field) || "") || null;
@@ -104,6 +151,33 @@ export async function saveContentAction(formData: FormData) {
       : [];
     delete payload.content_text;
   }
+  if (moduleKey === "carrossel" && payload.linked_news_id) {
+    const { data: linkedNews } = await supabase
+      .from("news_posts")
+      .select("slug")
+      .eq("id", String(payload.linked_news_id))
+      .maybeSingle();
+    if (!linkedNews) redirect(`/admin/${moduleKey}?error=validation`);
+    payload.cta_url = `/noticias/${linkedNews.slug}`;
+    payload.open_in_new_tab = false;
+  }
+  if (moduleKey === "preparos") {
+    payload.search_terms = nonEmptyLines(raw.search_terms_text);
+    payload.schedules = parseSchedules(raw.schedules_text);
+    payload.preparation_groups = parsePreparationGroups(
+      raw.preparation_groups_text,
+    );
+    payload.documents = nonEmptyLines(raw.documents_text);
+    payload.safety_questions = nonEmptyLines(raw.safety_questions_text);
+    for (const key of [
+      "search_terms_text",
+      "schedules_text",
+      "preparation_groups_text",
+      "documents_text",
+      "safety_questions_text",
+    ])
+      delete payload[key];
+  }
   for (const key of ["publish_at", "occurred_at"]) {
     if (key in payload) payload[key] = payload[key] || null;
   }
@@ -113,6 +187,21 @@ export async function saveContentAction(formData: FormData) {
       : intent === "schedule"
         ? "scheduled"
         : "draft";
+  if (moduleKey === "carrossel" && intent !== "draft") {
+    let hasPersistedImage = false;
+    if (id) {
+      const { data: current } = await supabase
+        .from("carousel_slides")
+        .select("image_url,desktop_media_id")
+        .eq("id", id)
+        .maybeSingle();
+      hasPersistedImage = Boolean(
+        current?.image_url || current?.desktop_media_id,
+      );
+    }
+    if (!payload.desktop_media_id && !hasPersistedImage)
+      redirect(`/admin/${moduleKey}?error=image-required`);
+  }
   if (intent === "publish" && moduleKey === "noticias") {
     payload.published_at = new Date().toISOString();
   }
@@ -135,6 +224,56 @@ export async function saveContentAction(formData: FormData) {
     savedId = String(data.id);
   }
 
+  if (moduleKey === "noticias") {
+    const newsData = parsed.data as z.infer<typeof moduleSchemas.noticias>;
+    if (newsData.show_in_carousel) {
+      const coverId = String(formData.get("cover_media_id") || "") || null;
+      const { data: cover } = coverId
+        ? await supabase
+            .from("media_assets")
+            .select("alt_text")
+            .eq("id", coverId)
+            .maybeSingle()
+        : { data: null };
+      const carouselPayload = {
+        title: newsData.title,
+        description: newsData.summary,
+        category: newsData.category || "Notícia",
+        desktop_media_id: coverId,
+        image_alt: cover?.alt_text || `Imagem de capa: ${newsData.title}`,
+        cta_label: "Ler matéria",
+        cta_url: `/noticias/${newsData.slug}`,
+        linked_news_id: savedId,
+        open_in_new_tab: false,
+        status: payload.status,
+        active: intent !== "draft",
+        publish_at: payload.publish_at ?? null,
+        updated_by: user.id,
+      };
+      const { data: linkedSlide } = await supabase
+        .from("carousel_slides")
+        .select("id")
+        .eq("linked_news_id", savedId)
+        .maybeSingle();
+      const { error: carouselError } = linkedSlide
+        ? await supabase
+            .from("carousel_slides")
+            .update(carouselPayload)
+            .eq("id", linkedSlide.id)
+        : await supabase.from("carousel_slides").insert({
+            ...carouselPayload,
+            sort_order: 999,
+            created_by: user.id,
+          });
+      if (carouselError) redirect(`/admin/${moduleKey}?error=carousel-link`);
+    } else {
+      await supabase
+        .from("carousel_slides")
+        .update({ active: false, updated_by: user.id })
+        .eq("linked_news_id", savedId);
+    }
+  }
+
   await audit(
     supabase,
     user.id,
@@ -146,6 +285,10 @@ export async function saveContentAction(formData: FormData) {
   revalidatePath("/");
   revalidatePath("/convenios");
   revalidatePath("/noticias");
+  revalidatePath("/exames");
+  revalidatePath("/preparos");
+  revalidatePath("/contato");
+  revalidatePath("/sobre");
   if (moduleKey === "noticias") {
     revalidatePath(`/noticias/${String(raw.slug ?? "")}`);
   }
@@ -249,31 +392,71 @@ function detectImage(bytes: Uint8Array) {
   return null;
 }
 
-export async function uploadMediaAction(formData: FormData) {
-  const { supabase, user } = await requireAdmin();
+export type MediaUploadResult = {
+  ok: boolean;
+  message: string;
+  code?: "validation" | "file" | "size" | "session" | "storage" | "save";
+};
+
+export async function uploadMediaAction(
+  formData: FormData,
+): Promise<MediaUploadResult> {
+  const session = await getAdminSession();
+  if (!session.user || !session.profile || !session.supabase)
+    return {
+      ok: false,
+      code: "session",
+      message: "Sua sessão expirou. Entre novamente.",
+    };
+  const { supabase, user } = session;
   const file = formData.get("file");
   const parsed = mediaSchema.safeParse(Object.fromEntries(formData));
   if (!(file instanceof File) || !parsed.success)
-    redirect("/admin/midias?error=validation");
+    return {
+      ok: false,
+      code: "validation",
+      message: "Preencha a descrição e escolha uma imagem válida.",
+    };
+
+  if (file.size > 8 * 1024 * 1024)
+    return {
+      ok: false,
+      code: "size",
+      message: "A imagem excede o limite de 8 MB.",
+    };
 
   const bytes = new Uint8Array(await file.arrayBuffer());
   const detected = detectImage(bytes);
   const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
-  const limits = { photo: 8, logo: 2, thumbnail: 4 } as const;
   if (
     !detected ||
     detected.mime !== file.type ||
-    !detected.extensions.includes(extension) ||
-    file.size > limits[parsed.data.kind] * 1024 * 1024
+    !detected.extensions.includes(extension)
   ) {
-    redirect("/admin/midias?error=file");
+    return {
+      ok: false,
+      code: "file",
+      message: "Formato não permitido. Envie uma imagem JPG, PNG ou WebP.",
+    };
   }
 
   const path = `${user.id}/${crypto.randomUUID()}.${extension}`;
   const { error: uploadError } = await supabase.storage
     .from("site-media")
     .upload(path, bytes, { contentType: detected.mime, upsert: false });
-  if (uploadError) redirect("/admin/midias?error=upload");
+  if (uploadError) {
+    console.error("Falha no upload do CMS", {
+      code: uploadError.name,
+      message: uploadError.message,
+    });
+    return {
+      ok: false,
+      code: "storage",
+      message: uploadError.message.toLowerCase().includes("bucket")
+        ? "O armazenamento de imagens não está configurado."
+        : "Não foi possível concluir o envio. Verifique sua conexão e tente novamente.",
+    };
+  }
 
   const { error } = await supabase.from("media_assets").insert({
     bucket: "site-media",
@@ -286,11 +469,20 @@ export async function uploadMediaAction(formData: FormData) {
   });
   if (error) {
     await supabase.storage.from("site-media").remove([path]);
-    redirect("/admin/midias?error=save");
+    console.error("Falha ao registrar mídia do CMS", {
+      code: error.code,
+      message: error.message,
+    });
+    return {
+      ok: false,
+      code: "save",
+      message:
+        "A imagem foi enviada, mas não pôde ser registrada. Tente novamente.",
+    };
   }
   await audit(supabase, user.id, "upload", "media_assets", path);
   revalidatePath("/admin/midias");
-  redirect("/admin/midias?success=uploaded");
+  return { ok: true, message: "Imagem enviada com sucesso." };
 }
 
 export async function inviteUserAction(formData: FormData) {
@@ -416,12 +608,93 @@ export async function updateMediaMetadataAction(formData: FormData) {
   redirect("/admin/midias?success=updated");
 }
 
+const institutionalSchema = z.object({
+  full_name: z.string().trim().min(1).max(160),
+  description: z.string().trim().min(1).max(500),
+  phone: z.string().trim().max(40),
+  email: z.string().trim().email().or(z.literal("")),
+  opening_hours: z.string().trim().max(500),
+  whatsapp_primary_label: z.string().trim().min(1).max(80),
+  whatsapp_primary_display: z.string().trim().min(1).max(40),
+  whatsapp_primary_number: z
+    .string()
+    .trim()
+    .regex(/^\d{10,15}$/),
+  whatsapp_secondary_label: z.string().trim().min(1).max(80),
+  whatsapp_secondary_display: z.string().trim().min(1).max(40),
+  whatsapp_secondary_number: z
+    .string()
+    .trim()
+    .regex(/^\d{10,15}$/),
+  instagram_url: z.string().trim().url(),
+  instagram_handle: z.string().trim().min(1).max(80),
+  address_street: z.string().trim().min(1).max(160),
+  address_number: z.string().trim().min(1).max(30),
+  address_neighborhood: z.string().trim().min(1).max(120),
+  address_city: z.string().trim().min(1).max(120),
+  address_state: z.string().trim().min(2).max(2),
+  address_postal_code: z.string().trim().max(20),
+  address_reference: z.string().trim().max(300),
+  maps_url: z.string().trim().url(),
+  patient_portal_url: z.string().trim().url(),
+  about_title: z.string().trim().min(1).max(160),
+  about_description: z.string().trim().min(1).max(500),
+  about_purpose: z.string().trim().min(1).max(1000),
+  about_technology: z.string().trim().min(1).max(1000),
+});
+
+export async function saveInstitutionalSettingsAction(formData: FormData) {
+  const { supabase, user } = await requireAdmin(["super_admin", "admin"]);
+  const parsed = institutionalSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) redirect("/admin/informacoes?error=validation");
+  const { data: current } = await supabase
+    .from("site_settings")
+    .select("value")
+    .eq("key", "institutional")
+    .maybeSingle();
+  const value = {
+    ...((current?.value && typeof current.value === "object"
+      ? current.value
+      : {}) as Record<string, unknown>),
+    ...parsed.data,
+  };
+  const { error } = await supabase.from("site_settings").upsert({
+    key: "institutional",
+    category: "institutional",
+    is_public: true,
+    value,
+    updated_by: user.id,
+  });
+  if (error) redirect("/admin/informacoes?error=save");
+  await audit(
+    supabase,
+    user.id,
+    "update",
+    "site_settings",
+    "institutional",
+    parsed.data,
+  );
+  for (const path of [
+    "/",
+    "/contato",
+    "/sobre",
+    "/exames",
+    "/preparos",
+    "/convenios",
+    "/admin/informacoes",
+  ])
+    revalidatePath(path);
+  redirect("/admin/informacoes?success=saved");
+}
+
 const restorableTables = [
   "carousel_slides",
   "news_posts",
   "health_partners",
   "social_posts",
   "equipment",
+  "exams",
+  "preparations",
 ] as const;
 
 export async function trashCommandAction(formData: FormData) {

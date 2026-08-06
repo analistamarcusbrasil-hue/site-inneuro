@@ -3,8 +3,8 @@
 import { CalendarClock, Search, X } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { clinicalServices } from "@/data/clinical-services";
-import { modalities } from "@/data/modalidades";
+import type { ClinicalService } from "@/types/clinical-service";
+import type { Modality } from "@/types/modality";
 
 const filters = [
   ["todos", "Todos"],
@@ -16,13 +16,6 @@ const filters = [
   ["cintilografia", "Cintilografia"],
 ] as const;
 
-const catalogItems = modalities
-  .filter((modality) => modality.active)
-  .map((modality) => ({
-    modality,
-    service: clinicalServices.find((service) => service.slug === modality.slug),
-  }));
-
 function normalize(value: string) {
   return value
     .normalize("NFD")
@@ -30,7 +23,10 @@ function normalize(value: string) {
     .toLowerCase();
 }
 
-function searchableText(item: (typeof catalogItems)[number]) {
+function searchableText(item: {
+  modality: Modality;
+  service: ClinicalService | undefined;
+}) {
   const { modality, service } = item;
   return [
     modality.name,
@@ -44,7 +40,23 @@ function searchableText(item: (typeof catalogItems)[number]) {
   ].join(" ");
 }
 
-export function PreparationCatalog() {
+export function PreparationCatalog({
+  modalities,
+  services,
+}: {
+  modalities: Modality[];
+  services: ClinicalService[];
+}) {
+  const catalogItems = useMemo(
+    () =>
+      modalities
+        .filter((modality) => modality.active)
+        .map((modality) => ({
+          modality,
+          service: services.find((service) => service.slug === modality.slug),
+        })),
+    [modalities, services],
+  );
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("todos");
   const results = useMemo(
@@ -54,7 +66,7 @@ export function PreparationCatalog() {
           (filter === "todos" || item.modality.slug === filter) &&
           normalize(searchableText(item)).includes(normalize(query)),
       ),
-    [filter, query],
+    [catalogItems, filter, query],
   );
 
   return (

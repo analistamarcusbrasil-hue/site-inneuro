@@ -3,9 +3,8 @@ import Link from "next/link";
 import { ScanVisual } from "@/components/brand/scan-visual";
 import { Container } from "@/components/layout/container";
 import { Badge } from "@/components/ui/badge";
-import { siteConfig } from "@/config/site";
 
-export function Hero() {
+export function Hero({ patientPortalUrl }: { patientPortalUrl: string }) {
   return (
     <section
       aria-labelledby="hero-title"
@@ -41,7 +40,7 @@ export function Hero() {
               Agendar meu exame
             </Link>
             <a
-              href={siteConfig.patientPortal.url}
+              href={patientPortalUrl}
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Acessar resultados no Portal de Exames — abre em nova aba"

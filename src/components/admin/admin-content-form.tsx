@@ -7,6 +7,7 @@ import type { CmsModuleFormConfig } from "@/lib/cms/modules";
 import { saveContentAction } from "@/app/admin/actions";
 import { AdminGuidedField } from "@/components/admin/admin-guided-field";
 import { AdminContentPreview } from "@/components/admin/admin-content-preview";
+import { AdminMediaUploadForm } from "@/components/admin/admin-media-upload-form";
 
 type MediaOption = { id: string; label: string; url: string };
 type FieldValue = string | boolean;
@@ -18,6 +19,51 @@ function initialFieldValue(
 ) {
   if (name === "content_text" && Array.isArray(initial.content))
     return String((initial.content[0] as { text?: string })?.text ?? "");
+  if (name === "search_terms_text" && Array.isArray(initial.search_terms))
+    return initial.search_terms.map(String).join("\n");
+  if (name === "documents_text" && Array.isArray(initial.documents))
+    return initial.documents.map(String).join("\n");
+  if (
+    name === "safety_questions_text" &&
+    Array.isArray(initial.safety_questions)
+  )
+    return initial.safety_questions.map(String).join("\n");
+  if (name === "schedules_text" && Array.isArray(initial.schedules))
+    return initial.schedules
+      .map((item) => {
+        const schedule = item as {
+          label?: string;
+          days?: string;
+          periods?: { start?: string; end?: string }[];
+        };
+        const periods = (schedule.periods ?? [])
+          .map((period) => `${period.start ?? ""}-${period.end ?? ""}`)
+          .join("; ");
+        return `${schedule.label ?? ""} | ${schedule.days ?? ""} | ${periods}`;
+      })
+      .join("\n");
+  if (
+    name === "preparation_groups_text" &&
+    Array.isArray(initial.preparation_groups)
+  )
+    return initial.preparation_groups
+      .map((item) => {
+        const group = item as {
+          title?: string;
+          appliesTo?: string[];
+          instructions?: string[];
+          warning?: string;
+        };
+        return [
+          group.title ?? "",
+          (group.appliesTo ?? []).join("; "),
+          (group.instructions ?? []).join("; "),
+          group.warning ?? "",
+        ].join(" | ");
+      })
+      .join("\n");
+  if (type === "date" && initial[name])
+    return String(initial[name]).slice(0, 10);
   if (type === "checkbox") return Boolean(initial[name]);
   return String(initial[name] ?? "");
 }
@@ -65,6 +111,14 @@ const mediaFieldConfig = {
       recommendation: "Card: 1200 × 800 px (proporção 3:2).",
     },
   ],
+  exames: [
+    {
+      name: "cover_media_id",
+      label: "Imagem do exame (opcional)",
+      recommendation: "Card ou notícia: 1200 × 800 px (proporção 3:2).",
+    },
+  ],
+  preparos: [],
 } satisfies Record<
   string,
   { name: string; label: string; recommendation: string }[]
@@ -318,6 +372,15 @@ export function AdminContentForm({
           </Link>
         </div>
       </form>
+
+      {mediaFieldConfig[module.key].length ? (
+        <details className="border-border-light mt-5 rounded-3xl border bg-white p-5">
+          <summary className="text-brand cursor-pointer text-sm font-bold">
+            Enviar uma nova imagem sem sair desta tela
+          </summary>
+          <AdminMediaUploadForm />
+        </details>
+      ) : null}
 
       {previewOpen ? (
         <AdminContentPreview

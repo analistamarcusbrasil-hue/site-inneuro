@@ -1,8 +1,22 @@
 import type { LucideIcon } from "lucide-react";
-import { Images, Newspaper, Handshake, Share2, MonitorCog } from "lucide-react";
+import {
+  Images,
+  Newspaper,
+  Handshake,
+  Share2,
+  MonitorCog,
+  Stethoscope,
+  ClipboardList,
+} from "lucide-react";
 
 export type CmsModuleKey =
-  "carrossel" | "noticias" | "convenios" | "redes-sociais" | "equipamentos";
+  | "carrossel"
+  | "noticias"
+  | "exames"
+  | "preparos"
+  | "convenios"
+  | "redes-sociais"
+  | "equipamentos";
 
 export type CmsField = {
   name: string;
@@ -12,6 +26,7 @@ export type CmsField = {
     | "textarea"
     | "url"
     | "number"
+    | "date"
     | "datetime-local"
     | "select"
     | "checkbox";
@@ -33,6 +48,8 @@ export type CmsModule = {
   table:
     | "carousel_slides"
     | "news_posts"
+    | "exams"
+    | "preparations"
     | "health_partners"
     | "social_posts"
     | "equipment";
@@ -108,6 +125,21 @@ export const cmsModules: CmsModule[] = [
         maxLength: 500,
       },
       {
+        name: "linked_news_id",
+        label: "Matéria vinculada",
+        type: "select",
+        help: "Opcional. Escolha uma notícia publicada ou em preparação.",
+        location: "Ao clicar no slide, abre a matéria escolhida.",
+        options: [{ label: "Nenhuma matéria", value: "" }],
+      },
+      {
+        name: "open_in_new_tab",
+        label: "Abrir em nova aba",
+        type: "checkbox",
+        help: "Use apenas para links externos. Links do próprio site devem abrir na mesma aba.",
+        location: "Comportamento do botão do slide.",
+      },
+      {
         name: "publish_at",
         label: "Agendar publicação",
         type: "datetime-local",
@@ -179,6 +211,15 @@ export const cmsModules: CmsModule[] = [
         maxLength: 80,
       },
       {
+        name: "author",
+        label: "Autor",
+        help: "Informe o nome ou a equipe responsável pelo texto.",
+        example: "Equipe INNEURO",
+        location: "Identificação editorial da matéria.",
+        recommendedMax: 60,
+        maxLength: 120,
+      },
+      {
         name: "content_text",
         label: "Texto completo",
         type: "textarea",
@@ -232,6 +273,292 @@ export const cmsModules: CmsModule[] = [
     ],
   },
   {
+    key: "exames",
+    label: "Exames",
+    singular: "exame",
+    table: "exams",
+    icon: Stethoscope,
+    fields: [
+      {
+        name: "name",
+        label: "Nome do exame",
+        required: true,
+        help: "Use o nome pelo qual o paciente procura o exame.",
+        example: "Ressonância Magnética",
+        location: "Cards, busca e página do exame.",
+        recommendedMax: 60,
+        maxLength: 160,
+      },
+      {
+        name: "slug",
+        label: "Endereço do exame",
+        required: true,
+        help: "Use letras minúsculas e hífens, sem espaços ou acentos.",
+        example: "ressonancia-magnetica",
+        location: "Forma o endereço /exames/endereco-do-exame.",
+        maxLength: 120,
+      },
+      {
+        name: "modality",
+        label: "Modalidade",
+        required: true,
+        help: "Informe a categoria usada no filtro.",
+        example: "Ressonância Magnética",
+        location: "Filtro e identificação do card.",
+        recommendedMax: 60,
+        maxLength: 120,
+      },
+      {
+        name: "modality_slug",
+        label: "Identificador da modalidade",
+        required: true,
+        help: "Normalmente é igual ao endereço do exame.",
+        example: "ressonancia-magnetica",
+        location: "Filtro interno do catálogo.",
+        maxLength: 120,
+      },
+      {
+        name: "short_description",
+        label: "Descrição curta",
+        type: "textarea",
+        required: true,
+        help: "Explique de forma objetiva, sem criar promessa médica.",
+        example:
+          "Modalidade realizada conforme indicação e solicitação médica.",
+        location: "Card e topo da página do exame.",
+        recommendedMax: 160,
+        maxLength: 500,
+        fullWidth: true,
+      },
+      {
+        name: "preparation_slug",
+        label: "Preparo relacionado",
+        help: "Informe o endereço do preparo associado.",
+        example: "ressonancia-magnetica",
+        location: "Link “Consultar preparo” da página do exame.",
+        maxLength: 120,
+      },
+      {
+        name: "purpose",
+        label: "Para que serve",
+        type: "textarea",
+        help: "Use somente informação aprovada pela clínica.",
+        location: "Página de detalhes do exame.",
+        recommendedMax: 300,
+        maxLength: 3000,
+        fullWidth: true,
+      },
+      {
+        name: "how_performed",
+        label: "Como é realizado",
+        type: "textarea",
+        help: "Descreva o procedimento de forma simples.",
+        location: "Página de detalhes do exame.",
+        recommendedMax: 300,
+        maxLength: 3000,
+        fullWidth: true,
+      },
+      {
+        name: "general_guidance",
+        label: "Orientações gerais",
+        type: "textarea",
+        help: "Não substitua o preparo específico nem orientação médica.",
+        location: "Página de detalhes do exame.",
+        maxLength: 3000,
+        fullWidth: true,
+      },
+      {
+        name: "documents",
+        label: "Documentos",
+        type: "textarea",
+        help: "Liste os documentos solicitados pela clínica.",
+        location: "Página de detalhes do exame.",
+        maxLength: 2000,
+        fullWidth: true,
+      },
+      {
+        name: "icon",
+        label: "Ícone",
+        type: "select",
+        help: "Escolha o símbolo visual da modalidade.",
+        location: "Cards de modalidades.",
+        options: [
+          { label: "Ressonância", value: "magnetic-resonance" },
+          { label: "Tomografia", value: "computed-tomography" },
+          { label: "Raios X", value: "x-ray" },
+          { label: "Medicina Nuclear", value: "nuclear-medicine" },
+          { label: "Cintilografia", value: "scintigraphy" },
+          { label: "Mapeamento Cerebral", value: "brain-mapping" },
+        ],
+      },
+      {
+        name: "featured",
+        label: "Destacar na página inicial",
+        type: "checkbox",
+        help: "Mostra o exame entre as principais modalidades.",
+        location: "Página inicial.",
+      },
+      {
+        name: "active",
+        label: "Exibir no site",
+        type: "checkbox",
+        help: "Somente exames publicados e ativos aparecem ao público.",
+        location: "Página inicial e catálogo de exames.",
+      },
+      {
+        name: "sort_order",
+        label: "Ordem de exibição",
+        type: "number",
+        help: "Use 0 para aparecer primeiro.",
+        example: "0",
+        location: "Listas e filtros.",
+      },
+    ],
+  },
+  {
+    key: "preparos",
+    label: "Preparos e horários",
+    singular: "preparo",
+    table: "preparations",
+    icon: ClipboardList,
+    fields: [
+      {
+        name: "name",
+        label: "Nome da modalidade",
+        required: true,
+        help: "Use o mesmo nome exibido no exame relacionado.",
+        example: "Ressonância Magnética",
+        location: "Catálogo e página de preparo.",
+        maxLength: 160,
+      },
+      {
+        name: "slug",
+        label: "Endereço do preparo",
+        required: true,
+        help: "Use letras minúsculas e hífens, sem espaços ou acentos.",
+        example: "ressonancia-magnetica",
+        location: "Forma o endereço /preparos/endereco-do-preparo.",
+        maxLength: 120,
+      },
+      {
+        name: "exam_slug",
+        label: "Exame relacionado",
+        required: true,
+        help: "Informe o endereço do exame associado.",
+        example: "ressonancia-magnetica",
+        location: "Vínculo entre exame e preparo.",
+        maxLength: 120,
+      },
+      {
+        name: "search_terms_text",
+        label: "Termos de busca",
+        type: "textarea",
+        help: "Digite um termo por linha.",
+        example: "contraste\njejum\nmetais",
+        location: "Pesquisa de preparos.",
+        maxLength: 3000,
+        fullWidth: true,
+      },
+      {
+        name: "attendance_mode",
+        label: "Forma de atendimento",
+        type: "select",
+        help: "Indique se é por ordem de chegada ou agendamento.",
+        location: "Página de preparos.",
+        options: [
+          { label: "Necessita agendamento", value: "appointment" },
+          { label: "Ordem de chegada", value: "walk-in" },
+          { label: "Misto", value: "mixed" },
+        ],
+      },
+      {
+        name: "attendance_label",
+        label: "Texto do atendimento",
+        required: true,
+        help: "Mensagem curta exibida ao paciente.",
+        example: "Necessita agendamento",
+        location: "Card e página de preparo.",
+        maxLength: 120,
+      },
+      {
+        name: "schedules_text",
+        label: "Horários",
+        type: "textarea",
+        help: "Uma linha por horário: Rótulo | Dias | 07h-12h; 13h-18h.",
+        example: "Atendimento | Segunda a sexta-feira | 08h-12h; 13h-18h",
+        location: "Contato, Home e página do preparo.",
+        maxLength: 8000,
+        fullWidth: true,
+      },
+      {
+        name: "preparation_groups_text",
+        label: "Orientações de preparo",
+        type: "textarea",
+        help: "Uma linha por grupo: Título | Aplica-se a | instrução 1; instrução 2 | aviso opcional.",
+        example:
+          "Exames com contraste | Tomografia com contraste | Jejum de 4 horas; Trazer exames anteriores | Confirme dúvidas com a equipe.",
+        location: "Página detalhada do preparo.",
+        maxLength: 20000,
+        fullWidth: true,
+      },
+      {
+        name: "documents_text",
+        label: "Documentos necessários",
+        type: "textarea",
+        help: "Digite um documento por linha.",
+        location: "Página detalhada do preparo.",
+        maxLength: 5000,
+        fullWidth: true,
+      },
+      {
+        name: "safety_questions_text",
+        label: "Informações de segurança",
+        type: "textarea",
+        help: "Digite uma situação por linha, somente com conteúdo aprovado pela clínica.",
+        location: "Página detalhada do preparo.",
+        maxLength: 5000,
+        fullWidth: true,
+      },
+      {
+        name: "previous_exams_recommended",
+        label: "Recomendar exames anteriores",
+        type: "checkbox",
+        help: "Marque quando a orientação oficial pedir exames anteriores.",
+        location: "Página detalhada do preparo.",
+      },
+      {
+        name: "validated_by_clinic",
+        label: "Conteúdo validado pela clínica",
+        type: "checkbox",
+        help: "Confirme somente após revisão responsável da INNEURO.",
+        location: "Aviso de validação do preparo.",
+      },
+      {
+        name: "last_reviewed_at",
+        label: "Data da última revisão",
+        type: "date",
+        required: true,
+        help: "Informe quando a clínica revisou estas orientações.",
+        location: "Página do preparo.",
+      },
+      {
+        name: "active",
+        label: "Exibir no site",
+        type: "checkbox",
+        help: "Somente preparos publicados e ativos aparecem ao público.",
+        location: "Catálogo de preparos.",
+      },
+      {
+        name: "sort_order",
+        label: "Ordem de exibição",
+        type: "number",
+        help: "Use 0 para aparecer primeiro.",
+        example: "0",
+        location: "Catálogo de preparos.",
+      },
+    ],
+  },
+  {
     key: "convenios",
     label: "Convênios",
     singular: "convênio ou parceria",
@@ -265,6 +592,34 @@ export const cmsModules: CmsModule[] = [
         example: "https://www.exemplo.com.br/",
         location: "Referência institucional do cadastro.",
         maxLength: 500,
+      },
+      {
+        name: "logo_alt",
+        label: "Descrição da logo",
+        required: true,
+        help: "Use o nome correto da marca, por exemplo “Logo SulAmérica”.",
+        example: "Logo SulAmérica",
+        location: "Acessibilidade da Home e da página de convênios.",
+        recommendedMax: 120,
+        maxLength: 240,
+      },
+      {
+        name: "notes",
+        label: "Observações",
+        type: "textarea",
+        help: "Informações administrativas úteis e aprovadas.",
+        location: "Cadastro do convênio.",
+        maxLength: 2000,
+        fullWidth: true,
+      },
+      {
+        name: "restrictions",
+        label: "Restrições",
+        type: "textarea",
+        help: "Informe somente restrições confirmadas pela INNEURO.",
+        location: "Cadastro do convênio.",
+        maxLength: 2000,
+        fullWidth: true,
       },
       {
         name: "kind",
@@ -384,7 +739,7 @@ export const cmsModules: CmsModule[] = [
   },
   {
     key: "equipamentos",
-    label: "Exames e equipamentos",
+    label: "Equipamentos",
     singular: "equipamento",
     table: "equipment",
     icon: MonitorCog,

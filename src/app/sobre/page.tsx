@@ -8,8 +8,10 @@ import {
 import Link from "next/link";
 import { InternalHero } from "@/components/layout/internal-hero";
 import { Container } from "@/components/layout/container";
-import { siteConfig } from "@/config/site";
-import { modalities } from "@/data/modalidades";
+import {
+  getPublicExams,
+  getPublicInstitutionalContent,
+} from "@/lib/cms/public-content";
 import { createPageMetadata } from "@/lib/metadata";
 
 export const metadata = createPageMetadata({
@@ -19,13 +21,18 @@ export const metadata = createPageMetadata({
   path: "/sobre",
 });
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  const [{ modalities }, institutional] = await Promise.all([
+    getPublicExams(),
+    getPublicInstitutionalContent(),
+  ]);
+  const { config, about } = institutional;
   return (
     <main id="main-content" tabIndex={-1}>
       <InternalHero
         eyebrow="Sobre a INNEURO"
-        title="Tecnologia, precisão e cuidado."
-        description="O Instituto de Neurologia do Amapá reúne diagnóstico por imagem, neurologia e medicina nuclear em Macapá."
+        title={about.title}
+        description={about.description}
       />
       <section className="bg-surface pt-10 pb-16 sm:pt-12 sm:pb-20 lg:pt-14 lg:pb-28">
         <Container>
@@ -35,10 +42,7 @@ export default function AboutPage() {
               <h2 className="font-heading text-ink mt-5 text-2xl font-semibold">
                 Propósito
               </h2>
-              <p className="text-muted mt-3 leading-relaxed">
-                Facilitar o acesso a informações sobre exames, preparos,
-                convênios e canais oficiais da INNEURO.
-              </p>
+              <p className="text-muted mt-3 leading-relaxed">{about.purpose}</p>
             </article>
             <article className="border-border-light rounded-3xl border bg-white p-7">
               <BrainCircuit aria-hidden="true" className="text-brand" />
@@ -46,8 +50,7 @@ export default function AboutPage() {
                 Atendimento e tecnologia
               </h2>
               <p className="text-muted mt-3 leading-relaxed">
-                Tecnologia, comunicação clara e acesso digital aos resultados
-                apoiam a jornada de atendimento.
+                {about.technology}
               </p>
             </article>
             <article className="border-border-light rounded-3xl border bg-white p-7">
@@ -56,12 +59,12 @@ export default function AboutPage() {
                 Localização
               </h2>
               <p className="text-muted mt-3 leading-relaxed">
-                {siteConfig.address.formatted}
+                {config.address.formatted}
                 <br />
-                Referência: {siteConfig.address.reference}
+                Referência: {config.address.reference}
               </p>
               <a
-                href={siteConfig.mapsUrl}
+                href={config.mapsUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-brand mt-4 inline-flex min-h-11 items-center text-sm font-bold"

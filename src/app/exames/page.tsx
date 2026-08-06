@@ -5,6 +5,7 @@ import { InternalHero } from "@/components/layout/internal-hero";
 import { Container } from "@/components/layout/container";
 import { Modalities } from "@/components/sections/modalities";
 import { createPageMetadata } from "@/lib/metadata";
+import { getPublicExams } from "@/lib/cms/public-content";
 
 export const metadata = createPageMetadata({
   title: "Exames de imagem em Macapá | INNEURO",
@@ -13,7 +14,8 @@ export const metadata = createPageMetadata({
   path: "/exames",
 });
 
-export default function ExamsPage() {
+export default async function ExamsPage() {
+  const content = await getPublicExams();
   return (
     <main id="main-content" tabIndex={-1}>
       <InternalHero
@@ -21,7 +23,7 @@ export default function ExamsPage() {
         title="Encontre a modalidade que você procura."
         description="Pesquise e filtre as modalidades de exames confirmadas da INNEURO."
       />
-      <Modalities compactTop />
+      <Modalities compactTop items={content.modalities} />
       <section className="bg-surface py-14 sm:py-18 lg:py-24">
         <Container>
           <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
@@ -46,7 +48,10 @@ export default function ExamsPage() {
               />
             }
           >
-            <ExamCatalog />
+            <ExamCatalog
+              exams={content.exams}
+              modalities={content.modalities}
+            />
           </Suspense>
         </Container>
       </section>

@@ -1,12 +1,18 @@
 import { AtSign, ExternalLink, MapPin, MessageCircle } from "lucide-react";
 import { Container } from "@/components/layout/container";
-import { siteConfig } from "@/config/site";
-import { clinicalServices } from "@/data/clinical-services";
+import type { SiteConfig } from "@/config/site";
+import type { ClinicalService } from "@/types/clinical-service";
 import { createWhatsAppUrl } from "@/lib/whatsapp";
 
 const message =
   "Olá! Acessei o site da INNEURO e gostaria de informações sobre exames.";
-export function Location() {
+export function Location({
+  config,
+  services,
+}: {
+  config: SiteConfig;
+  services: ClinicalService[];
+}) {
   return (
     <section
       id="localizacao"
@@ -28,13 +34,13 @@ export function Location() {
             <div>
               <p className="flex gap-3 text-white/78">
                 <MapPin aria-hidden="true" className="text-tech shrink-0" />
-                {siteConfig.address.formatted}
+                {config.address.formatted}
                 <br />
-                {siteConfig.address.reference}
+                {config.address.reference}
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
                 <a
-                  href={siteConfig.mapsUrl}
+                  href={config.mapsUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="Como chegar pelo Google Maps — abre em nova aba"
@@ -43,13 +49,13 @@ export function Location() {
                   Como chegar <ExternalLink aria-hidden="true" size={15} />
                 </a>
                 <a
-                  href={siteConfig.instagram.url}
+                  href={config.instagram.url}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex min-h-12 items-center gap-2 rounded-full border border-white/20 px-5 text-sm font-bold"
                 >
                   <AtSign aria-hidden="true" size={16} />
-                  {siteConfig.instagram.handle}
+                  {config.instagram.handle}
                 </a>
               </div>
             </div>
@@ -61,7 +67,7 @@ export function Location() {
                 Horários confirmados para os serviços com orientação cadastrada.
               </p>
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                {clinicalServices.map((service) => (
+                {services.map((service) => (
                   <article
                     key={service.slug}
                     className="rounded-2xl border border-white/12 bg-white/5 p-4"
@@ -83,7 +89,7 @@ export function Location() {
                 ))}
               </div>
               <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2">
-                {Object.values(siteConfig.whatsapp).map((channel) => (
+                {Object.values(config.whatsapp).map((channel) => (
                   <a
                     key={channel.number}
                     href={createWhatsAppUrl(channel.number, message)}

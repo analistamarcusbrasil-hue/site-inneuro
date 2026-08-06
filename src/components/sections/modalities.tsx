@@ -2,17 +2,25 @@ import { Container } from "@/components/layout/container";
 import { Section } from "@/components/layout/section";
 import { SectionHeader } from "@/components/sections/section-header";
 import { ModalityCard } from "@/components/ui/modality-card";
-import { modalities } from "@/data/modalidades";
+import type { Modality } from "@/types/modality";
 
-export function Modalities({ compactTop = false }: { compactTop?: boolean }) {
+export function Modalities({
+  compactTop = false,
+  items,
+}: {
+  compactTop?: boolean;
+  items: Modality[];
+}) {
   const featuredSlugs = new Set([
     "ressonancia-magnetica",
     "tomografia-computadorizada",
     "raios-x",
     "mapeamento-cerebral",
   ]);
-  const activeModalities = modalities.filter(
-    (modality) => modality.active && featuredSlugs.has(modality.slug),
+  const activeModalities = items.filter(
+    (modality) =>
+      modality.active &&
+      (modality.featured ?? featuredSlugs.has(modality.slug)),
   );
 
   return (

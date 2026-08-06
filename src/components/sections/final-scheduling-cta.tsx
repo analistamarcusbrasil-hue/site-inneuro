@@ -1,13 +1,16 @@
 import { CalendarCheck, MessageCircle } from "lucide-react";
 import Link from "next/link";
 import { Container } from "@/components/layout/container";
-import { siteConfig } from "@/config/site";
 import { createWhatsAppUrl } from "@/lib/whatsapp";
 
 const message =
   "Olá! Acessei o site da INNEURO e gostaria de informações sobre exames.";
 
-export function FinalSchedulingCta() {
+export function FinalSchedulingCta({
+  whatsappNumber,
+}: {
+  whatsappNumber: string;
+}) {
   return (
     <section
       aria-labelledby="final-scheduling-title"
@@ -37,10 +40,7 @@ export function FinalSchedulingCta() {
               Solicitar pré-agendamento
             </Link>
             <a
-              href={createWhatsAppUrl(
-                siteConfig.whatsapp.primary.number,
-                message,
-              )}
+              href={createWhatsAppUrl(whatsappNumber, message)}
               target="_blank"
               rel="noopener noreferrer"
               className="focus-visible:ring-tech inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-white/22 px-6 text-sm font-bold focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"

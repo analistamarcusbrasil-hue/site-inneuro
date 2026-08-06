@@ -63,6 +63,11 @@ export default async function NewsDetailPage({ params }: PageProps) {
       />
       <article className="bg-surface py-12 sm:py-16 lg:py-20">
         <Container className="max-w-4xl">
+          {item.author ? (
+            <p className="text-muted mb-6 text-sm font-semibold">
+              Por {item.author}
+            </p>
+          ) : null}
           {item.coverUrl ? (
             <figure className="mb-10">
               <div className="relative aspect-[16/9] overflow-hidden rounded-3xl bg-white">

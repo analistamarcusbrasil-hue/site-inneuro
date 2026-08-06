@@ -5,7 +5,7 @@ import { useState, type FormEvent } from "react";
 import { Container } from "@/components/layout/container";
 import { DocumentUploadField } from "@/components/scheduling/document-upload-field";
 import { Badge } from "@/components/ui/badge";
-import { siteConfig } from "@/config/site";
+import type { SiteConfig } from "@/config/site";
 import {
   documentKinds,
   MAX_REQUEST_SIZE,
@@ -111,7 +111,13 @@ function uploadFileToSignedUrl(
   });
 }
 
-export function Scheduling({ initialExam = "" }: { initialExam?: string }) {
+export function Scheduling({
+  initialExam = "",
+  whatsapp,
+}: {
+  initialExam?: string;
+  whatsapp: SiteConfig["whatsapp"];
+}) {
   const [errors, setErrors] = useState<Errors>({});
   const [formError, setFormError] = useState("");
   const [phone, setPhone] = useState("");
@@ -129,7 +135,7 @@ export function Scheduling({ initialExam = "" }: { initialExam?: string }) {
   const [startedAt] = useState(() => Date.now());
   const isSubmitting = phase !== "idle";
   const whatsappReady = Boolean(
-    normalizeWhatsAppNumber(siteConfig.whatsapp[channel].number),
+    normalizeWhatsAppNumber(whatsapp[channel].number),
   );
 
   function updateFile(kind: DocumentKind, file: File | null) {
@@ -575,12 +581,10 @@ export function Scheduling({ initialExam = "" }: { initialExam?: string }) {
                   className={inputClasses}
                 >
                   <option value="primary">
-                    {siteConfig.whatsapp.primary.label} —{" "}
-                    {siteConfig.whatsapp.primary.display}
+                    {whatsapp.primary.label} — {whatsapp.primary.display}
                   </option>
                   <option value="secondary">
-                    {siteConfig.whatsapp.secondary.label} —{" "}
-                    {siteConfig.whatsapp.secondary.display}
+                    {whatsapp.secondary.label} — {whatsapp.secondary.display}
                   </option>
                 </select>
               </label>

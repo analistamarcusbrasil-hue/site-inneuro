@@ -5,20 +5,27 @@ import { notFound } from "next/navigation";
 import { Container } from "@/components/layout/container";
 import { InternalHero } from "@/components/layout/internal-hero";
 import { ServiceDetails } from "@/components/preparations/service-details";
-import { getClinicalService } from "@/data/clinical-services";
-import { modalities } from "@/data/modalidades";
-import { siteConfig } from "@/config/site";
+import {
+  getPublicExamBySlug,
+  getPublicInstitutionalContent,
+  getPublicPreparationBySlug,
+} from "@/lib/cms/public-content";
 import { createPageMetadata } from "@/lib/metadata";
 import { createWhatsAppUrl } from "@/lib/whatsapp";
+import { modalities as staticModalities } from "@/data/modalidades";
 
 type Props = { params: Promise<{ slug: string }> };
 export function generateStaticParams() {
-  return modalities.filter((item) => item.active).map(({ slug }) => ({ slug }));
+  return staticModalities
+    .filter((item) => item.active)
+    .map(({ slug }) => ({ slug }));
 }
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const slug = (await params).slug;
-  const service = getClinicalService(slug);
-  const modality = modalities.find((item) => item.slug === slug && item.active);
+  const [service, { modality }] = await Promise.all([
+    getPublicPreparationBySlug(slug),
+    getPublicExamBySlug(slug),
+  ]);
   if (!modality) return {};
   return createPageMetadata({
     title: `Preparo para ${modality.name} | INNEURO Macapá`,
@@ -30,11 +37,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 export default async function PreparationPage({ params }: Props) {
   const slug = (await params).slug;
-  const service = getClinicalService(slug);
-  const modality = modalities.find((item) => item.slug === slug && item.active);
+  const [service, { modality }, institutional] = await Promise.all([
+    getPublicPreparationBySlug(slug),
+    getPublicExamBySlug(slug),
+    getPublicInstitutionalContent(),
+  ]);
   if (!modality) notFound();
   const whatsappUrl = createWhatsAppUrl(
-    siteConfig.whatsapp.primary.number,
+    institutional.config.whatsapp.primary.number,
     `Olá! Gostaria de confirmar as orientações para ${modality.name} na INNEURO.`,
   );
   return (
@@ -51,7 +61,10 @@ export default async function PreparationPage({ params }: Props) {
       <section className="bg-surface py-14 sm:py-20 lg:py-24">
         <Container>
           {service ? (
-            <ServiceDetails service={service} />
+            <ServiceDetails
+              service={service}
+              whatsappNumber={institutional.config.whatsapp.primary.number}
+            />
           ) : (
             <div className="border-border-light rounded-3xl border bg-white p-7 sm:p-9">
               <h2 className="font-heading text-ink text-2xl font-semibold">

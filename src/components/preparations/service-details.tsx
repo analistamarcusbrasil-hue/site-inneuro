@@ -5,13 +5,18 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import Link from "next/link";
-import { siteConfig } from "@/config/site";
 import { createWhatsAppUrl } from "@/lib/whatsapp";
 import type { ClinicalService } from "@/types/clinical-service";
 
-export function ServiceDetails({ service }: { service: ClinicalService }) {
+export function ServiceDetails({
+  service,
+  whatsappNumber,
+}: {
+  service: ClinicalService;
+  whatsappNumber: string;
+}) {
   const whatsappUrl = createWhatsAppUrl(
-    siteConfig.whatsapp.primary.number,
+    whatsappNumber,
     "Olá! Acessei o site da INNEURO e gostaria de informações sobre exames.",
   );
   return (

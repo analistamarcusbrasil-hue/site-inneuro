@@ -2,6 +2,10 @@ import { InternalHero } from "@/components/layout/internal-hero";
 import { Container } from "@/components/layout/container";
 import { PreparationCatalog } from "@/components/preparations/preparation-catalog";
 import { createPageMetadata } from "@/lib/metadata";
+import {
+  getPublicExams,
+  getPublicPreparations,
+} from "@/lib/cms/public-content";
 
 export const metadata = createPageMetadata({
   title: "Preparos para exames | INNEURO Macapá",
@@ -10,7 +14,11 @@ export const metadata = createPageMetadata({
   path: "/preparos",
 });
 
-export default function PreparationsPage() {
+export default async function PreparationsPage() {
+  const [examContent, services] = await Promise.all([
+    getPublicExams(),
+    getPublicPreparations(),
+  ]);
   return (
     <main id="main-content" tabIndex={-1}>
       <InternalHero
@@ -20,7 +28,10 @@ export default function PreparationsPage() {
       />
       <section className="bg-surface pt-10 pb-14 sm:pt-12 sm:pb-18 lg:pt-14 lg:pb-24">
         <Container>
-          <PreparationCatalog />
+          <PreparationCatalog
+            modalities={examContent.modalities}
+            services={services}
+          />
         </Container>
       </section>
     </main>

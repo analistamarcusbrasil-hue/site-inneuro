@@ -2,8 +2,10 @@ import { AtSign, ExternalLink, MapPin, MessageCircle } from "lucide-react";
 import { Container } from "@/components/layout/container";
 import { QuickActions } from "@/components/sections/quick-actions";
 import { Scheduling } from "@/components/sections/scheduling";
-import { siteConfig } from "@/config/site";
-import { clinicalServices } from "@/data/clinical-services";
+import {
+  getPublicInstitutionalContent,
+  getPublicPreparations,
+} from "@/lib/cms/public-content";
 import { createWhatsAppUrl } from "@/lib/whatsapp";
 import { createPageMetadata } from "@/lib/metadata";
 
@@ -25,10 +27,15 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
   const initialExam = (
     Array.isArray(requestedExam) ? requestedExam[0] : (requestedExam ?? "")
   ).slice(0, 160);
+  const [institutional, clinicalServices] = await Promise.all([
+    getPublicInstitutionalContent(),
+    getPublicPreparations(),
+  ]);
+  const { config } = institutional;
 
   return (
     <main id="main-content" tabIndex={-1}>
-      <Scheduling initialExam={initialExam} />
+      <Scheduling initialExam={initialExam} whatsapp={config.whatsapp} />
       <QuickActions
         eyebrow="Canais de atendimento"
         title="Acesse os serviços e canais oficiais."
@@ -42,7 +49,7 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
             Escolha um dos canais oficiais para falar com a INNEURO.
           </p>
           <div className="mt-6 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-            {Object.values(siteConfig.whatsapp).map((channel) => (
+            {Object.values(config.whatsapp).map((channel) => (
               <a
                 key={channel.number}
                 href={createWhatsAppUrl(channel.number, message)}
@@ -66,7 +73,7 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
               </a>
             ))}
             <a
-              href={siteConfig.instagram.url}
+              href={config.instagram.url}
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Instagram @inneuroap — abre em nova aba"
@@ -77,7 +84,7 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
                 Instagram
               </p>
               <p className="font-heading text-ink mt-2 text-xl font-semibold">
-                {siteConfig.instagram.handle}
+                {config.instagram.handle}
               </p>
               <ExternalLink
                 aria-hidden="true"
@@ -127,17 +134,17 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
               Endereço e mapa
             </h2>
             <p className="text-muted mt-3">
-              {siteConfig.address.street}, {siteConfig.address.number}
+              {config.address.street}, {config.address.number}
               <br />
-              {siteConfig.address.neighborhood}
+              {config.address.neighborhood}
               <br />
-              {siteConfig.address.city} — {siteConfig.address.state}
+              {config.address.city} — {config.address.state}
             </p>
             <p className="text-ink mt-4 text-sm font-semibold">
-              Referência: {siteConfig.address.reference}
+              Referência: {config.address.reference}
             </p>
             <a
-              href={siteConfig.mapsUrl}
+              href={config.mapsUrl}
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Como chegar pelo Google Maps — abre em nova aba"

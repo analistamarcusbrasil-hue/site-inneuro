@@ -15,7 +15,7 @@ export function PartnerLogoCard({ partner }: { partner: Convenio }) {
         {hasLogo ? (
           <Image
             src={partner.logo!}
-            alt={`Logo ${partner.name}`}
+            alt={partner.logoAlt ?? `Logo ${partner.name}`}
             width={180}
             height={76}
             sizes="180px"

@@ -2,9 +2,11 @@ import { CalendarPlus, ExternalLink, MessageCircle } from "lucide-react";
 import Link from "next/link";
 import { Container } from "@/components/layout/container";
 import { InternalHero } from "@/components/layout/internal-hero";
-import { getPublicPartners } from "@/lib/cms/public-content";
+import {
+  getPublicInstitutionalContent,
+  getPublicPartners,
+} from "@/lib/cms/public-content";
 import { PartnerLogoCard } from "@/components/partners/partner-logo-card";
-import { siteConfig } from "@/config/site";
 import { createPageMetadata } from "@/lib/metadata";
 import { createWhatsAppUrl } from "@/lib/whatsapp";
 
@@ -19,7 +21,10 @@ export const metadata = createPageMetadata({
 });
 
 export default async function InsurancePage() {
-  const convenios = await getPublicPartners();
+  const [convenios, institutional] = await Promise.all([
+    getPublicPartners(),
+    getPublicInstitutionalContent(),
+  ]);
   return (
     <main id="main-content" tabIndex={-1}>
       <InternalHero
@@ -47,7 +52,7 @@ export default async function InsurancePage() {
           <div className="mt-7 flex flex-col gap-3 sm:flex-row">
             <a
               href={createWhatsAppUrl(
-                siteConfig.whatsapp.primary.number,
+                institutional.config.whatsapp.primary.number,
                 coverageMessage,
               )}
               target="_blank"

@@ -12,12 +12,18 @@ import {
   Users,
   ScrollText,
   LogOut,
+  Building2,
 } from "lucide-react";
 import { cmsModules } from "@/lib/cms/modules";
 import type { AdminProfile } from "@/types/cms";
 import { logoutAction } from "@/app/admin/actions";
 
 const extraLinks = [
+  {
+    href: "/admin/informacoes",
+    label: "Informações institucionais",
+    icon: Building2,
+  },
   { href: "/admin/midias", label: "Mídias", icon: Image },
   { href: "/admin/lixeira", label: "Lixeira", icon: Trash2 },
   { href: "/admin/usuarios", label: "Usuários", icon: Users, superOnly: true },

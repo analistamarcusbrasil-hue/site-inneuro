@@ -11,16 +11,35 @@ export async function AdminModuleView({
   searchParams,
 }: {
   module: CmsModule;
-  searchParams: Promise<{ edit?: string; success?: string; error?: string }>;
+  searchParams: Promise<{
+    edit?: string;
+    success?: string;
+    error?: string;
+    q?: string;
+    status?: string;
+  }>;
 }) {
   const query = await searchParams;
   const { supabase, profile } = await requireAdmin();
-  const { data = [] } = await supabase
+  const displayField = [
+    "convenios",
+    "equipamentos",
+    "exames",
+    "preparos",
+  ].includes(module.key)
+    ? "name"
+    : module.key === "redes-sociais"
+      ? "network"
+      : "title";
+  let recordsRequest = supabase
     .from(module.table)
     .select("*")
     .is("deleted_at", null)
-    .order("updated_at", { ascending: false })
-    .limit(100);
+    .order("updated_at", { ascending: false });
+  if (query.q)
+    recordsRequest = recordsRequest.ilike(displayField, `%${query.q}%`);
+  if (query.status) recordsRequest = recordsRequest.eq("status", query.status);
+  const { data = [] } = await recordsRequest.limit(100);
   const selected = query.edit
     ? data?.find((item) => item.id === query.edit)
     : undefined;
@@ -38,12 +57,33 @@ export async function AdminModuleView({
   }));
   const canPublish = profile.role !== "editor";
   const supportsActive = module.fields.some((field) => field.name === "active");
+  const { data: newsRows = [] } =
+    module.key === "carrossel"
+      ? await supabase
+          .from("news_posts")
+          .select("id,title,status")
+          .is("deleted_at", null)
+          .order("title")
+      : { data: [] };
   const formModule = {
     key: module.key,
     label: module.label,
     singular: module.singular,
     table: module.table,
-    fields: module.fields,
+    fields: module.fields.map((field) =>
+      field.name === "linked_news_id"
+        ? {
+            ...field,
+            options: [
+              { label: "Nenhuma matéria", value: "" },
+              ...(newsRows ?? []).map((item) => ({
+                label: `${item.title} (${item.status})`,
+                value: item.id,
+              })),
+            ],
+          }
+        : field,
+    ),
   };
 
   return (
@@ -67,9 +107,11 @@ export async function AdminModuleView({
         >
           {query.error === "validation"
             ? "Revise os campos destacados e tente novamente. Os campos obrigatórios precisam estar preenchidos."
-            : query.error === "permission"
-              ? "Sua conta pode salvar rascunhos, mas não tem permissão para publicar."
-              : "Não foi possível concluir esta ação. Tente novamente ou peça ajuda ao administrador."}
+            : query.error === "image-required"
+              ? "Escolha uma imagem principal antes de publicar o slide."
+              : query.error === "permission"
+                ? "Sua conta pode salvar rascunhos, mas não tem permissão para publicar."
+                : "Não foi possível concluir esta ação. Tente novamente ou peça ajuda ao administrador."}
         </p>
       ) : null}
       <div className="grid gap-8 xl:grid-cols-[minmax(0,1.05fr)_minmax(25rem,.95fr)]">
@@ -77,6 +119,28 @@ export async function AdminModuleView({
           <h2 id="records-title" className="font-heading text-xl font-semibold">
             Conteúdos cadastrados
           </h2>
+          <form className="mt-4 grid gap-2 sm:grid-cols-[1fr_10rem_auto]">
+            <input
+              name="q"
+              defaultValue={query.q}
+              placeholder={`Buscar ${module.singular}`}
+              className="border-border-light min-h-11 min-w-0 rounded-full border bg-white px-4 text-sm"
+            />
+            <select
+              name="status"
+              defaultValue={query.status}
+              className="border-border-light min-h-11 rounded-full border bg-white px-3 text-sm"
+            >
+              <option value="">Todos os status</option>
+              <option value="draft">Rascunhos</option>
+              <option value="scheduled">Agendados</option>
+              <option value="published">Publicados</option>
+              <option value="archived">Arquivados</option>
+            </select>
+            <button className="bg-brand-dark min-h-11 rounded-full px-4 text-sm font-bold text-white">
+              Filtrar
+            </button>
+          </form>
           <div className="mt-4 space-y-3">
             {data?.length ? (
               data.map((item) => (

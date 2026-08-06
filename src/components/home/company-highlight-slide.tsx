@@ -79,7 +79,17 @@ export function CompanyHighlightSlide({
         <p className="mt-3 line-clamp-3 max-w-2xl text-sm leading-relaxed text-white/80 sm:text-base">
           {item.description}
         </p>
-        {item.href ? (
+        {item.href && item.openInNewTab ? (
+          <a
+            href={item.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="focus-visible:ring-tech text-brand-dark mt-5 inline-flex min-h-12 items-center gap-2 rounded-full bg-white px-5 text-sm font-bold focus-visible:ring-2 focus-visible:ring-offset-2"
+          >
+            {item.ctaLabel ?? "Saiba mais"}{" "}
+            <ArrowUpRight aria-hidden="true" size={17} />
+          </a>
+        ) : item.href ? (
           <Link
             href={item.href}
             className="focus-visible:ring-tech text-brand-dark mt-5 inline-flex min-h-12 items-center gap-2 rounded-full bg-white px-5 text-sm font-bold focus-visible:ring-2 focus-visible:ring-offset-2"

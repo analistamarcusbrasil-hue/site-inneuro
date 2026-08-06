@@ -2,12 +2,15 @@ import { ExternalLink, MessageCircle, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { Container } from "@/components/layout/container";
 import type { Convenio } from "@/types/convenio";
-import { siteConfig } from "@/config/site";
 import { PartnerLogoCard } from "@/components/partners/partner-logo-card";
 
-const whatsappNumber = siteConfig.whatsapp.primary.number;
-
-export function Insurance({ partners }: { partners: Convenio[] }) {
+export function Insurance({
+  partners,
+  whatsappNumber,
+}: {
+  partners: Convenio[];
+  whatsappNumber: string;
+}) {
   const activeConvenios = partners.filter((convenio) => convenio.active);
 
   return (

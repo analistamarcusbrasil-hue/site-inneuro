@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Logo } from "@/components/brand/logo";
 import { Container } from "@/components/layout/container";
-import { siteConfig } from "@/config/site";
+import type { SiteConfig } from "@/config/site";
 import { cn } from "@/lib/utils";
 
 const menuId = "inneuro-mobile-menu";
@@ -16,7 +16,7 @@ function isActiveRoute(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function Header() {
+export function Header({ config }: { config: SiteConfig }) {
   const pathname = usePathname();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -85,7 +85,7 @@ export function Header() {
           className="hidden items-center gap-1 xl:flex"
           aria-label="Navegação principal"
         >
-          {siteConfig.navigation.map((item) => {
+          {config.navigation.map((item) => {
             const active = isActiveRoute(pathname, item.href);
             return (
               <Link
@@ -110,9 +110,9 @@ export function Header() {
         </nav>
 
         <div className="hidden shrink-0 items-center gap-2 xl:flex">
-          {siteConfig.patientPortal.url ? (
+          {config.patientPortal.url ? (
             <a
-              href={siteConfig.patientPortal.url}
+              href={config.patientPortal.url}
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Portal de Exames — abre em uma nova aba"
@@ -220,7 +220,7 @@ export function Header() {
           className="mx-auto flex w-full max-w-[1280px] flex-col"
           aria-label="Navegação para celular"
         >
-          {siteConfig.navigation.map((item, index) => {
+          {config.navigation.map((item, index) => {
             const active = isActiveRoute(pathname, item.href);
             return (
               <Link
@@ -241,9 +241,9 @@ export function Header() {
             );
           })}
           <div className="border-border-light mt-5 grid gap-3 border-t pt-5 sm:grid-cols-2">
-            {siteConfig.patientPortal.url ? (
+            {config.patientPortal.url ? (
               <a
-                href={siteConfig.patientPortal.url}
+                href={config.patientPortal.url}
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="Portal de Exames — abre em uma nova aba"

@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Crop, ImageUp, ZoomIn } from "lucide-react";
-import { uploadMediaAction } from "@/app/admin/actions";
+import { uploadMediaAction, type MediaUploadResult } from "@/app/admin/actions";
 
 type MediaKind = "photo" | "thumbnail" | "logo";
 type ImageInfo = {
@@ -89,12 +90,14 @@ async function cropToWebp(
 }
 
 export function AdminMediaUploadForm() {
+  const router = useRouter();
   const [kind, setKind] = useState<MediaKind>("photo");
   const [image, setImage] = useState<ImageInfo | null>(null);
   const [zoom, setZoom] = useState(1);
   const [positionX, setPositionX] = useState(50);
   const [positionY, setPositionY] = useState(50);
   const [processing, setProcessing] = useState(false);
+  const [result, setResult] = useState<MediaUploadResult | null>(null);
 
   useEffect(
     () => () => {
@@ -135,6 +138,7 @@ export function AdminMediaUploadForm() {
   async function submit(formData: FormData) {
     if (!image) return;
     setProcessing(true);
+    setResult(null);
     try {
       const processed =
         kind === "logo"
@@ -142,7 +146,14 @@ export function AdminMediaUploadForm() {
           : await cropToWebp(image, kind, zoom, positionX, positionY);
       formData.set("file", processed);
       formData.set("kind", kind);
-      await uploadMediaAction(formData);
+      const uploadResult = await uploadMediaAction(formData);
+      setResult(uploadResult);
+      if (uploadResult.ok) router.refresh();
+    } catch {
+      setResult({
+        ok: false,
+        message: "A conexão foi interrompida. Tente novamente.",
+      });
     } finally {
       setProcessing(false);
     }
@@ -174,7 +185,7 @@ export function AdminMediaUploadForm() {
         </select>
         <p className="text-muted mt-2 text-xs">
           Recomendação: {recommendation.size}. Formatos aceitos: JPG, PNG e
-          WebP. Tamanho recomendado: até 2 MB.
+          WebP. Tamanho recomendado: até 2 MB. Limite máximo: 8 MB.
         </p>
       </div>
 
@@ -188,8 +199,31 @@ export function AdminMediaUploadForm() {
           onChange={async (event) => {
             const file = event.target.files?.[0];
             if (!file) return;
+            setResult(null);
+            if (file.size > 8 * 1024 * 1024) {
+              setImage(null);
+              setResult({
+                ok: false,
+                code: "size",
+                message: "A imagem excede o limite de 8 MB.",
+              });
+              event.currentTarget.value = "";
+              return;
+            }
             if (image) URL.revokeObjectURL(image.url);
-            setImage(await readImage(file));
+            try {
+              setImage(await readImage(file));
+            } catch {
+              setImage(null);
+              setResult({
+                ok: false,
+                code: "file",
+                message:
+                  "Formato não permitido. Envie uma imagem JPG, PNG ou WebP.",
+              });
+              event.currentTarget.value = "";
+              return;
+            }
             setZoom(1);
             setPositionX(50);
             setPositionY(50);
@@ -319,6 +353,16 @@ export function AdminMediaUploadForm() {
         transparência. SVG não é enviado pelo painel por segurança; exporte-o
         como PNG transparente.
       </p>
+      {result ? (
+        <p
+          role={result.ok ? "status" : "alert"}
+          className={`rounded-xl p-3 text-sm font-bold ${
+            result.ok ? "bg-mint text-brand" : "bg-error/10 text-error"
+          }`}
+        >
+          {result.message}
+        </p>
+      ) : null}
       <button
         disabled={!image || processing}
         className="bg-brand inline-flex min-h-11 items-center gap-2 rounded-full px-5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"

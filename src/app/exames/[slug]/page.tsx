@@ -4,16 +4,20 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { InternalHero } from "@/components/layout/internal-hero";
 import { Container } from "@/components/layout/container";
-import { siteConfig } from "@/config/site";
-import { getClinicalService } from "@/data/clinical-services";
-import { exames, hasIndexableExamContent } from "@/data/exames";
+import { hasIndexableExamContent } from "@/data/exames";
+import { exames as staticExams } from "@/data/exames";
+import {
+  getPublicExamBySlug,
+  getPublicInstitutionalContent,
+  getPublicPreparationBySlug,
+} from "@/lib/cms/public-content";
 import { normalizeWhatsAppNumber } from "@/lib/whatsapp";
 import { createPageMetadata } from "@/lib/metadata";
 
 type ExamPageProps = { params: Promise<{ slug: string }> };
 
 export function generateStaticParams() {
-  return exames
+  return staticExams
     .filter((exam) => exam.active)
     .map((exam) => ({ slug: exam.slug }));
 }
@@ -22,7 +26,7 @@ export async function generateMetadata({
   params,
 }: ExamPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const exam = exames.find((item) => item.slug === slug && item.active);
+  const { exam } = await getPublicExamBySlug(slug);
   if (!exam) return {};
   return createPageMetadata({
     title: `${exam.name} em Macapá | INNEURO`,
@@ -34,11 +38,14 @@ export async function generateMetadata({
 
 export default async function ExamPage({ params }: ExamPageProps) {
   const { slug } = await params;
-  const exam = exames.find((item) => item.slug === slug && item.active);
+  const [{ exam }, service, institutional] = await Promise.all([
+    getPublicExamBySlug(slug),
+    getPublicPreparationBySlug(slug),
+    getPublicInstitutionalContent(),
+  ]);
   if (!exam) notFound();
-  const service = getClinicalService(exam.slug);
   const whatsappNumber = normalizeWhatsAppNumber(
-    siteConfig.whatsapp.primary.number,
+    institutional.config.whatsapp.primary.number,
   );
   const fields = [
     ["Para que serve", exam.purpose],

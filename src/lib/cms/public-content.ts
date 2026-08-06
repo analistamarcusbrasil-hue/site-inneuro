@@ -1,16 +1,24 @@
 import { connection } from "next/server";
 import { companyHighlights } from "@/data/company-highlights";
 import { convenios } from "@/data/convenios";
+import { exames } from "@/data/exames";
+import { modalities } from "@/data/modalidades";
+import { clinicalServices } from "@/data/clinical-services";
+import { siteConfig, type SiteConfig } from "@/config/site";
 import { isCmsConfigured } from "@/lib/cms/config";
 import { createSupabasePublicClient } from "@/lib/supabase/server";
 import type { CompanyHighlight } from "@/types/company-highlight";
 import type { Convenio } from "@/types/convenio";
+import type { Exame } from "@/types/exame";
+import type { Modality, ModalityIcon } from "@/types/modality";
+import type { ClinicalService } from "@/types/clinical-service";
 
 export type PublicNews = {
   id: string;
   title: string;
   summary: string;
   category: string | null;
+  author: string | null;
   slug: string;
   content: unknown;
   seoTitle: string | null;
@@ -66,19 +74,37 @@ async function publicClient() {
   return createSupabasePublicClient();
 }
 
+async function hasCompleteCms(
+  supabase: NonNullable<ReturnType<typeof createSupabasePublicClient>>,
+) {
+  const { data } = await supabase
+    .from("site_settings")
+    .select("key")
+    .eq("key", "institutional")
+    .maybeSingle();
+  return Boolean(data);
+}
+
 export async function getPublicCarousel(): Promise<CompanyHighlight[]> {
   const supabase = await publicClient();
   if (!supabase) return companyHighlights.filter((item) => item.published);
   const { data, error } = await supabase
     .from("carousel_slides")
     .select(
-      "id,title,description,category,image_alt,cta_label,cta_url,sort_order,desktop:media_assets!desktop_media_id(storage_path)",
+      "id,title,description,category,image_alt,cta_label,cta_url,image_url,open_in_new_tab,sort_order,desktop:media_assets!desktop_media_id(storage_path),linked_news:news_posts!linked_news_id(slug)",
     )
     .order("sort_order");
-  if (error || !data?.length)
-    return companyHighlights.filter((item) => item.published);
-  const cmsHighlights = (data ?? []).map((item) => {
+  if (error) return companyHighlights.filter((item) => item.published);
+  if (!data?.length) {
+    return (await hasCompleteCms(supabase))
+      ? []
+      : companyHighlights.filter((item) => item.published);
+  }
+  return (data ?? []).map((item) => {
     const path = mediaPath(item.desktop);
+    const linkedNews = Array.isArray(item.linked_news)
+      ? item.linked_news[0]
+      : item.linked_news;
     return {
       id: item.id,
       title: item.title,
@@ -86,18 +112,17 @@ export async function getPublicCarousel(): Promise<CompanyHighlight[]> {
       category: item.category ?? "INNEURO",
       image: path
         ? supabase.storage.from("site-media").getPublicUrl(path).data.publicUrl
-        : undefined,
+        : (item.image_url ?? undefined),
       imageAlt: item.image_alt,
-      href: item.cta_url ?? undefined,
+      href:
+        linkedNews && typeof linkedNews === "object" && "slug" in linkedNews
+          ? `/noticias/${String(linkedNews.slug)}`
+          : (item.cta_url ?? undefined),
       ctaLabel: item.cta_label ?? undefined,
+      openInNewTab: item.open_in_new_tab,
       published: true,
     };
   });
-  const institutional = companyHighlights[0];
-  return [
-    institutional,
-    ...cmsHighlights.filter((item) => item.title !== institutional.title),
-  ];
 }
 
 export async function getPublicPartners(): Promise<Convenio[]> {
@@ -106,13 +131,17 @@ export async function getPublicPartners(): Promise<Convenio[]> {
   const { data, error } = await supabase
     .from("health_partners")
     .select(
-      "id,name,slug,kind,website_url,sort_order,logo:media_assets!logo_media_id(storage_path)",
+      "id,name,slug,kind,website_url,logo_url,logo_alt,notes,restrictions,sort_order,logo:media_assets!logo_media_id(storage_path,alt_text)",
     )
     .order("sort_order");
-  if (error || !data?.length) return convenios.filter((item) => item.active);
-  const cmsPartners = (data ?? []).map((item) => {
+  if (error) return convenios.filter((item) => item.active);
+  if (!data?.length) {
+    return (await hasCompleteCms(supabase))
+      ? []
+      : convenios.filter((item) => item.active);
+  }
+  return (data ?? []).map((item) => {
     const path = mediaPath(item.logo);
-    const fallback = convenios.find((partner) => partner.slug === item.slug);
     return {
       id: item.id,
       name: item.name,
@@ -120,17 +149,15 @@ export async function getPublicPartners(): Promise<Convenio[]> {
       website: item.website_url ?? undefined,
       logo: path
         ? supabase.storage.from("site-media").getPublicUrl(path).data.publicUrl
-        : fallback?.logo,
-      logoStatus: path ? "official" : (fallback?.logoStatus ?? "pending"),
-      active: item.slug !== "capsaude",
+        : (item.logo_url ?? undefined),
+      logoAlt: mediaAlt(item.logo) || item.logo_alt || `Logo ${item.name}`,
+      notes: item.notes ?? undefined,
+      restrictions: item.restrictions ?? undefined,
+      logoStatus: path || item.logo_url ? "official" : "pending",
+      active: true,
       category: item.kind,
     } satisfies Convenio;
   });
-  const cmsSlugs = new Set(cmsPartners.map((item) => item.slug));
-  return [
-    ...cmsPartners,
-    ...convenios.filter((item) => item.active && !cmsSlugs.has(item.slug)),
-  ];
 }
 
 export async function getPublicNewsAndSocial(): Promise<{
@@ -143,7 +170,7 @@ export async function getPublicNewsAndSocial(): Promise<{
     supabase
       .from("news_posts")
       .select(
-        "id,title,summary,category,slug,content,seo_title,seo_description,published_at,cover:media_assets!cover_media_id(storage_path,alt_text)",
+        "id,title,summary,category,author,slug,content,seo_title,seo_description,published_at,cover:media_assets!cover_media_id(storage_path,alt_text)",
       )
       .eq("featured_on_home", true)
       .order("published_at", { ascending: false })
@@ -162,6 +189,7 @@ export async function getPublicNewsAndSocial(): Promise<{
       title: item.title,
       summary: item.summary,
       category: item.category,
+      author: item.author,
       slug: item.slug,
       content: item.content,
       seoTitle: item.seo_title,
@@ -189,7 +217,7 @@ export async function getPublicNews(limit = 24): Promise<PublicNews[]> {
   const { data, error } = await supabase
     .from("news_posts")
     .select(
-      "id,title,summary,category,slug,content,seo_title,seo_description,published_at,cover:media_assets!cover_media_id(storage_path,alt_text)",
+      "id,title,summary,category,author,slug,content,seo_title,seo_description,published_at,cover:media_assets!cover_media_id(storage_path,alt_text)",
     )
     .order("published_at", { ascending: false })
     .limit(limit);
@@ -199,6 +227,7 @@ export async function getPublicNews(limit = 24): Promise<PublicNews[]> {
     title: item.title,
     summary: item.summary,
     category: item.category,
+    author: item.author,
     slug: item.slug,
     content: item.content,
     seoTitle: item.seo_title,
@@ -215,7 +244,7 @@ export async function getPublicNewsBySlug(slug: string) {
   const { data, error } = await supabase
     .from("news_posts")
     .select(
-      "id,title,summary,category,slug,content,seo_title,seo_description,published_at,cover:media_assets!cover_media_id(storage_path,alt_text)",
+      "id,title,summary,category,author,slug,content,seo_title,seo_description,published_at,cover:media_assets!cover_media_id(storage_path,alt_text)",
     )
     .eq("slug", slug)
     .maybeSingle();
@@ -225,6 +254,7 @@ export async function getPublicNewsBySlug(slug: string) {
     title: data.title,
     summary: data.summary,
     category: data.category,
+    author: data.author,
     slug: data.slug,
     content: data.content,
     seoTitle: data.seo_title,
@@ -244,4 +274,241 @@ export async function getPublicEquipment(): Promise<PublicEquipment[]> {
     .order("sort_order")
     .limit(6);
   return (data ?? []) as PublicEquipment[];
+}
+
+export async function getPublicExams(): Promise<{
+  exams: Exame[];
+  modalities: Modality[];
+}> {
+  const supabase = await publicClient();
+  if (!supabase) return { exams: exames, modalities };
+  const { data, error } = await supabase
+    .from("exams")
+    .select(
+      "slug,name,modality,modality_slug,short_description,preparation_slug,purpose,how_performed,general_guidance,documents,icon,featured,sort_order",
+    )
+    .order("sort_order");
+  if (error) return { exams: exames, modalities };
+  if (!data?.length) {
+    return (await hasCompleteCms(supabase))
+      ? { exams: [], modalities: [] }
+      : { exams: exames, modalities };
+  }
+  const publicExams: Exame[] = data.map((item) => ({
+    slug: item.slug,
+    name: item.name,
+    modality: item.modality,
+    modalitySlug: item.modality_slug,
+    shortDescription: item.short_description,
+    preparationSlug: item.preparation_slug ?? undefined,
+    purpose: item.purpose ?? undefined,
+    howPerformed: item.how_performed ?? undefined,
+    generalGuidance: item.general_guidance ?? undefined,
+    documents: item.documents ?? undefined,
+    active: true,
+  }));
+  const publicModalities: Modality[] = data.map((item) => ({
+    slug: item.modality_slug,
+    name: item.modality,
+    shortDescription: item.short_description,
+    icon: item.icon as ModalityIcon,
+    active: true,
+    featured: item.featured,
+  }));
+  return { exams: publicExams, modalities: publicModalities };
+}
+
+export async function getPublicExamBySlug(slug: string) {
+  const content = await getPublicExams();
+  return {
+    exam: content.exams.find((item) => item.slug === slug) ?? null,
+    modality: content.modalities.find((item) => item.slug === slug) ?? null,
+  };
+}
+
+export async function getPublicPreparations(): Promise<ClinicalService[]> {
+  const supabase = await publicClient();
+  if (!supabase) return clinicalServices;
+  const { data, error } = await supabase
+    .from("preparations")
+    .select(
+      "slug,name,search_terms,attendance_mode,attendance_label,schedules,preparation_groups,documents,safety_questions,previous_exams_recommended,validated_by_clinic,last_reviewed_at,sort_order",
+    )
+    .order("sort_order");
+  if (error) return clinicalServices;
+  if (!data?.length) {
+    return (await hasCompleteCms(supabase)) ? [] : clinicalServices;
+  }
+  return data.map((item) => ({
+    slug: item.slug,
+    name: item.name,
+    searchTerms: Array.isArray(item.search_terms)
+      ? item.search_terms.map(String)
+      : [],
+    attendanceMode: item.attendance_mode as ClinicalService["attendanceMode"],
+    attendanceLabel: item.attendance_label,
+    schedules: Array.isArray(item.schedules)
+      ? (item.schedules as ClinicalService["schedules"])
+      : [],
+    preparationGroups: Array.isArray(item.preparation_groups)
+      ? (item.preparation_groups as ClinicalService["preparationGroups"])
+      : [],
+    documents: Array.isArray(item.documents)
+      ? item.documents.map(String)
+      : undefined,
+    safetyQuestions: Array.isArray(item.safety_questions)
+      ? item.safety_questions.map(String)
+      : undefined,
+    previousExamsRecommended: item.previous_exams_recommended,
+    validatedByClinic: item.validated_by_clinic,
+    lastReviewedAt: item.last_reviewed_at,
+  }));
+}
+
+export async function getPublicPreparationBySlug(slug: string) {
+  const content = await getPublicPreparations();
+  return content.find((item) => item.slug === slug) ?? null;
+}
+
+export type PublicInstitutionalContent = {
+  config: SiteConfig;
+  about: {
+    title: string;
+    description: string;
+    purpose: string;
+    technology: string;
+  };
+};
+
+function settingText(
+  value: Record<string, unknown>,
+  key: string,
+  fallback: string,
+) {
+  return typeof value[key] === "string" ? String(value[key]) : fallback;
+}
+
+export async function getPublicInstitutionalContent(): Promise<PublicInstitutionalContent> {
+  const fallback = {
+    config: siteConfig,
+    about: {
+      title: "Tecnologia, precisão e cuidado.",
+      description:
+        "O Instituto de Neurologia do Amapá reúne diagnóstico por imagem, neurologia e medicina nuclear em Macapá.",
+      purpose:
+        "Facilitar o acesso a informações sobre exames, preparos, convênios e canais oficiais da INNEURO.",
+      technology:
+        "Tecnologia, comunicação clara e acesso digital aos resultados apoiam a jornada de atendimento.",
+    },
+  };
+  const supabase = await publicClient();
+  if (!supabase) return fallback;
+  const { data, error } = await supabase
+    .from("site_settings")
+    .select("value")
+    .eq("key", "institutional")
+    .maybeSingle();
+  if (error || !data?.value || typeof data.value !== "object") return fallback;
+  const value = data.value as Record<string, unknown>;
+  const address = {
+    street: settingText(value, "address_street", siteConfig.address.street),
+    number: settingText(value, "address_number", siteConfig.address.number),
+    neighborhood: settingText(
+      value,
+      "address_neighborhood",
+      siteConfig.address.neighborhood,
+    ),
+    city: settingText(value, "address_city", siteConfig.address.city),
+    state: settingText(value, "address_state", siteConfig.address.state),
+    postalCode: settingText(
+      value,
+      "address_postal_code",
+      siteConfig.address.postalCode,
+    ),
+    reference: settingText(
+      value,
+      "address_reference",
+      siteConfig.address.reference,
+    ),
+    formatted: "",
+  };
+  address.formatted = `${address.street}, ${address.number} — ${address.neighborhood}, ${address.city}/${address.state}`;
+  const patientPortalUrl = settingText(
+    value,
+    "patient_portal_url",
+    siteConfig.patientPortal.url,
+  );
+  const config: SiteConfig = {
+    ...siteConfig,
+    fullName: settingText(value, "full_name", siteConfig.fullName),
+    description: settingText(value, "description", siteConfig.description),
+    phone: settingText(value, "phone", siteConfig.phone),
+    email: settingText(value, "email", siteConfig.email),
+    openingHours: settingText(value, "opening_hours", siteConfig.openingHours),
+    whatsapp: {
+      primary: {
+        label: settingText(
+          value,
+          "whatsapp_primary_label",
+          siteConfig.whatsapp.primary.label,
+        ),
+        display: settingText(
+          value,
+          "whatsapp_primary_display",
+          siteConfig.whatsapp.primary.display,
+        ),
+        number: settingText(
+          value,
+          "whatsapp_primary_number",
+          siteConfig.whatsapp.primary.number,
+        ),
+      },
+      secondary: {
+        label: settingText(
+          value,
+          "whatsapp_secondary_label",
+          siteConfig.whatsapp.secondary.label,
+        ),
+        display: settingText(
+          value,
+          "whatsapp_secondary_display",
+          siteConfig.whatsapp.secondary.display,
+        ),
+        number: settingText(
+          value,
+          "whatsapp_secondary_number",
+          siteConfig.whatsapp.secondary.number,
+        ),
+      },
+    },
+    instagram: {
+      url: settingText(value, "instagram_url", siteConfig.instagram.url),
+      handle: settingText(
+        value,
+        "instagram_handle",
+        siteConfig.instagram.handle,
+      ),
+    },
+    address,
+    mapsUrl: settingText(value, "maps_url", siteConfig.mapsUrl),
+    patientPortalUrl,
+    patientPortal: { ...siteConfig.patientPortal, url: patientPortalUrl },
+  };
+  return {
+    config,
+    about: {
+      title: settingText(value, "about_title", fallback.about.title),
+      description: settingText(
+        value,
+        "about_description",
+        fallback.about.description,
+      ),
+      purpose: settingText(value, "about_purpose", fallback.about.purpose),
+      technology: settingText(
+        value,
+        "about_technology",
+        fallback.about.technology,
+      ),
+    },
+  };
 }

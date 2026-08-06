@@ -15,7 +15,7 @@ export type SiteAddress = {
   formatted: string;
 };
 
-type SiteConfig = {
+export type SiteConfig = {
   name: string;
   fullName: string;
   description: string;

@@ -12,4 +12,5 @@ export type Modality = {
   shortDescription: string;
   icon: ModalityIcon;
   active: boolean;
+  featured?: boolean;
 };
