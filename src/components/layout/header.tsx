@@ -53,6 +53,8 @@ export function Header() {
 
   const closeMenu = () => dialogRef.current?.close();
   const lightHeader = !isScrolled && !isMenuOpen && pathname !== "/contato";
+  const seamlessContactHeader =
+    !isScrolled && !isMenuOpen && pathname === "/contato";
   const isHome = pathname === "/";
 
   return (
@@ -62,10 +64,12 @@ export function Header() {
         lightHeader
           ? isHome
             ? "bg-transparent text-white"
-            : "border-b border-white/10 bg-transparent text-white"
+            : "bg-transparent text-white"
           : isHome
             ? "text-ink bg-white/92 shadow-[0_10px_35px_rgba(3,37,27,0.06)] backdrop-blur-xl"
-            : "border-border-light/80 text-ink border-b bg-white/92 shadow-[0_10px_35px_rgba(3,37,27,0.06)] backdrop-blur-xl",
+            : seamlessContactHeader
+              ? "text-ink bg-white/92 backdrop-blur-xl"
+              : "border-border-light/80 text-ink border-b bg-white/92 shadow-[0_10px_35px_rgba(3,37,27,0.06)] backdrop-blur-xl",
       )}
     >
       <Container className="flex min-h-20 items-center justify-between gap-4 xl:min-h-24">
