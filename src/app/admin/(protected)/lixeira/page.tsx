@@ -15,7 +15,7 @@ export default async function TrashPage({
     cmsModules.map(async (module) => {
       const { data = [] } = await supabase
         .from(module.table)
-        .select("id, title, name, network, archived_at")
+        .select("*")
         .not("archived_at", "is", null)
         .order("archived_at", { ascending: false });
       return { module, rows: data ?? [] };
