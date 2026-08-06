@@ -4,7 +4,9 @@ import { QuickActions } from "@/components/sections/quick-actions";
 import { Scheduling } from "@/components/sections/scheduling";
 import {
   getPublicInstitutionalContent,
-  getPublicPreparations,
+  getPublicPartners,
+  getPublicSchedulingExams,
+  getPublicSchedulingSettings,
 } from "@/lib/cms/public-content";
 import { createWhatsAppUrl } from "@/lib/whatsapp";
 import { createPageMetadata } from "@/lib/metadata";
@@ -27,15 +29,24 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
   const initialExam = (
     Array.isArray(requestedExam) ? requestedExam[0] : (requestedExam ?? "")
   ).slice(0, 160);
-  const [institutional, clinicalServices] = await Promise.all([
-    getPublicInstitutionalContent(),
-    getPublicPreparations(),
-  ]);
+  const [institutional, exams, partners, schedulingSettings] =
+    await Promise.all([
+      getPublicInstitutionalContent(),
+      getPublicSchedulingExams(),
+      getPublicPartners(),
+      getPublicSchedulingSettings(),
+    ]);
   const { config } = institutional;
 
   return (
     <main id="main-content" tabIndex={-1}>
-      <Scheduling initialExam={initialExam} whatsapp={config.whatsapp} />
+      <Scheduling
+        initialExam={initialExam}
+        whatsapp={config.whatsapp}
+        exams={exams}
+        partners={partners}
+        settings={schedulingSettings}
+      />
       <QuickActions
         eyebrow="Canais de atendimento"
         title="Acesse os serviços e canais oficiais."
@@ -95,38 +106,14 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
           </div>
           <section className="mt-10">
             <h2 className="font-heading text-ink text-3xl font-semibold">
-              Horários por modalidade
+              Realização dos exames
             </h2>
-            <p className="text-muted mt-3">
-              Consulte os horários confirmados para cada modalidade.
+            <p className="text-muted mt-3">{schedulingSettings.publicText}</p>
+            <p className="text-muted mt-2 text-sm">
+              {schedulingSettings.note} Esta informação refere-se à realização
+              dos exames e não ao horário da recepção ou dos canais
+              administrativos.
             </p>
-            <div className="mt-6 grid gap-5 md:grid-cols-2">
-              {clinicalServices.map((service) => (
-                <article
-                  key={service.slug}
-                  className="border-border-light rounded-3xl border bg-white p-6"
-                >
-                  <h3 className="font-heading text-xl font-semibold">
-                    {service.name}
-                  </h3>
-                  <p className="text-brand mt-2 text-sm font-bold">
-                    {service.attendanceLabel}
-                  </p>
-                  <ul className="text-muted mt-4 space-y-2 text-sm">
-                    {service.schedules.map((schedule, index) => (
-                      <li key={`${schedule.days}-${index}`}>
-                        <strong>
-                          {schedule.label} — {schedule.days}:
-                        </strong>{" "}
-                        {schedule.periods
-                          .map((period) => `${period.start} às ${period.end}`)
-                          .join(" · ")}
-                      </li>
-                    ))}
-                  </ul>
-                </article>
-              ))}
-            </div>
           </section>
           <section className="border-border-light mt-10 rounded-3xl border bg-white p-7">
             <MapPin aria-hidden="true" className="text-brand" />

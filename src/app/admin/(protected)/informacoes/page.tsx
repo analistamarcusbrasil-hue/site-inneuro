@@ -14,7 +14,7 @@ const groups = [
       [
         "opening_hours",
         "Horário geral",
-        "Opcional. Horários por modalidade são editados em Preparos e horários.",
+        "Opcional. Não use este campo para os exames; edite a fonte única em Horários dos exames.",
       ],
       [
         "whatsapp_primary_label",

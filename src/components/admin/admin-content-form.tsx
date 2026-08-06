@@ -5,10 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CalendarClock, Eye, ImagePlus, Save, Send, X } from "lucide-react";
 import type { CmsModuleFormConfig } from "@/lib/cms/modules";
-import {
-  saveContentAction,
-  type SaveContentResult,
-} from "@/app/admin/actions";
+import { saveContentAction, type SaveContentResult } from "@/app/admin/actions";
 import { AdminGuidedField } from "@/components/admin/admin-guided-field";
 import { AdminContentPreview } from "@/components/admin/admin-content-preview";
 import { AdminMediaUploadForm } from "@/components/admin/admin-media-upload-form";
@@ -25,6 +22,13 @@ function initialFieldValue(
     return String((initial.content[0] as { text?: string })?.text ?? "");
   if (name === "search_terms_text" && Array.isArray(initial.search_terms))
     return initial.search_terms.map(String).join("\n");
+  if (name === "override_days_text" && Array.isArray(initial.override_days))
+    return initial.override_days.map(String).join("\n");
+  if (
+    name === "override_periods_text" &&
+    Array.isArray(initial.override_periods)
+  )
+    return initial.override_periods.map(String).join("\n");
   if (name === "documents_text" && Array.isArray(initial.documents))
     return initial.documents.map(String).join("\n");
   if (
@@ -370,9 +374,7 @@ export function AdminContentForm({
           <p
             role={saveResult.ok ? "status" : "alert"}
             className={`mt-6 rounded-xl p-4 text-sm font-bold ${
-              saveResult.ok
-                ? "bg-mint text-brand"
-                : "bg-error/10 text-error"
+              saveResult.ok ? "bg-mint text-brand" : "bg-error/10 text-error"
             }`}
           >
             {saveResult.message}

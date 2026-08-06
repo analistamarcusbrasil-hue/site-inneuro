@@ -13,12 +13,24 @@ import {
   ScrollText,
   LogOut,
   Building2,
+  CalendarClock,
+  ClipboardList,
 } from "lucide-react";
 import { cmsModules } from "@/lib/cms/modules";
 import type { AdminProfile } from "@/types/cms";
 import { logoutAction } from "@/app/admin/actions";
 
 const extraLinks = [
+  {
+    href: "/admin/solicitacoes",
+    label: "Solicitações de agendamento",
+    icon: ClipboardList,
+  },
+  {
+    href: "/admin/horarios",
+    label: "Horários dos exames",
+    icon: CalendarClock,
+  },
   {
     href: "/admin/informacoes",
     label: "Informações institucionais",

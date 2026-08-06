@@ -20,6 +20,7 @@ export type ClinicalService = {
   attendanceMode: "walk-in" | "appointment" | "mixed";
   attendanceLabel: string;
   schedules: ServiceSchedule[];
+  scheduleNote?: string;
   preparationGroups: PreparationGroup[];
   documents?: string[];
   safetyQuestions?: string[];

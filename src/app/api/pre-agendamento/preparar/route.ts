@@ -6,7 +6,11 @@ import {
   getSchedulingAdminClient,
   isSecureSchedulingRequest,
 } from "@/lib/scheduling/server";
-import type { SchedulingFileDescriptor } from "@/lib/scheduling/shared";
+import {
+  serviceTypes,
+  type SchedulingFileDescriptor,
+  type ServiceType,
+} from "@/lib/scheduling/shared";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -30,7 +34,8 @@ export async function POST(request: NextRequest) {
       return json({ error: "Solicitação inválida." }, 413);
 
     const body = (await request.json()) as {
-      attendance?: unknown;
+      serviceType?: unknown;
+      authorizationPending?: unknown;
       files?: unknown;
       website?: unknown;
       startedAt?: unknown;
@@ -46,13 +51,13 @@ export async function POST(request: NextRequest) {
     )
       return json({ error: "Atualize a página e tente novamente." }, 400);
 
-    const attendance = body.attendance;
-    if (attendance !== "Particular" && attendance !== "Convênio")
+    const serviceType = body.serviceType;
+    if (!(serviceTypes as readonly unknown[]).includes(serviceType))
       return json({ error: "Selecione o tipo de atendimento." }, 400);
     if (
       !Array.isArray(body.files) ||
-      body.files.length < 2 ||
-      body.files.length > 3
+      body.files.length < 1 ||
+      body.files.length > 12
     )
       return json({ error: "Revise os documentos selecionados." }, 400);
 
@@ -70,8 +75,9 @@ export async function POST(request: NextRequest) {
 
     const prepared = await createPreparedUploadSession(
       admin,
-      attendance,
+      serviceType as ServiceType,
       body.files as SchedulingFileDescriptor[],
+      body.authorizationPending === true,
     );
     return json(prepared);
   } catch (error) {

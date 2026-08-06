@@ -7,14 +7,20 @@ export const UPLOAD_SESSION_TTL_MS = 2 * 60 * 60 * 1000;
 export const documentKinds = [
   "photoId",
   "medicalOrder",
-  "insuranceCard",
+  "susAuthorization",
+  "insuranceCardFront",
+  "insuranceCardBack",
+  "other",
 ] as const;
 export type DocumentKind = (typeof documentKinds)[number];
 
 export const documentLabels: Record<DocumentKind, string> = {
   photoId: "Documento com foto",
   medicalOrder: "Pedido médico",
-  insuranceCard: "Carteirinha do convênio",
+  susAuthorization: "Autorização da regulação",
+  insuranceCardFront: "Carteirinha do convênio — frente",
+  insuranceCardBack: "Carteirinha do convênio — verso",
+  other: "Outro documento",
 };
 
 export const allowedMimeTypes = [
@@ -27,6 +33,7 @@ export const allowedMimeTypes = [
 export type AllowedMimeType = (typeof allowedMimeTypes)[number];
 
 export type SchedulingFileDescriptor = {
+  id: string;
   kind: DocumentKind;
   name: string;
   size: number;
@@ -34,6 +41,7 @@ export type SchedulingFileDescriptor = {
 };
 
 export type PreparedUpload = {
+  id: string;
   kind: DocumentKind;
   signedUrl: string;
 };
@@ -49,6 +57,17 @@ export type FinalizeSchedulingResponse = {
   protectedUrl: string;
   whatsappUrl: string;
 };
+
+export const serviceTypes = ["PARTICULAR", "INSURANCE", "SUS"] as const;
+export type ServiceType = (typeof serviceTypes)[number];
+
+export const preferredPeriods = [
+  "MORNING",
+  "AFTERNOON",
+  "EVENING",
+  "ANY",
+] as const;
+export type PreferredPeriod = (typeof preferredPeriods)[number];
 
 const mimeExtensions: Record<AllowedMimeType, readonly string[]> = {
   "application/pdf": ["pdf"],

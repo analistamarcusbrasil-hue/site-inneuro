@@ -75,6 +75,11 @@ export default async function SchedulingRequestPage({
     ["Exame ou procedimento", manifest.exam],
     ["Período preferido", manifest.preferredPeriod],
     ["Observações", manifest.observations ?? "Não informadas"],
+    [
+      "Datas preferenciais",
+      manifest.preferredDates?.map((date) => formatDate(date)).join(" · ") ??
+        "Não informadas",
+    ],
     ["Solicitação criada em", formatDate(manifest.createdAt, true)],
   ];
 
@@ -128,6 +133,28 @@ export default async function SchedulingRequestPage({
                   </div>
                 ))}
               </dl>
+              {manifest.exams?.length ? (
+                <div className="mt-6">
+                  <h3 className="font-heading text-ink text-lg font-semibold">
+                    Exames solicitados ({manifest.exams.length})
+                  </h3>
+                  <ul className="mt-3 space-y-2">
+                    {manifest.exams.map((exam) => (
+                      <li
+                        key={exam.id}
+                        className="bg-surface rounded-xl p-3 text-sm"
+                      >
+                        <strong>{exam.name}</strong>
+                        {exam.modality ? (
+                          <span className="text-muted mt-1 block">
+                            {exam.modality}
+                          </span>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
             </section>
 
             <section aria-labelledby="documents-title">
@@ -140,8 +167,8 @@ export default async function SchedulingRequestPage({
               <div className="mt-5 grid gap-3">
                 {manifest.documents.map((document) => (
                   <a
-                    key={document.kind}
-                    href={`/api/solicitacao/${token}/documento/${document.kind}`}
+                    key={document.id ?? `${document.kind}-${document.path}`}
+                    href={`/api/solicitacao/${token}/documento/${document.id ?? document.kind}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="border-brand/15 hover:border-brand/40 focus-visible:ring-tech text-brand-dark flex min-h-14 items-center gap-3 rounded-2xl border bg-white px-4 text-sm font-semibold transition-colors focus-visible:ring-2 focus-visible:outline-none"
@@ -152,7 +179,12 @@ export default async function SchedulingRequestPage({
                       className="text-brand"
                       size={20}
                     />
-                    {documentLabels[document.kind]}
+                    <span>
+                      {documentLabels[document.kind]}
+                      <span className="text-muted mt-1 block text-xs font-normal">
+                        {document.name ?? "Arquivo enviado"}
+                      </span>
+                    </span>
                   </a>
                 ))}
               </div>

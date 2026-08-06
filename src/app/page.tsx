@@ -11,7 +11,7 @@ import {
   getPublicExams,
   getPublicInstitutionalContent,
   getPublicPartners,
-  getPublicPreparations,
+  getPublicSchedulingSettings,
 } from "@/lib/cms/public-content";
 import { createPageMetadata } from "@/lib/metadata";
 
@@ -23,12 +23,12 @@ export const metadata = createPageMetadata({
 });
 
 export default async function Home() {
-  const [highlights, partners, examContent, services, institutional] =
+  const [highlights, partners, examContent, scheduling, institutional] =
     await Promise.all([
       getPublicCarousel(),
       getPublicPartners(),
       getPublicExams(),
-      getPublicPreparations(),
+      getPublicSchedulingSettings(),
       getPublicInstitutionalContent(),
     ]);
   return (
@@ -44,7 +44,7 @@ export default async function Home() {
         whatsappNumber={institutional.config.whatsapp.primary.number}
       />
       <Differentials />
-      <Location config={institutional.config} services={services} />
+      <Location config={institutional.config} scheduling={scheduling} />
       <FinalSchedulingCta
         whatsappNumber={institutional.config.whatsapp.primary.number}
       />

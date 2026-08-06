@@ -5,6 +5,7 @@ import { createPageMetadata } from "@/lib/metadata";
 import {
   getPublicExams,
   getPublicPreparations,
+  getPublicSchedulingSettings,
 } from "@/lib/cms/public-content";
 
 export const metadata = createPageMetadata({
@@ -15,9 +16,10 @@ export const metadata = createPageMetadata({
 });
 
 export default async function PreparationsPage() {
-  const [examContent, services] = await Promise.all([
+  const [examContent, services, scheduling] = await Promise.all([
     getPublicExams(),
     getPublicPreparations(),
+    getPublicSchedulingSettings(),
   ]);
   return (
     <main id="main-content" tabIndex={-1}>
@@ -28,6 +30,10 @@ export default async function PreparationsPage() {
       />
       <section className="bg-surface pt-10 pb-14 sm:pt-12 sm:pb-18 lg:pt-14 lg:pb-24">
         <Container>
+          <p className="bg-mint text-brand-dark mb-8 rounded-2xl p-4 text-sm font-semibold">
+            {scheduling.publicText} Os preparos abaixo continuam específicos
+            para cada exame.
+          </p>
           <PreparationCatalog
             modalities={examContent.modalities}
             services={services}

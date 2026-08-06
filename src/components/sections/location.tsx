@@ -1,17 +1,17 @@
 import { AtSign, ExternalLink, MapPin, MessageCircle } from "lucide-react";
 import { Container } from "@/components/layout/container";
 import type { SiteConfig } from "@/config/site";
-import type { ClinicalService } from "@/types/clinical-service";
+import type { SchedulingSettings } from "@/lib/scheduling/settings";
 import { createWhatsAppUrl } from "@/lib/whatsapp";
 
 const message =
   "Olá! Acessei o site da INNEURO e gostaria de informações sobre exames.";
 export function Location({
   config,
-  services,
+  scheduling,
 }: {
   config: SiteConfig;
-  services: ClinicalService[];
+  scheduling: SchedulingSettings;
 }) {
   return (
     <section
@@ -61,33 +61,14 @@ export function Location({
             </div>
             <div>
               <h3 className="font-heading text-xl font-semibold">
-                Horários por modalidade
+                Realização dos exames
               </h3>
               <p className="mt-2 text-sm text-white/65">
-                Horários confirmados para os serviços com orientação cadastrada.
+                {scheduling.publicText}
               </p>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                {services.map((service) => (
-                  <article
-                    key={service.slug}
-                    className="rounded-2xl border border-white/12 bg-white/5 p-4"
-                  >
-                    <h4 className="text-sm font-bold">{service.name}</h4>
-                    <p className="mt-2 text-xs leading-relaxed text-white/68">
-                      {service.schedules
-                        .map(
-                          (schedule) =>
-                            `${schedule.days}: ${schedule.periods
-                              .map(
-                                (period) => `${period.start} às ${period.end}`,
-                              )
-                              .join(" e ")}`,
-                        )
-                        .join(" · ")}
-                    </p>
-                  </article>
-                ))}
-              </div>
+              <p className="mt-3 rounded-2xl border border-white/12 bg-white/5 p-4 text-sm leading-relaxed text-white/68">
+                {scheduling.note}
+              </p>
               <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2">
                 {Object.values(config.whatsapp).map((channel) => (
                   <a

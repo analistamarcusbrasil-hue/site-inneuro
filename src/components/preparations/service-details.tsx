@@ -54,12 +54,19 @@ export function ServiceDetails({
               </span>
               <span className="text-muted mt-1 block text-sm">
                 {schedule.periods
-                  .map((period) => `${period.start} às ${period.end}`)
+                  .map((period) =>
+                    period.end
+                      ? `${period.start} às ${period.end}`
+                      : period.start,
+                  )
                   .join(" · ")}
               </span>
             </li>
           ))}
         </ul>
+        {service.scheduleNote ? (
+          <p className="text-muted mt-4 text-sm">{service.scheduleNote}</p>
+        ) : null}
       </section>
       {service.preparationGroups.map((group) => (
         <section

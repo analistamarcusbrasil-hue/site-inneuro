@@ -11,6 +11,7 @@ import { Container } from "@/components/layout/container";
 import {
   getPublicExams,
   getPublicInstitutionalContent,
+  getPublicSchedulingSettings,
 } from "@/lib/cms/public-content";
 import { createPageMetadata } from "@/lib/metadata";
 
@@ -22,9 +23,10 @@ export const metadata = createPageMetadata({
 });
 
 export default async function AboutPage() {
-  const [{ modalities }, institutional] = await Promise.all([
+  const [{ modalities }, institutional, scheduling] = await Promise.all([
     getPublicExams(),
     getPublicInstitutionalContent(),
+    getPublicSchedulingSettings(),
   ]);
   const { config, about } = institutional;
   return (
@@ -36,6 +38,9 @@ export default async function AboutPage() {
       />
       <section className="bg-surface pt-10 pb-16 sm:pt-12 sm:pb-20 lg:pt-14 lg:pb-28">
         <Container>
+          <p className="bg-mint text-brand-dark mb-8 rounded-2xl p-4 text-sm font-semibold">
+            {scheduling.publicText}
+          </p>
           <div className="grid gap-5 lg:grid-cols-3">
             <article className="border-border-light rounded-3xl border bg-white p-7">
               <ScanLine aria-hidden="true" className="text-brand" />

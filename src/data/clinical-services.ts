@@ -15,22 +15,9 @@ export const clinicalServices: ClinicalService[] = [
     attendanceLabel: "Ordem de chegada",
     schedules: [
       {
-        label: "Sem contraste",
-        days: "Segunda a sexta-feira",
-        periods: [{ start: "07h", end: "23h" }],
-      },
-      {
-        label: "Sem contraste",
-        days: "Sábado",
-        periods: [{ start: "08h", end: "22h" }],
-      },
-      {
-        label: "Com contraste",
-        days: "Segunda a sexta-feira",
-        periods: [
-          { start: "08h", end: "12h" },
-          { start: "13h", end: "18h" },
-        ],
+        label: "Mediante agendamento",
+        days: "Segunda a domingo",
+        periods: [{ start: "Manhã, tarde e noite", end: "" }],
       },
     ],
     preparationGroups: [
@@ -58,17 +45,9 @@ export const clinicalServices: ClinicalService[] = [
     attendanceLabel: "Ordem de chegada",
     schedules: [
       {
-        label: "Atendimento",
-        days: "Segunda a sexta-feira",
-        periods: [
-          { start: "08h", end: "12h" },
-          { start: "13h", end: "23h" },
-        ],
-      },
-      {
-        label: "Atendimento",
-        days: "Sábado",
-        periods: [{ start: "08h", end: "22h" }],
+        label: "Mediante agendamento",
+        days: "Segunda a domingo",
+        periods: [{ start: "Manhã, tarde e noite", end: "" }],
       },
     ],
     preparationGroups: [
@@ -103,17 +82,9 @@ export const clinicalServices: ClinicalService[] = [
     attendanceLabel: "Consulte a equipe",
     schedules: [
       {
-        label: "Atendimento",
-        days: "Segunda a sexta-feira",
-        periods: [
-          { start: "08h", end: "11h30" },
-          { start: "13h", end: "18h30" },
-        ],
-      },
-      {
-        label: "Atendimento",
-        days: "Sábado",
-        periods: [{ start: "08h", end: "11h30" }],
+        label: "Mediante agendamento",
+        days: "Segunda a domingo",
+        periods: [{ start: "Manhã, tarde e noite", end: "" }],
       },
     ],
     preparationGroups: [
@@ -158,19 +129,9 @@ export const clinicalServices: ClinicalService[] = [
     attendanceLabel: "Necessita agendamento",
     schedules: [
       {
-        label: "Atendimento",
-        days: "Segunda a sexta-feira",
-        periods: [{ start: "07h", end: "23h" }],
-      },
-      {
-        label: "Atendimento",
-        days: "Sábado",
-        periods: [{ start: "07h", end: "22h" }],
-      },
-      {
-        label: "Atendimento",
-        days: "Domingo",
-        periods: [{ start: "07h", end: "19h" }],
+        label: "Mediante agendamento",
+        days: "Segunda a domingo",
+        periods: [{ start: "Manhã, tarde e noite", end: "" }],
       },
     ],
     preparationGroups: [

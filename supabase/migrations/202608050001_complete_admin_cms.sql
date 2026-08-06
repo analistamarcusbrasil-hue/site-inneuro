@@ -183,28 +183,28 @@ values
   (
     'tomografia-computadorizada', 'Tomografia Computadorizada', 'tomografia-computadorizada',
     array['tomografia','contraste','abdome'], 'walk-in', 'Ordem de chegada',
-    '[{"label":"Sem contraste","days":"Segunda a sexta-feira","periods":[{"start":"07h","end":"23h"}]},{"label":"Sem contraste","days":"Sábado","periods":[{"start":"08h","end":"22h"}]},{"label":"Com contraste","days":"Segunda a sexta-feira","periods":[{"start":"08h","end":"12h"},{"start":"13h","end":"18h"}]}]'::jsonb,
+    '[]'::jsonb,
     '[{"title":"Exames com contraste ou de abdome","appliesTo":["Tomografia com contraste","Tomografia de abdome"],"instructions":["Jejum de 4 horas.","Usar roupas leves.","Não usar roupas ou acessórios com metais.","Pacientes com 60 anos ou mais devem comparecer acompanhados.","Pacientes com 60 anos ou mais devem trazer exames recentes de ureia e creatinina."],"warning":"Em caso de dúvida sobre contraste ou preparo, confirme com a equipe da INNEURO."}]'::jsonb,
     '{}', '{}', false, true, '2026-07-21', true, 0, 'published'
   ),
   (
     'raios-x', 'Raios X', 'raios-x',
     array['raios x','bacia','coluna lombar','quadril'], 'walk-in', 'Ordem de chegada',
-    '[{"label":"Atendimento","days":"Segunda a sexta-feira","periods":[{"start":"08h","end":"12h"},{"start":"13h","end":"23h"}]},{"label":"Atendimento","days":"Sábado","periods":[{"start":"08h","end":"22h"}]}]'::jsonb,
+    '[]'::jsonb,
     '[{"title":"Preparo informado pela INNEURO para esses exames específicos","appliesTo":["Raios X de bacia","Raios X de coluna lombar","Raios X de quadril"],"instructions":["Jejum de 4 horas.","No dia anterior, a partir das 07h, tomar 20 gotas de Luftal a cada 6 horas.","Fazer jantar leve até às 20h.","Após o jantar, tomar 2 comprimidos de Lactopurga ou Ducolax.","Trazer exames anteriores, caso possua.","Comparecer com roupas leves.","Não usar metais, joias ou piercing."],"warning":"Em caso de contraindicação, dúvida, gestação ou uso contínuo de medicamentos, confirme com a equipe da INNEURO."}]'::jsonb,
     '{}', '{}', true, true, '2026-07-21', true, 1, 'published'
   ),
   (
     'mapeamento-cerebral', 'Mapeamento Cerebral', 'mapeamento-cerebral',
     array['mapeamento cerebral','cabelo','menores de 6 anos','sono'], 'appointment', 'Consulte a equipe',
-    '[{"label":"Atendimento","days":"Segunda a sexta-feira","periods":[{"start":"08h","end":"11h30"},{"start":"13h","end":"18h30"}]},{"label":"Atendimento","days":"Sábado","periods":[{"start":"08h","end":"11h30"}]}]'::jsonb,
+    '[]'::jsonb,
     '[{"title":"Preparo","appliesTo":["Mapeamento Cerebral"],"instructions":["Lavar o cabelo com sabão neutro no dia anterior.","Não usar creme.","Não usar gel.","Não usar óleo.","Não utilizar outros produtos no cabelo.","Comparecer com o cabelo seco."]},{"title":"Menores de 6 anos","appliesTo":["Somente menores de 6 anos"],"instructions":["No dia anterior, dormir por volta de 00h.","Acordar até 03h.","A orientação tem como objetivo que a criança consiga dormir novamente durante o exame na clínica.","Trazer toalha de rosto."],"warning":"Em caso de dúvida, confirme as orientações com a equipe da INNEURO."}]'::jsonb,
     array['Carteira do convênio.','RG.','Pedido médico original.'], '{}', false, true, '2026-07-21', true, 2, 'published'
   ),
   (
     'ressonancia-magnetica', 'Ressonância Magnética', 'ressonancia-magnetica',
     array['ressonância magnética','contraste','metais','claustrofobia'], 'appointment', 'Necessita agendamento',
-    '[{"label":"Atendimento","days":"Segunda a sexta-feira","periods":[{"start":"07h","end":"23h"}]},{"label":"Atendimento","days":"Sábado","periods":[{"start":"07h","end":"22h"}]},{"label":"Atendimento","days":"Domingo","periods":[{"start":"07h","end":"19h"}]}]'::jsonb,
+    '[]'::jsonb,
     '[{"title":"Exames com contraste","appliesTo":["Ressonância Magnética com contraste"],"instructions":["Jejum de 2 horas.","Comparecer com roupas leves.","Não usar roupas ou acessórios com metais.","Não usar joias.","Não usar piercing.","Pacientes com 60 anos ou mais devem comparecer acompanhados.","Pacientes com 60 anos ou mais devem trazer ureia e creatinina recentes."]}]'::jsonb,
     '{}', array['use aparelho ortodôntico;','possua clipes metálicos;','use marca-passo;','use cílios metálicos;','possua próteses ou metais no corpo;','tenha claustrofobia.'],
     false, true, '2026-07-21', true, 3, 'published'

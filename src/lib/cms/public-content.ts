@@ -12,6 +12,47 @@ import type { Convenio } from "@/types/convenio";
 import type { Exame } from "@/types/exame";
 import type { Modality, ModalityIcon } from "@/types/modality";
 import type { ClinicalService } from "@/types/clinical-service";
+import {
+  defaultSchedulingSettings,
+  parseSchedulingSettings,
+  type SchedulingSettings,
+} from "@/lib/scheduling/settings";
+
+export type SchedulingExamOption = {
+  id: string;
+  name: string;
+  modality: string;
+};
+
+export async function getPublicSchedulingSettings(): Promise<SchedulingSettings> {
+  const supabase = await publicClient();
+  if (!supabase) return defaultSchedulingSettings;
+  const { data, error } = await supabase
+    .from("site_settings")
+    .select("value")
+    .eq("key", "scheduling")
+    .maybeSingle();
+  return error
+    ? defaultSchedulingSettings
+    : parseSchedulingSettings(data?.value);
+}
+
+export async function getPublicSchedulingExams(): Promise<
+  SchedulingExamOption[]
+> {
+  const supabase = await publicClient();
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("exams")
+    .select("id,name,modality")
+    .order("name");
+  if (error) return [];
+  return (data ?? []).map((item) => ({
+    id: item.id,
+    name: item.name,
+    modality: item.modality,
+  }));
+}
 
 export type PublicNews = {
   id: string;
@@ -332,7 +373,7 @@ export async function getPublicPreparations(): Promise<ClinicalService[]> {
   const { data, error } = await supabase
     .from("preparations")
     .select(
-      "slug,name,search_terms,attendance_mode,attendance_label,schedules,preparation_groups,documents,safety_questions,previous_exams_recommended,validated_by_clinic,last_reviewed_at,sort_order",
+      "slug,name,search_terms,attendance_mode,attendance_label,schedules,use_general_schedule,override_days,override_periods,schedule_note,preparation_groups,documents,safety_questions,previous_exams_recommended,validated_by_clinic,last_reviewed_at,sort_order",
     )
     .order("sort_order");
   if (error) return clinicalServices;
@@ -347,9 +388,33 @@ export async function getPublicPreparations(): Promise<ClinicalService[]> {
       : [],
     attendanceMode: item.attendance_mode as ClinicalService["attendanceMode"],
     attendanceLabel: item.attendance_label,
-    schedules: Array.isArray(item.schedules)
-      ? (item.schedules as ClinicalService["schedules"])
-      : [],
+    schedules:
+      item.use_general_schedule !== false
+        ? [
+            {
+              label: "Mediante agendamento",
+              days: "Segunda a domingo",
+              periods: [{ start: "Manhã, tarde e noite", end: "" }],
+            },
+          ]
+        : Array.isArray(item.schedules) && item.schedules.length
+          ? (item.schedules as ClinicalService["schedules"])
+          : Array.isArray(item.override_days) &&
+              Array.isArray(item.override_periods) &&
+              item.override_days.length &&
+              item.override_periods.length
+            ? [
+                {
+                  label: "Disponibilidade específica",
+                  days: item.override_days.map(String).join(", "),
+                  periods: item.override_periods.map((period) => ({
+                    start: String(period),
+                    end: "",
+                  })),
+                },
+              ]
+            : [],
+    scheduleNote: item.schedule_note ?? undefined,
     preparationGroups: Array.isArray(item.preparation_groups)
       ? (item.preparation_groups as ClinicalService["preparationGroups"])
       : [],

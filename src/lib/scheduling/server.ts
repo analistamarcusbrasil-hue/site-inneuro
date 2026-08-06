@@ -22,45 +22,102 @@ import {
   SCHEDULING_BUCKET,
   type AllowedMimeType,
   type DocumentKind,
+  type ServiceType,
   type SchedulingFileDescriptor,
   UPLOAD_SESSION_TTL_MS,
   validateFileDescriptor,
 } from "@/lib/scheduling/shared";
 
-type PreparedDocument = Omit<SchedulingFileDescriptor, "name"> & {
+type PreparedDocument = SchedulingFileDescriptor & {
   path: string;
 };
 
 type UploadSession = {
-  version: 1;
+  version: 2;
   expiresAt: string;
   protocol: string;
   accessToken: string;
-  attendance: "Particular" | "Convênio";
+  serviceType: ServiceType;
+  authorizationPending: boolean;
   documents: PreparedDocument[];
 };
 
 export type StoredDocument = {
+  id: string;
   kind: DocumentKind;
+  name: string;
   path: string;
   mimeType: AllowedMimeType;
   size: number;
 };
 
 export type SchedulingManifest = {
-  version: 1;
+  version: 1 | 2;
   protocol: string;
   patientName: string;
   birthDate: string;
   phone: string;
-  attendance: "Particular" | "Convênio";
+  attendance: "Particular" | "Convênio" | "SUS";
   insuranceName: string | null;
   exam: string;
   preferredPeriod: string;
   observations: string | null;
   documents: StoredDocument[];
+  serviceType?: ServiceType;
+  exams?: Array<{ id: string; name: string; modality: string | null }>;
+  preferredDates?: string[];
+  preferredPeriods?: string[];
+  email?: string | null;
+  cpf?: string | null;
+  city?: string | null;
+  responsibleName?: string | null;
+  insuranceCardNumber?: string | null;
+  insuranceCardExpiry?: string | null;
+  insuranceHolderName?: string | null;
+  susCardNumber?: string | null;
+  susAuthorizationNumber?: string | null;
+  regulationNumber?: string | null;
+  susRequestNumber?: string | null;
+  sisregCode?: string | null;
+  originCity?: string | null;
+  requestingUnit?: string | null;
+  requestingProfessional?: string | null;
+  authorizationDate?: string | null;
+  authorizationExpiry?: string | null;
+  authorizationPending?: boolean;
   createdAt: string;
   expiresAt: string;
+};
+
+export type SchedulingDatabaseInput = {
+  patientName: string;
+  cpf: string | null;
+  birthDate: string;
+  phone: string;
+  email: string | null;
+  city: string | null;
+  responsibleName: string | null;
+  serviceType: ServiceType;
+  insuranceId: string | null;
+  insuranceName: string | null;
+  insuranceCardNumber: string | null;
+  insuranceCardExpiry: string | null;
+  insuranceHolderName: string | null;
+  susCardNumber: string | null;
+  susAuthorizationNumber: string | null;
+  regulationNumber: string | null;
+  susRequestNumber: string | null;
+  sisregCode: string | null;
+  originCity: string | null;
+  requestingUnit: string | null;
+  requestingProfessional: string | null;
+  authorizationDate: string | null;
+  authorizationExpiry: string | null;
+  authorizationPending: boolean;
+  preferredDates: string[];
+  preferredPeriods: string[];
+  observations: string | null;
+  exams: Array<{ id: string; name: string; modality: string | null }>;
 };
 
 type ExpiredManifest = {
@@ -168,10 +225,11 @@ export function readUploadSessionToken(token: string): UploadSession | null {
       Buffer.from(payload, "base64url").toString("utf8"),
     );
     if (
-      value?.version !== 1 ||
+      value?.version !== 2 ||
       typeof value.protocol !== "string" ||
       typeof value.accessToken !== "string" ||
-      !["Particular", "Convênio"].includes(value.attendance) ||
+      !["PARTICULAR", "INSURANCE", "SUS"].includes(value.serviceType) ||
+      typeof value.authorizationPending !== "boolean" ||
       !Array.isArray(value.documents) ||
       Date.parse(value.expiresAt) <= Date.now()
     ) {
@@ -187,20 +245,22 @@ export function prepareDocuments(
   files: SchedulingFileDescriptor[],
   protocol: string,
 ) {
-  const seen = new Set<DocumentKind>();
+  const seen = new Set<string>();
   const documents: PreparedDocument[] = [];
   let totalSize = 0;
 
   for (const file of files) {
     const error = validateFileDescriptor(file);
     if (error) throw new Error(error);
-    if (seen.has(file.kind))
-      throw new Error("Envie apenas um arquivo por documento.");
-    seen.add(file.kind);
+    if (!/^[A-Za-z0-9_-]{8,80}$/.test(file.id) || seen.has(file.id))
+      throw new Error("Revise os arquivos selecionados.");
+    seen.add(file.id);
     const mimeType = normalizeMimeType(file.type) as AllowedMimeType;
     totalSize += file.size;
     documents.push({
+      id: file.id,
       kind: file.kind,
+      name: file.name.slice(0, 180),
       path: `uploads/${protocol}/${randomUUID()}.${getSafeExtension(file.name, mimeType)}`,
       size: file.size,
       type: mimeType,
@@ -214,15 +274,32 @@ export function prepareDocuments(
 
 export function validateRequiredDocuments(
   documents: PreparedDocument[],
-  attendance: "Particular" | "Convênio",
+  serviceType: ServiceType,
+  authorizationPending: boolean,
 ) {
   const kinds = new Set(documents.map((document) => document.kind));
-  if (!kinds.has("photoId")) throw new Error("Anexe um documento com foto.");
   if (!kinds.has("medicalOrder")) throw new Error("Anexe o pedido médico.");
-  if (attendance === "Convênio" && !kinds.has("insuranceCard"))
-    throw new Error("Anexe a carteirinha do convênio.");
-  if (attendance === "Particular" && kinds.has("insuranceCard"))
-    throw new Error("Remova a carteirinha para atendimento particular.");
+  if (
+    serviceType === "SUS" &&
+    !authorizationPending &&
+    !kinds.has("susAuthorization")
+  )
+    throw new Error(
+      "Anexe a autorização da regulação ou marque que ela está pendente.",
+    );
+  if (
+    serviceType === "PARTICULAR" &&
+    (kinds.has("insuranceCardFront") ||
+      kinds.has("insuranceCardBack") ||
+      kinds.has("susAuthorization"))
+  )
+    throw new Error(
+      "Remova documentos de convênio ou SUS para atendimento particular.",
+    );
+  if (serviceType === "INSURANCE" && kinds.has("susAuthorization"))
+    throw new Error(
+      "Remova a autorização do SUS para atendimento por convênio.",
+    );
 }
 
 function getRequestIp(request: Request) {
@@ -354,7 +431,9 @@ export async function verifyUploadedDocuments(
           "O conteúdo real de um dos arquivos não corresponde ao formato permitido.",
         );
       verified.push({
+        id: document.id,
         kind: document.kind,
+        name: document.name,
         path: document.path,
         mimeType: detectedType,
         size: data.size,
@@ -435,6 +514,108 @@ export async function saveSchedulingManifest(
   }
 }
 
+export async function saveSchedulingRequestRecord(
+  admin: SupabaseClient,
+  accessToken: string,
+  manifest: SchedulingManifest,
+  input: SchedulingDatabaseInput,
+) {
+  const { data: requestRecord, error: requestError } = await admin
+    .from("appointment_requests")
+    .insert({
+      protocol: manifest.protocol,
+      access_token_hash: hashAccessToken(accessToken),
+      patient_name: input.patientName,
+      cpf: input.cpf,
+      birth_date: input.birthDate,
+      phone: input.phone,
+      email: input.email,
+      city: input.city,
+      responsible_name: input.responsibleName,
+      service_type: input.serviceType,
+      insurance_id: input.insuranceId,
+      insurance_name: input.insuranceName,
+      insurance_card_number: input.insuranceCardNumber,
+      insurance_card_expiry: input.insuranceCardExpiry,
+      insurance_holder_name: input.insuranceHolderName,
+      sus_cns: input.susCardNumber,
+      sus_authorization_number: input.susAuthorizationNumber,
+      sus_regulation_number: input.regulationNumber,
+      sus_request_number: input.susRequestNumber,
+      sisreg_code: input.sisregCode,
+      origin_city: input.originCity,
+      requesting_unit: input.requestingUnit,
+      requesting_professional: input.requestingProfessional,
+      authorization_date: input.authorizationDate,
+      authorization_expiry: input.authorizationExpiry,
+      authorization_pending: input.authorizationPending,
+      preferred_dates: input.preferredDates,
+      preferred_periods: input.preferredPeriods,
+      notes: input.observations,
+      status: input.authorizationPending ? "AUTHORIZATION_PENDING" : "NEW",
+      expires_at: manifest.expiresAt,
+    })
+    .select("id")
+    .single();
+
+  if (requestError || !requestRecord)
+    throw new Error("SCHEDULING_DATABASE_WRITE_FAILED");
+
+  const requestId = requestRecord.id as string;
+  const examRows = input.exams.map((exam) => ({
+    appointment_request_id: requestId,
+    exam_id: exam.id,
+    exam_name: exam.name,
+    modality: exam.modality,
+  }));
+  const documentRows = manifest.documents.map((document) => ({
+    appointment_request_id: requestId,
+    document_type: (
+      {
+        photoId: "photo_id",
+        medicalOrder: "medical_request",
+        susAuthorization: "sus_authorization",
+        insuranceCardFront: "insurance_card_front",
+        insuranceCardBack: "insurance_card_back",
+        other: "other",
+      } as const
+    )[document.kind],
+    storage_path: document.path,
+    file_name: document.name,
+    mime_type: document.mimeType,
+    file_size: document.size,
+  }));
+
+  const [
+    { error: examsError },
+    { error: documentsError },
+    { error: historyError },
+  ] = await Promise.all([
+    admin.from("appointment_request_exams").insert(examRows),
+    admin.from("appointment_request_documents").insert(documentRows),
+    admin.from("appointment_request_history").insert({
+      appointment_request_id: requestId,
+      action: "Solicitação recebida pelo site",
+      details: {
+        status: input.authorizationPending ? "AUTHORIZATION_PENDING" : "NEW",
+      },
+    }),
+  ]);
+
+  if (examsError || documentsError || historyError) {
+    await admin.from("appointment_requests").delete().eq("id", requestId);
+    throw new Error("SCHEDULING_DATABASE_WRITE_FAILED");
+  }
+  return requestId;
+}
+
+export async function deleteSchedulingRequestRecord(
+  admin: SupabaseClient,
+  requestId: string,
+) {
+  await admin.from("appointment_requests").delete().eq("id", requestId);
+}
+
 function isSchedulingManifest(value: unknown): value is SchedulingManifest {
   if (!value || typeof value !== "object") return false;
   const manifest = value as Partial<SchedulingManifest>;
@@ -500,13 +681,12 @@ export async function getSchedulingRequest(accessToken: string) {
 
 export async function createTemporaryDocumentUrl(
   accessToken: string,
-  kindValue: string,
+  documentValue: string,
 ) {
-  if (!isDocumentKind(kindValue)) return null;
   const request = await getSchedulingRequest(accessToken);
   if (request.status !== "active") return null;
   const document = request.manifest.documents.find(
-    (item) => item.kind === kindValue,
+    (item) => item.id === documentValue || item.kind === documentValue,
   );
   if (!document) return null;
   const admin = getSchedulingAdminClient();
@@ -519,13 +699,14 @@ export async function createTemporaryDocumentUrl(
 
 export async function createPreparedUploadSession(
   admin: SupabaseClient,
-  attendance: "Particular" | "Convênio",
+  serviceType: ServiceType,
   files: SchedulingFileDescriptor[],
+  authorizationPending: boolean,
 ) {
   const protocol = createProtocol();
   const accessToken = createAccessToken();
   const documents = prepareDocuments(files, protocol);
-  validateRequiredDocuments(documents, attendance);
+  validateRequiredDocuments(documents, serviceType, authorizationPending);
   const uploads = [];
   for (const document of documents) {
     const { data, error } = await admin.storage
@@ -533,14 +714,19 @@ export async function createPreparedUploadSession(
       .createSignedUploadUrl(document.path);
     if (error || !data?.signedUrl)
       throw new Error("Não foi possível preparar o envio dos documentos.");
-    uploads.push({ kind: document.kind, signedUrl: data.signedUrl });
+    uploads.push({
+      id: document.id,
+      kind: document.kind,
+      signedUrl: data.signedUrl,
+    });
   }
   const session: UploadSession = {
-    version: 1,
+    version: 2,
     expiresAt: new Date(Date.now() + UPLOAD_SESSION_TTL_MS).toISOString(),
     protocol,
     accessToken,
-    attendance,
+    serviceType,
+    authorizationPending,
     documents,
   };
   const pendingMarker: PendingUploadMarker = {

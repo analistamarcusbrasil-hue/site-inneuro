@@ -5,6 +5,7 @@ import { InternalHero } from "@/components/layout/internal-hero";
 import {
   getPublicInstitutionalContent,
   getPublicPartners,
+  getPublicSchedulingSettings,
 } from "@/lib/cms/public-content";
 import { PartnerLogoCard } from "@/components/partners/partner-logo-card";
 import { createPageMetadata } from "@/lib/metadata";
@@ -21,9 +22,10 @@ export const metadata = createPageMetadata({
 });
 
 export default async function InsurancePage() {
-  const [convenios, institutional] = await Promise.all([
+  const [convenios, institutional, scheduling] = await Promise.all([
     getPublicPartners(),
     getPublicInstitutionalContent(),
+    getPublicSchedulingSettings(),
   ]);
   return (
     <main id="main-content" tabIndex={-1}>
@@ -37,6 +39,10 @@ export default async function InsurancePage() {
           <p className="text-muted mb-8 max-w-3xl text-lg leading-relaxed">
             Consulte nossa equipe para confirmar cobertura, autorização e
             disponibilidade para o exame desejado.
+          </p>
+          <p className="bg-mint text-brand-dark mb-8 max-w-3xl rounded-2xl p-4 text-sm font-semibold">
+            A INNEURO também recebe solicitações pelo SUS em um fluxo próprio de
+            atendimento. {scheduling.publicText}
           </p>
           <ul className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
             {convenios

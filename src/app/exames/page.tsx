@@ -5,7 +5,10 @@ import { InternalHero } from "@/components/layout/internal-hero";
 import { Container } from "@/components/layout/container";
 import { Modalities } from "@/components/sections/modalities";
 import { createPageMetadata } from "@/lib/metadata";
-import { getPublicExams } from "@/lib/cms/public-content";
+import {
+  getPublicExams,
+  getPublicSchedulingSettings,
+} from "@/lib/cms/public-content";
 
 export const metadata = createPageMetadata({
   title: "Exames de imagem em Macapá | INNEURO",
@@ -15,7 +18,10 @@ export const metadata = createPageMetadata({
 });
 
 export default async function ExamsPage() {
-  const content = await getPublicExams();
+  const [content, scheduling] = await Promise.all([
+    getPublicExams(),
+    getPublicSchedulingSettings(),
+  ]);
   return (
     <main id="main-content" tabIndex={-1}>
       <InternalHero
@@ -26,6 +32,9 @@ export default async function ExamsPage() {
       <Modalities compactTop items={content.modalities} />
       <section className="bg-surface py-14 sm:py-18 lg:py-24">
         <Container>
+          <p className="bg-mint text-brand-dark mb-8 rounded-2xl p-4 text-sm font-semibold">
+            {scheduling.publicText} {scheduling.note}
+          </p>
           <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div>
               <p className="eyebrow mb-2">Catálogo completo</p>

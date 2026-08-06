@@ -144,7 +144,7 @@ export function PreparationCatalog({
                       {service.schedules
                         .map(
                           (item) =>
-                            `${item.days}: ${item.periods.map((period) => `${period.start} às ${period.end}`).join(" e ")}`,
+                            `${item.days}: ${item.periods.map((period) => (period.end ? `${period.start} às ${period.end}` : period.start)).join(" e ")}`,
                         )
                         .join(" · ")}
                     </span>

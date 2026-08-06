@@ -3,7 +3,10 @@ import { Manrope, Plus_Jakarta_Sans } from "next/font/google";
 import { SiteChrome } from "@/components/layout/site-chrome";
 import { siteConfig } from "@/config/site";
 import { isPreviewDeployment } from "@/lib/deployment";
-import { getPublicInstitutionalContent } from "@/lib/cms/public-content";
+import {
+  getPublicInstitutionalContent,
+  getPublicSchedulingSettings,
+} from "@/lib/cms/public-content";
 import "./globals.css";
 
 const manrope = Manrope({
@@ -65,11 +68,16 @@ export const viewport: Viewport = {
 export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const { config } = await getPublicInstitutionalContent();
+  const [{ config }, scheduling] = await Promise.all([
+    getPublicInstitutionalContent(),
+    getPublicSchedulingSettings(),
+  ]);
   return (
     <html lang="pt-BR" className={`${manrope.variable} ${jakarta.variable}`}>
       <body>
-        <SiteChrome config={config}>{children}</SiteChrome>
+        <SiteChrome config={config} scheduling={scheduling}>
+          {children}
+        </SiteChrome>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{

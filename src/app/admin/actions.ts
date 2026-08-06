@@ -111,7 +111,12 @@ export async function saveContentAction(
   const failure = (
     code: SaveContentErrorCode,
     message: string,
-    error?: { code?: string; message?: string; details?: string; hint?: string },
+    error?: {
+      code?: string;
+      message?: string;
+      details?: string;
+      hint?: string;
+    },
     stage?: string,
   ): SaveContentResult => {
     const errorId = crypto.randomUUID().slice(0, 8).toUpperCase();
@@ -212,7 +217,11 @@ export async function saveContentAction(
   }
   if (moduleKey === "preparos") {
     payload.search_terms = nonEmptyLines(raw.search_terms_text);
-    payload.schedules = parseSchedules(raw.schedules_text);
+    payload.override_days = nonEmptyLines(raw.override_days_text);
+    payload.override_periods = nonEmptyLines(raw.override_periods_text);
+    payload.schedules = raw.use_general_schedule
+      ? []
+      : parseSchedules(raw.schedules_text);
     payload.preparation_groups = parsePreparationGroups(
       raw.preparation_groups_text,
     );
@@ -220,6 +229,8 @@ export async function saveContentAction(
     payload.safety_questions = nonEmptyLines(raw.safety_questions_text);
     for (const key of [
       "search_terms_text",
+      "override_days_text",
+      "override_periods_text",
       "schedules_text",
       "preparation_groups_text",
       "documents_text",
@@ -375,10 +386,7 @@ export async function saveContentAction(
 }
 
 type SaveContentErrorCode =
-  | "validation"
-  | "permission"
-  | "image-required"
-  | "save";
+  "validation" | "permission" | "image-required" | "save";
 
 export type SaveContentResult =
   | { ok: true; message: string; id: string }
@@ -788,6 +796,147 @@ export async function saveInstitutionalSettingsAction(formData: FormData) {
   ])
     revalidatePath(path);
   redirect("/admin/informacoes?success=saved");
+}
+
+const schedulingSettingsSchema = z.object({
+  days: z
+    .array(
+      z.enum([
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday",
+      ]),
+    )
+    .min(1),
+  periods: z.array(z.enum(["morning", "afternoon", "evening"])).min(1),
+  public_text: z.string().trim().min(20).max(300),
+  short_text: z.string().trim().min(10).max(160),
+  note: z.string().trim().min(5).max(240),
+  sus_authorization_required: z.boolean(),
+});
+
+export async function saveSchedulingSettingsAction(formData: FormData) {
+  const { supabase, user } = await requireAdmin(["super_admin", "admin"]);
+  const parsed = schedulingSettingsSchema.safeParse({
+    days: formData.getAll("days"),
+    periods: formData.getAll("periods"),
+    public_text: formData.get("public_text"),
+    short_text: formData.get("short_text"),
+    note: formData.get("note"),
+    sus_authorization_required:
+      formData.get("sus_authorization_required") === "on",
+  });
+  if (!parsed.success) redirect("/admin/horarios?error=validation");
+  const value = { ...parsed.data, updated_at: new Date().toISOString() };
+  const { error } = await supabase.from("site_settings").upsert({
+    key: "scheduling",
+    category: "scheduling",
+    is_public: true,
+    value,
+    updated_by: user.id,
+  });
+  if (error) redirect("/admin/horarios?error=save");
+  await audit(
+    supabase,
+    user.id,
+    "update",
+    "site_settings",
+    "scheduling",
+    value,
+  );
+  for (const path of [
+    "/",
+    "/contato",
+    "/exames",
+    "/preparos",
+    "/convenios",
+    "/sobre",
+    "/admin/horarios",
+  ])
+    revalidatePath(path);
+  redirect("/admin/horarios?success=saved");
+}
+
+const requestStatuses = [
+  "NEW",
+  "IN_REVIEW",
+  "DOCUMENT_PENDING",
+  "AUTHORIZATION_PENDING",
+  "AWAITING_CONTACT",
+  "CONTACTED",
+  "PARTIALLY_SCHEDULED",
+  "SCHEDULED",
+  "COMPLETED",
+  "CANCELLED",
+] as const;
+
+export async function updateAppointmentRequestAction(formData: FormData) {
+  const { supabase, user } = await requireAdmin();
+  const parsed = z
+    .object({
+      id: z.string().uuid(),
+      status: z.enum(requestStatuses),
+      note: z.string().trim().max(500),
+      assign_to_me: z.boolean(),
+    })
+    .safeParse({
+      id: formData.get("id"),
+      status: formData.get("status"),
+      note: formData.get("note") ?? "",
+      assign_to_me: formData.get("assign_to_me") === "on",
+    });
+  if (!parsed.success) redirect("/admin/solicitacoes?error=validation");
+  const { data: current } = await supabase
+    .from("appointment_requests")
+    .select("status")
+    .eq("id", parsed.data.id)
+    .single();
+  const { error } = await supabase
+    .from("appointment_requests")
+    .update({
+      status: parsed.data.status,
+      ...(parsed.data.assign_to_me ? { assigned_to: user.id } : {}),
+    })
+    .eq("id", parsed.data.id);
+  if (error) redirect(`/admin/solicitacoes?id=${parsed.data.id}&error=save`);
+  await supabase.from("appointment_request_history").insert({
+    appointment_request_id: parsed.data.id,
+    actor_id: user.id,
+    action: "Status atualizado",
+    details: {
+      from: current?.status ?? null,
+      to: parsed.data.status,
+      note: parsed.data.note || null,
+    },
+  });
+  revalidatePath("/admin/solicitacoes");
+  redirect(`/admin/solicitacoes?id=${parsed.data.id}&success=updated`);
+}
+
+export async function markAppointmentDocumentAction(formData: FormData) {
+  const { supabase, user } = await requireAdmin();
+  const parsed = z
+    .object({ id: z.string().uuid(), request_id: z.string().uuid() })
+    .safeParse(Object.fromEntries(formData));
+  if (!parsed.success) redirect("/admin/solicitacoes?error=validation");
+  const { error } = await supabase
+    .from("appointment_request_documents")
+    .update({ checked_at: new Date().toISOString(), checked_by: user.id })
+    .eq("id", parsed.data.id);
+  if (error)
+    redirect(`/admin/solicitacoes?id=${parsed.data.request_id}&error=document`);
+  await supabase.from("appointment_request_history").insert({
+    appointment_request_id: parsed.data.request_id,
+    actor_id: user.id,
+    action: "Documento conferido",
+    details: { document_id: parsed.data.id },
+  });
+  revalidatePath("/admin/solicitacoes");
+  redirect(`/admin/solicitacoes?id=${parsed.data.request_id}&success=document`);
 }
 
 const restorableTables = [

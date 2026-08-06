@@ -5,6 +5,7 @@ import { Logo } from "@/components/brand/logo";
 import { Container } from "@/components/layout/container";
 import type { SiteConfig } from "@/config/site";
 import { createWhatsAppUrl } from "@/lib/whatsapp";
+import type { SchedulingSettings } from "@/lib/scheduling/settings";
 
 const footerLinks = [
   { label: "Exames", href: "/exames" },
@@ -24,7 +25,13 @@ const legalLinks = [
 const vegaWhatsAppUrl =
   "https://wa.me/5596991493854?text=Ol%C3%A1%2C%20Marcus.%20Conheci%20seu%20trabalho%20pelo%20site%20da%20INNEURO%20e%20gostaria%20de%20conversar%20sobre%20uma%20solu%C3%A7%C3%A3o%20em%20tecnologia.";
 
-export function Footer({ config }: { config: SiteConfig }) {
+export function Footer({
+  config,
+  scheduling,
+}: {
+  config: SiteConfig;
+  scheduling: SchedulingSettings;
+}) {
   const year = new Date().getFullYear();
   return (
     <footer className="bg-brand-dark text-white">
@@ -40,6 +47,9 @@ export function Footer({ config }: { config: SiteConfig }) {
           <p className="mt-5 flex gap-2 text-sm leading-relaxed text-white/72">
             <MapPin aria-hidden="true" size={16} className="shrink-0" />
             {config.address.formatted}
+          </p>
+          <p className="text-mint mt-4 text-sm font-semibold">
+            {scheduling.shortText}
           </p>
         </div>
         <div>

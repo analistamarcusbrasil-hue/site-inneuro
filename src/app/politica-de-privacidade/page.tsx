@@ -18,14 +18,14 @@ export default function PrivacyPolicyPage() {
         {
           title: "Dados fornecidos pelo usuário",
           paragraphs: [
-            "No pré-agendamento, o usuário pode informar nome, telefone, data de nascimento, tipo de atendimento, convênio, exame, período de preferência e observações. Também pode enviar documento com foto, pedido médico e, quando aplicável, carteirinha do convênio.",
+            "No pré-agendamento, o usuário pode informar dados de identificação e contato, um ou vários exames, forma de atendimento, disponibilidade e observações. Para convênio ou SUS, pode informar os dados necessários à análise. Também pode enviar pedido médico, autorização da regulação, carteirinha e outros documentos relacionados à solicitação.",
           ],
         },
         {
           title: "Finalidade e tratamento",
           paragraphs: [
-            "Os dados e documentos são utilizados para organizar a solicitação, gerar um protocolo protegido e agilizar o atendimento pela equipe da INNEURO. O envio do formulário abre o WhatsApp para que o usuário conclua o contato; o pré-agendamento somente é confirmado pela equipe.",
-            "Os arquivos são mantidos em armazenamento privado, com acesso por link temporário e restrito. A solicitação é configurada para expirar em 48 horas, quando os documentos deixam de ficar disponíveis e entram no fluxo de remoção automática.",
+            "Os dados e documentos são utilizados para analisar e organizar a solicitação, gerar um protocolo protegido e permitir o contato pela equipe da INNEURO. O usuário pode enviar a notificação também pelo WhatsApp; a solicitação não representa confirmação automática de agendamento.",
+            "Os arquivos são mantidos em armazenamento privado, com acesso temporário e restrito à equipe autorizada. O acesso aos documentos expira em 48 horas e os arquivos entram no fluxo de remoção automática.",
           ],
         },
         {
