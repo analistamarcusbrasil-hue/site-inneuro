@@ -6,6 +6,10 @@ import {
 } from "@/app/admin/actions";
 import { AdminPageHeading } from "@/components/admin/admin-page-heading";
 import { requireAdmin } from "@/lib/cms/auth";
+import {
+  getSchedulingModalityLabel,
+  schedulingModalities,
+} from "@/lib/scheduling/shared";
 
 const statusLabels: Record<string, string> = {
   NEW: "Nova",
@@ -34,8 +38,10 @@ const documentLabels: Record<string, string> = {
   photo_id: "Documento com foto",
   medical_request: "Pedido médico",
   sus_authorization: "Autorização da regulação",
+  sus_card: "Cartão SUS",
   insurance_card_front: "Carteirinha — frente",
   insurance_card_back: "Carteirinha — verso",
+  insurance_authorization: "Autorização ou guia do convênio",
   other: "Outro documento",
 };
 
@@ -74,6 +80,7 @@ type RequestRow = {
     id: string;
     exam_name: string;
     modality: string | null;
+    sort_order: number;
     status: string;
     scheduled_date: string | null;
     scheduled_period: string | null;
@@ -261,11 +268,18 @@ export default async function AppointmentRequestsPage({
         </label>
         <label className="text-xs font-bold">
           Modalidade
-          <input
+          <select
             name="modality"
             defaultValue={value("modality")}
             className="border-border-light mt-1 min-h-11 w-full rounded-xl border px-3 font-normal"
-          />
+          >
+            <option value="">Todas</option>
+            {schedulingModalities.map((item) => (
+              <option key={item.id} value={item.id.toLocaleLowerCase("pt-BR")}>
+                {item.label}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="text-xs font-bold">
           Período
@@ -382,20 +396,69 @@ export default async function AppointmentRequestsPage({
                 <h3 className="font-heading text-lg font-semibold">
                   Exames ({selected.appointment_request_exams.length})
                 </h3>
-                <ul className="mt-2 space-y-2">
-                  {selected.appointment_request_exams.map((exam) => (
-                    <li
-                      key={exam.id}
-                      className="bg-surface rounded-xl p-3 text-sm"
-                    >
-                      <strong>{exam.exam_name}</strong>
-                      <span className="text-muted mt-1 block">
-                        {exam.modality || "Modalidade não informada"} ·{" "}
-                        {exam.status}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+                <div className="mt-3 space-y-4">
+                  {schedulingModalities.map((modality) => {
+                    const items = selected.appointment_request_exams
+                      .filter((exam) => exam.modality === modality.id)
+                      .sort((a, b) => a.sort_order - b.sort_order);
+                    return items.length ? (
+                      <div
+                        key={modality.id}
+                        className="bg-surface rounded-2xl p-4"
+                      >
+                        <p className="text-brand text-xs font-bold uppercase">
+                          {getSchedulingModalityLabel(modality.id)}
+                        </p>
+                        <ul className="mt-2 space-y-2">
+                          {items.map((exam) => (
+                            <li
+                              key={exam.id}
+                              className="rounded-xl bg-white p-3 text-sm"
+                            >
+                              <strong>{exam.exam_name}</strong>
+                              <span className="text-muted mt-1 block">
+                                {exam.status}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null;
+                  })}
+                  {selected.appointment_request_exams.some(
+                    (exam) =>
+                      !schedulingModalities.some(
+                        (item) => item.id === exam.modality,
+                      ),
+                  ) ? (
+                    <div className="bg-surface rounded-2xl p-4">
+                      <p className="text-muted text-xs font-bold uppercase">
+                        Modalidade não estruturada
+                      </p>
+                      <ul className="mt-2 space-y-2">
+                        {selected.appointment_request_exams
+                          .filter(
+                            (exam) =>
+                              !schedulingModalities.some(
+                                (item) => item.id === exam.modality,
+                              ),
+                          )
+                          .map((exam) => (
+                            <li
+                              key={exam.id}
+                              className="rounded-xl bg-white p-3 text-sm"
+                            >
+                              <strong>{exam.exam_name}</strong>
+                              <span className="text-muted mt-1 block">
+                                {exam.modality || "Não informada"} ·{" "}
+                                {exam.status}
+                              </span>
+                            </li>
+                          ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </div>
               </section>
               <section>
                 <h3 className="font-heading text-lg font-semibold">

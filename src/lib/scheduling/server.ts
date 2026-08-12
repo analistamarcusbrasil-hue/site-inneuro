@@ -22,6 +22,7 @@ import {
   SCHEDULING_BUCKET,
   type AllowedMimeType,
   type DocumentKind,
+  type SchedulingExamInput,
   type ServiceType,
   type SchedulingFileDescriptor,
   UPLOAD_SESSION_TTL_MS,
@@ -52,7 +53,7 @@ export type StoredDocument = {
 };
 
 export type SchedulingManifest = {
-  version: 1 | 2;
+  version: 1 | 2 | 3;
   protocol: string;
   patientName: string;
   birthDate: string;
@@ -64,7 +65,13 @@ export type SchedulingManifest = {
   observations: string | null;
   documents: StoredDocument[];
   serviceType?: ServiceType;
-  exams?: Array<{ id: string; name: string; modality: string | null }>;
+  exams?: Array<{
+    id: string | null;
+    name: string;
+    modality: string;
+    officialName?: string | null;
+    order?: number;
+  }>;
   preferredDates?: string[];
   preferredPeriods?: string[];
   email?: string | null;
@@ -117,7 +124,7 @@ export type SchedulingDatabaseInput = {
   preferredDates: string[];
   preferredPeriods: string[];
   observations: string | null;
-  exams: Array<{ id: string; name: string; modality: string | null }>;
+  exams: SchedulingExamInput[];
 };
 
 type ExpiredManifest = {
@@ -279,6 +286,10 @@ export function validateRequiredDocuments(
 ) {
   const kinds = new Set(documents.map((document) => document.kind));
   if (!kinds.has("medicalOrder")) throw new Error("Anexe o pedido médico.");
+  if (!kinds.has("photoId"))
+    throw new Error("Anexe um documento oficial com foto.");
+  if (serviceType === "INSURANCE" && !kinds.has("insuranceCardFront"))
+    throw new Error("Anexe a carteirinha do convênio.");
   if (
     serviceType === "SUS" &&
     !authorizationPending &&
@@ -291,15 +302,27 @@ export function validateRequiredDocuments(
     serviceType === "PARTICULAR" &&
     (kinds.has("insuranceCardFront") ||
       kinds.has("insuranceCardBack") ||
-      kinds.has("susAuthorization"))
+      kinds.has("insuranceAuthorization") ||
+      kinds.has("susAuthorization") ||
+      kinds.has("susCard"))
   )
     throw new Error(
       "Remova documentos de convênio ou SUS para atendimento particular.",
     );
-  if (serviceType === "INSURANCE" && kinds.has("susAuthorization"))
+  if (
+    serviceType === "INSURANCE" &&
+    (kinds.has("susAuthorization") || kinds.has("susCard"))
+  )
     throw new Error(
       "Remova a autorização do SUS para atendimento por convênio.",
     );
+  if (
+    serviceType === "SUS" &&
+    (kinds.has("insuranceCardFront") ||
+      kinds.has("insuranceCardBack") ||
+      kinds.has("insuranceAuthorization"))
+  )
+    throw new Error("Remova documentos de convênio para atendimento pelo SUS.");
 }
 
 function getRequestIp(request: Request) {
@@ -564,9 +587,10 @@ export async function saveSchedulingRequestRecord(
   const requestId = requestRecord.id as string;
   const examRows = input.exams.map((exam) => ({
     appointment_request_id: requestId,
-    exam_id: exam.id,
-    exam_name: exam.name,
+    exam_id: exam.examId,
+    exam_name: exam.description,
     modality: exam.modality,
+    sort_order: exam.order,
   }));
   const documentRows = manifest.documents.map((document) => ({
     appointment_request_id: requestId,
@@ -575,8 +599,10 @@ export async function saveSchedulingRequestRecord(
         photoId: "photo_id",
         medicalOrder: "medical_request",
         susAuthorization: "sus_authorization",
+        susCard: "sus_card",
         insuranceCardFront: "insurance_card_front",
         insuranceCardBack: "insurance_card_back",
+        insuranceAuthorization: "insurance_authorization",
         other: "other",
       } as const
     )[document.kind],
@@ -620,7 +646,7 @@ function isSchedulingManifest(value: unknown): value is SchedulingManifest {
   if (!value || typeof value !== "object") return false;
   const manifest = value as Partial<SchedulingManifest>;
   return (
-    manifest.version === 1 &&
+    [1, 2, 3].includes(Number(manifest.version)) &&
     typeof manifest.protocol === "string" &&
     typeof manifest.patientName === "string" &&
     typeof manifest.expiresAt === "string" &&

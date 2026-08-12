@@ -1,4 +1,5 @@
 import type { ClinicalService } from "@/types/clinical-service";
+import { createGeneralExamSchedules } from "@/lib/scheduling/settings";
 
 const reviewed = {
   validatedByClinic: true,
@@ -13,13 +14,7 @@ export const clinicalServices: ClinicalService[] = [
     searchTerms: ["tomografia", "contraste", "abdome"],
     attendanceMode: "walk-in",
     attendanceLabel: "Ordem de chegada",
-    schedules: [
-      {
-        label: "Mediante agendamento",
-        days: "Segunda a domingo",
-        periods: [{ start: "Manhã, tarde e noite", end: "" }],
-      },
-    ],
+    schedules: createGeneralExamSchedules(),
     preparationGroups: [
       {
         title: "Exames com contraste ou de abdome",
@@ -43,13 +38,7 @@ export const clinicalServices: ClinicalService[] = [
     searchTerms: ["raios x", "bacia", "coluna lombar", "quadril"],
     attendanceMode: "walk-in",
     attendanceLabel: "Ordem de chegada",
-    schedules: [
-      {
-        label: "Mediante agendamento",
-        days: "Segunda a domingo",
-        periods: [{ start: "Manhã, tarde e noite", end: "" }],
-      },
-    ],
+    schedules: createGeneralExamSchedules(),
     preparationGroups: [
       {
         title: "Preparo informado pela INNEURO para esses exames específicos",
@@ -80,13 +69,7 @@ export const clinicalServices: ClinicalService[] = [
     searchTerms: ["mapeamento cerebral", "cabelo", "menores de 6 anos", "sono"],
     attendanceMode: "appointment",
     attendanceLabel: "Consulte a equipe",
-    schedules: [
-      {
-        label: "Mediante agendamento",
-        days: "Segunda a domingo",
-        periods: [{ start: "Manhã, tarde e noite", end: "" }],
-      },
-    ],
+    schedules: createGeneralExamSchedules(),
     preparationGroups: [
       {
         title: "Preparo",
@@ -127,13 +110,7 @@ export const clinicalServices: ClinicalService[] = [
     ],
     attendanceMode: "appointment",
     attendanceLabel: "Necessita agendamento",
-    schedules: [
-      {
-        label: "Mediante agendamento",
-        days: "Segunda a domingo",
-        periods: [{ start: "Manhã, tarde e noite", end: "" }],
-      },
-    ],
+    schedules: createGeneralExamSchedules(),
     preparationGroups: [
       {
         title: "Exames com contraste",

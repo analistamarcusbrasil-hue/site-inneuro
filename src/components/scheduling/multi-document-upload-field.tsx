@@ -1,7 +1,7 @@
 "use client";
 
 import { CheckCircle2, FileText, UploadCloud, X } from "lucide-react";
-import { useId } from "react";
+import { useEffect, useId, useMemo } from "react";
 import { formatFileSize, type DocumentKind } from "@/lib/scheduling/shared";
 
 export type SelectedSchedulingFile = {
@@ -21,8 +21,33 @@ type Props = {
   progress: Record<string, number>;
   disabled?: boolean;
   onAdd: (kind: DocumentKind, files: File[]) => void;
+  onReplace: (id: string, kind: DocumentKind, file: File) => void;
   onRemove: (id: string) => void;
 };
+
+function FileThumbnail({ file }: { file: File }) {
+  const previewUrl = useMemo(
+    () => (file.type.startsWith("image/") ? URL.createObjectURL(file) : ""),
+    [file],
+  );
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
+  return previewUrl ? (
+    <span
+      role="img"
+      aria-label={`Miniatura de ${file.name}`}
+      className="bg-mint h-12 w-12 shrink-0 rounded-xl bg-cover bg-center"
+      style={{ backgroundImage: `url(${previewUrl})` }}
+    />
+  ) : (
+    <span className="bg-mint text-brand grid h-12 w-12 shrink-0 place-items-center rounded-xl">
+      <FileText aria-hidden="true" size={19} />
+    </span>
+  );
+}
 
 export function MultiDocumentUploadField({
   kind,
@@ -35,6 +60,7 @@ export function MultiDocumentUploadField({
   progress,
   disabled,
   onAdd,
+  onReplace,
   onRemove,
 }: Props) {
   const inputId = useId();
@@ -94,9 +120,7 @@ export function MultiDocumentUploadField({
                 key={item.id}
                 className="border-border-light flex min-w-0 items-center gap-3 rounded-2xl border bg-white p-3"
               >
-                <span className="bg-mint text-brand grid h-10 w-10 shrink-0 place-items-center rounded-xl">
-                  <FileText aria-hidden="true" size={19} />
-                </span>
+                <FileThumbnail file={item.file} />
                 <span className="min-w-0 flex-1">
                   <span className="text-ink block truncate text-sm font-semibold">
                     {item.file.name}
@@ -122,15 +146,35 @@ export function MultiDocumentUploadField({
                     </span>
                   ) : null}
                 </span>
-                <button
-                  type="button"
-                  disabled={disabled}
-                  onClick={() => onRemove(item.id)}
-                  aria-label={`Remover ${item.file.name}`}
-                  className="text-muted hover:bg-error/10 hover:text-error focus-visible:ring-tech grid h-10 w-10 shrink-0 place-items-center rounded-full focus-visible:ring-2 focus-visible:outline-none disabled:opacity-50"
-                >
-                  <X aria-hidden="true" size={17} />
-                </button>
+                <span className="flex shrink-0 items-center gap-1">
+                  <input
+                    id={`${inputId}-${item.id}`}
+                    type="file"
+                    accept="application/pdf,image/jpeg,image/png,image/webp"
+                    disabled={disabled}
+                    className="sr-only"
+                    onChange={(event) => {
+                      const replacement = event.target.files?.[0];
+                      if (replacement) onReplace(item.id, kind, replacement);
+                      event.currentTarget.value = "";
+                    }}
+                  />
+                  <label
+                    htmlFor={`${inputId}-${item.id}`}
+                    className="text-brand inline-flex min-h-10 cursor-pointer items-center rounded-full px-2 text-xs font-bold"
+                  >
+                    Trocar
+                  </label>
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => onRemove(item.id)}
+                    aria-label={`Remover ${item.file.name}`}
+                    className="text-muted hover:bg-error/10 hover:text-error focus-visible:ring-tech grid h-10 w-10 place-items-center rounded-full focus-visible:ring-2 focus-visible:outline-none disabled:opacity-50"
+                  >
+                    <X aria-hidden="true" size={17} />
+                  </button>
+                </span>
               </li>
             );
           })}

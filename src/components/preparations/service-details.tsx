@@ -37,8 +37,8 @@ export function ServiceDetails({
           Horários desta modalidade
         </h2>
         <p className="text-muted mt-2 text-sm">
-          Estes horários são específicos para {service.name} e não representam o
-          horário geral da clínica.
+          Consulte os limites de atendimento informados para {service.name}. A
+          equipe confirmará a data e o horário solicitados.
         </p>
         <ul className="mt-5 grid gap-3 md:grid-cols-2">
           {service.schedules.map((schedule, index) => (

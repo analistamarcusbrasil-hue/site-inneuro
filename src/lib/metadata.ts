@@ -7,6 +7,12 @@ type PageMetadataOptions = {
   description: string;
   path: string;
   index?: boolean;
+  image?: {
+    url: string;
+    alt: string;
+    width?: number;
+    height?: number;
+  };
 };
 
 export function createPageMetadata({
@@ -14,8 +20,15 @@ export function createPageMetadata({
   description,
   path,
   index = true,
+  image,
 }: PageMetadataOptions): Metadata {
   const canonical = new URL(path, siteConfig.url).toString();
+  const socialImage = image ?? {
+    url: "/opengraph-image.png",
+    width: 1200,
+    height: 630,
+    alt: "INNEURO — Instituto de Neurologia do Amapá",
+  };
   return {
     title,
     description,
@@ -31,20 +44,13 @@ export function createPageMetadata({
       title,
       description,
       url: canonical,
-      images: [
-        {
-          url: "/opengraph-image.png",
-          width: 1200,
-          height: 630,
-          alt: "INNEURO — Instituto de Neurologia do Amapá",
-        },
-      ],
+      images: [socialImage],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      images: ["/twitter-image.png"],
+      images: [socialImage.url],
     },
   };
 }

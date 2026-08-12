@@ -25,8 +25,8 @@ export default async function SchedulingSettingsPage({
     <>
       <AdminPageHeading
         eyebrow="Agendamento"
-        title="Horários de realização dos exames"
-        description="Esta é a fonte única usada no site e no formulário. Não informe horários da recepção ou dos canais administrativos nesta área."
+        title="Horários de atendimento e exames"
+        description="Esta é a fonte única dos horários exibidos no site e no formulário de solicitação. Informe somente dados confirmados pela INNEURO."
       />
       {query.success ? (
         <p
@@ -50,8 +50,8 @@ export default async function SchedulingSettingsPage({
             Dias disponíveis
           </h2>
           <p className="text-muted mt-2 text-sm">
-            Marque os dias em que exames podem ser realizados mediante
-            confirmação.
+            Marque os dias em que a INNEURO atende e realiza exames, sempre
+            sujeitos à confirmação da solicitação.
           </p>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {schedulingDayOptions.map(([value, label]) => (

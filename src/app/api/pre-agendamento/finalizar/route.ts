@@ -17,9 +17,14 @@ import {
 } from "@/lib/scheduling/server";
 import {
   documentLabels,
+  inferSchedulingModality,
+  isValidCpf,
   preferredPeriods,
   sanitizeSchedulingText,
+  schedulingModalities,
   type PreferredPeriod,
+  type SchedulingExamInput,
+  type SchedulingModality,
 } from "@/lib/scheduling/shared";
 
 export const dynamic = "force-dynamic";
@@ -80,6 +85,45 @@ function sanitizeArray(value: unknown, maxItems: number, maxLength: number) {
   ].slice(0, maxItems);
 }
 
+function parseExams(value: unknown): SchedulingExamInput[] | null {
+  if (!Array.isArray(value) || value.length < 1 || value.length > 20)
+    return null;
+  const allowedModalities = new Set(
+    schedulingModalities.map((item) => item.id as string),
+  );
+  const parsed = value.map((item, order) => {
+    if (!item || typeof item !== "object") return null;
+    const source = item as Record<string, unknown>;
+    const modality = sanitizeSchedulingText(source.modality, 30);
+    const description = sanitizeSchedulingText(source.description, 180);
+    const examId = sanitizeSchedulingText(source.examId, 40) || null;
+    if (
+      !allowedModalities.has(modality) ||
+      description.length < 2 ||
+      (examId &&
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+          examId,
+        ))
+    )
+      return null;
+    return {
+      modality: modality as SchedulingModality,
+      description,
+      examId,
+      order,
+    };
+  });
+  if (parsed.some((item) => item === null)) return null;
+  const exams = parsed as SchedulingExamInput[];
+  const unique = new Set(
+    exams.map(
+      (item) =>
+        `${item.modality}:${item.description.toLocaleLowerCase("pt-BR")}`,
+    ),
+  );
+  return unique.size === exams.length ? exams : null;
+}
+
 export async function POST(request: NextRequest) {
   let uploadedPaths: string[] = [];
   try {
@@ -109,74 +153,29 @@ export async function POST(request: NextRequest) {
     const cpf = sanitizeSchedulingText(body.cpf, 18).replace(/\D/g, "");
     const birthDate = sanitizeSchedulingText(body.birthDate, 10);
     const phone = sanitizeSchedulingText(body.phone, 24);
-    const email = sanitizeSchedulingText(body.email, 160).toLowerCase();
-    const city = sanitizeSchedulingText(body.city, 100);
-    const responsibleName = sanitizeSchedulingText(body.responsibleName, 120);
     const insuranceId = sanitizeSchedulingText(body.insuranceId, 40);
     const insuranceName = sanitizeSchedulingText(body.insuranceName, 100);
-    const insuranceCardNumber = sanitizeSchedulingText(
-      body.insuranceCardNumber,
-      80,
-    );
-    const insuranceCardExpiry = sanitizeSchedulingText(
-      body.insuranceCardExpiry,
-      10,
-    );
-    const insuranceHolderName = sanitizeSchedulingText(
-      body.insuranceHolderName,
-      120,
-    );
-    const susCardNumber = sanitizeSchedulingText(
-      body.susCardNumber,
-      30,
-    ).replace(/\D/g, "");
-    const susAuthorizationNumber = sanitizeSchedulingText(
-      body.susAuthorizationNumber,
-      100,
-    );
-    const regulationNumber = sanitizeSchedulingText(body.regulationNumber, 100);
-    const susRequestNumber = sanitizeSchedulingText(body.susRequestNumber, 100);
-    const sisregCode = sanitizeSchedulingText(body.sisregCode, 100);
-    const originCity = sanitizeSchedulingText(body.originCity, 100);
-    const requestingUnit = sanitizeSchedulingText(body.requestingUnit, 160);
-    const requestingProfessional = sanitizeSchedulingText(
-      body.requestingProfessional,
-      160,
-    );
-    const authorizationDate = sanitizeSchedulingText(
-      body.authorizationDate,
-      10,
-    );
-    const authorizationExpiry = sanitizeSchedulingText(
-      body.authorizationExpiry,
-      10,
-    );
-    const observations = sanitizeSchedulingText(body.observations, 1000);
-    const examIds = sanitizeArray(body.examIds, 12, 40);
-    const dates = sanitizeArray(body.preferredDates, 3, 10);
+    const observations = sanitizeSchedulingText(body.observations, 500);
+    const exams = parseExams(body.exams);
+    const dates = sanitizeArray(body.preferredDates, 2, 10);
     const periods = sanitizeArray(body.preferredPeriods, 4, 20);
     const channel = body.channel;
 
     if (patientName.length < 2)
       return json({ error: "Informe o nome do paciente." }, 400);
-    if (cpf && cpf.length !== 11)
-      return json(
-        { error: "Informe um CPF válido ou deixe o campo em branco." },
-        400,
-      );
+    if (!isValidCpf(cpf))
+      return json({ error: "Confira o CPF informado." }, 400);
     if (!isValidDate(birthDate, false))
       return json({ error: "Informe uma data de nascimento válida." }, 400);
     if (!/^\d{10,11}$/.test(phone.replace(/\D/g, "")))
       return json({ error: "Informe um telefone válido com DDD." }, 400);
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    if (!exams)
       return json(
-        { error: "Informe um e-mail válido ou deixe o campo em branco." },
+        { error: "Informe pelo menos um exame e sua modalidade." },
         400,
       );
-    if (examIds.length < 1)
-      return json({ error: "Selecione pelo menos um exame." }, 400);
     if (dates.length < 1 || dates.some((date) => !isValidDate(date, true)))
-      return json({ error: "Escolha de uma a três datas válidas." }, 400);
+      return json({ error: "Escolha uma data preferencial válida." }, 400);
     if (
       periods.length < 1 ||
       periods.some(
@@ -224,68 +223,56 @@ export async function POST(request: NextRequest) {
           400,
         );
     }
-    if (insuranceCardExpiry && !isValidDate(insuranceCardExpiry, true))
+    if (
+      session.serviceType === "SUS" &&
+      susAuthorizationRequired &&
+      session.authorizationPending
+    )
       return json(
-        { error: "Informe uma validade válida para a carteirinha." },
+        {
+          error:
+            "A autorização da regulação é obrigatória para concluir esta solicitação.",
+        },
         400,
       );
-    if (session.serviceType === "SUS") {
-      if (susCardNumber && susCardNumber.length !== 15)
-        return json({ error: "O Cartão SUS deve ter 15 números." }, 400);
+
+    const officialExamIds = [
+      ...new Set(exams.map((exam) => exam.examId).filter(Boolean)),
+    ] as string[];
+    const { data: officialRows, error: examsError } = officialExamIds.length
+      ? await admin
+          .from("exams")
+          .select("id,name,modality")
+          .in("id", officialExamIds)
+          .eq("active", true)
+          .eq("status", "published")
+          .is("deleted_at", null)
+      : { data: [], error: null };
+    if (examsError || officialRows?.length !== officialExamIds.length)
+      return json(
+        { error: "Uma das sugestões selecionadas não está mais disponível." },
+        400,
+      );
+    for (const exam of exams) {
+      if (!exam.examId) continue;
+      const official = officialRows?.find((item) => item.id === exam.examId);
       if (
-        !regulationNumber &&
-        !susAuthorizationNumber &&
-        !susRequestNumber &&
-        !sisregCode &&
-        !session.authorizationPending
+        !official ||
+        inferSchedulingModality(String(official.modality)) !== exam.modality
       )
         return json(
-          {
-            error:
-              "Informe o número da autorização ou regulação, ou marque que o documento está pendente.",
-          },
-          400,
-        );
-      if (susAuthorizationRequired && session.authorizationPending)
-        return json(
-          {
-            error:
-              "A autorização da regulação é obrigatória para concluir esta solicitação.",
-          },
-          400,
-        );
-      if (authorizationDate && !isValidDate(authorizationDate, false))
-        return json(
-          { error: "Informe uma data válida para a autorização." },
-          400,
-        );
-      if (authorizationExpiry && !isValidDate(authorizationExpiry, true))
-        return json(
-          { error: "Informe uma validade válida para a autorização." },
+          { error: "Revise a modalidade dos exames informados." },
           400,
         );
     }
-
-    const { data: examRows, error: examsError } = await admin
-      .from("exams")
-      .select("id,name,modality")
-      .in("id", examIds)
-      .eq("active", true)
-      .eq("status", "published")
-      .is("deleted_at", null);
-    if (examsError || !examRows || examRows.length !== examIds.length)
-      return json(
-        { error: "Um dos exames selecionados não está mais disponível." },
-        400,
-      );
-    const exams = examIds.map((id) => {
-      const exam = examRows.find((item) => item.id === id)!;
-      return {
-        id: exam.id as string,
-        name: String(exam.name),
-        modality: exam.modality ? String(exam.modality) : null,
-      };
-    });
+    const manifestExams = exams.map((exam) => ({
+      id: exam.examId,
+      name: exam.description,
+      modality: exam.modality,
+      officialName:
+        officialRows?.find((item) => item.id === exam.examId)?.name ?? null,
+      order: exam.order,
+    }));
 
     const documents = await verifyUploadedDocuments(admin, session.documents);
     uploadedPaths = documents.map((document) => document.path);
@@ -293,68 +280,68 @@ export async function POST(request: NextRequest) {
     const expiresAt = createManifestExpiration();
     const attendance = serviceLabels[session.serviceType];
     const manifest: SchedulingManifest = {
-      version: 2,
+      version: 3,
       protocol: session.protocol,
       patientName,
       birthDate,
       phone,
       attendance,
       insuranceName: session.serviceType === "INSURANCE" ? insuranceName : null,
-      exam: exams.map((exam) => exam.name).join(", "),
+      exam: exams.map((exam) => exam.description).join(", "),
       preferredPeriod: periods
         .map((period) => periodLabels[period as PreferredPeriod])
         .join(", "),
       observations: observations || null,
       documents,
       serviceType: session.serviceType,
-      exams,
+      exams: manifestExams,
       preferredDates: dates,
       preferredPeriods: periods,
-      email: email || null,
-      cpf: cpf || null,
-      city: city || null,
-      responsibleName: responsibleName || null,
-      insuranceCardNumber: insuranceCardNumber || null,
-      insuranceCardExpiry: insuranceCardExpiry || null,
-      insuranceHolderName: insuranceHolderName || null,
-      susCardNumber: susCardNumber || null,
-      susAuthorizationNumber: susAuthorizationNumber || null,
-      regulationNumber: regulationNumber || null,
-      susRequestNumber: susRequestNumber || null,
-      sisregCode: sisregCode || null,
-      originCity: originCity || null,
-      requestingUnit: requestingUnit || null,
-      requestingProfessional: requestingProfessional || null,
-      authorizationDate: authorizationDate || null,
-      authorizationExpiry: authorizationExpiry || null,
+      email: null,
+      cpf,
+      city: null,
+      responsibleName: null,
+      insuranceCardNumber: null,
+      insuranceCardExpiry: null,
+      insuranceHolderName: null,
+      susCardNumber: null,
+      susAuthorizationNumber: null,
+      regulationNumber: null,
+      susRequestNumber: null,
+      sisregCode: null,
+      originCity: null,
+      requestingUnit: null,
+      requestingProfessional: null,
+      authorizationDate: null,
+      authorizationExpiry: null,
       authorizationPending: session.authorizationPending,
       createdAt,
       expiresAt,
     };
     const databaseInput: SchedulingDatabaseInput = {
       patientName,
-      cpf: cpf || null,
+      cpf,
       birthDate,
       phone,
-      email: email || null,
-      city: city || null,
-      responsibleName: responsibleName || null,
+      email: null,
+      city: null,
+      responsibleName: null,
       serviceType: session.serviceType,
       insuranceId: insuranceId || null,
       insuranceName: session.serviceType === "INSURANCE" ? insuranceName : null,
-      insuranceCardNumber: insuranceCardNumber || null,
-      insuranceCardExpiry: insuranceCardExpiry || null,
-      insuranceHolderName: insuranceHolderName || null,
-      susCardNumber: susCardNumber || null,
-      susAuthorizationNumber: susAuthorizationNumber || null,
-      regulationNumber: regulationNumber || null,
-      susRequestNumber: susRequestNumber || null,
-      sisregCode: sisregCode || null,
-      originCity: originCity || null,
-      requestingUnit: requestingUnit || null,
-      requestingProfessional: requestingProfessional || null,
-      authorizationDate: authorizationDate || null,
-      authorizationExpiry: authorizationExpiry || null,
+      insuranceCardNumber: null,
+      insuranceCardExpiry: null,
+      insuranceHolderName: null,
+      susCardNumber: null,
+      susAuthorizationNumber: null,
+      regulationNumber: null,
+      susRequestNumber: null,
+      sisregCode: null,
+      originCity: null,
+      requestingUnit: null,
+      requestingProfessional: null,
+      authorizationDate: null,
+      authorizationExpiry: null,
       authorizationPending: session.authorizationPending,
       preferredDates: dates,
       preferredPeriods: periods,
@@ -377,61 +364,47 @@ export async function POST(request: NextRequest) {
 
     const { config } = await getPublicInstitutionalContent();
     const protectedUrl = `${config.url.replace(/\/$/, "")}/solicitacao/${session.accessToken}`;
-    const documentSummary = documents.reduce<Record<string, number>>(
-      (result, document) => {
-        result[document.kind] = (result[document.kind] ?? 0) + 1;
-        return result;
-      },
-      {},
-    );
+    const documentKinds = new Set(documents.map((document) => document.kind));
+    const groupedExamLines = schedulingModalities.flatMap((modality) => {
+      const items = exams.filter((exam) => exam.modality === modality.id);
+      return items.length
+        ? [
+            `*${modality.label.toLocaleUpperCase("pt-BR")}*`,
+            ...items.map((exam) => `- ${exam.description}`),
+          ]
+        : [];
+    });
     const message = [
-      "Olá, equipe INNEURO! Enviei uma solicitação de agendamento pelo site.",
+      "*NOVA SOLICITAÇÃO DE AGENDAMENTO*",
       "",
-      `*PROTOCOLO:* ${session.protocol}`,
+      `Protocolo: ${session.protocol}`,
       "",
       "*PACIENTE*",
       `Nome: ${patientName}`,
+      `CPF: ${cpf}`,
       `Nascimento: ${formatDate(birthDate)}`,
-      `Telefone: ${phone}`,
-      `E-mail: ${email || "Não informado"}`,
-      `Cidade: ${city || "Não informada"}`,
-      responsibleName ? `Responsável: ${responsibleName}` : null,
+      `WhatsApp: ${phone}`,
       "",
-      "*SOLICITAÇÃO*",
-      `Atendimento: ${attendance}`,
+      `*FORMA DE ATENDIMENTO:* ${attendance}`,
       session.serviceType === "INSURANCE" ? `Convênio: ${insuranceName}` : null,
-      session.serviceType === "SUS"
-        ? `CNS: ${susCardNumber || "Não informado"}`
-        : null,
-      session.serviceType === "SUS"
-        ? `Autorização/regulação: ${session.authorizationPending ? "Pendente" : regulationNumber || susAuthorizationNumber || "Não informada"}`
-        : null,
-      session.serviceType === "SUS"
-        ? `SISREG: ${sisregCode || "Não informado"}`
-        : null,
-      session.serviceType === "SUS"
-        ? `Município: ${originCity || city || "Não informado"}`
-        : null,
-      session.serviceType === "SUS"
-        ? `Unidade solicitante: ${requestingUnit || "Não informada"}`
-        : null,
-      `Exames: ${exams.map((exam) => exam.name).join("; ")}`,
-      `Datas preferidas: ${dates.map(formatDate).join("; ")}`,
-      `Períodos: ${periods.map((period) => periodLabels[period as PreferredPeriod]).join(", ")}`,
-      `Observações: ${observations || "Não informadas"}`,
       "",
-      `*DOCUMENTOS:* ${documents.length} arquivo(s) — ${Object.entries(
-        documentSummary,
-      )
-        .map(
-          ([kind, count]) =>
-            `${documentLabels[kind as keyof typeof documentLabels]}: ${count}`,
-        )
-        .join(", ")}`,
+      "*EXAMES*",
+      ...groupedExamLines,
+      "",
+      "*DOCUMENTOS*",
+      `- ${documentLabels.medicalOrder}: ${documentKinds.has("medicalOrder") ? "anexado" : "pendente"}`,
+      `- ${documentLabels.photoId}: ${documentKinds.has("photoId") ? "anexado" : "pendente"}`,
+      `- Carteirinha do convênio: ${session.serviceType === "INSURANCE" ? (documentKinds.has("insuranceCardFront") ? "anexada" : "pendente") : "não aplicável"}`,
+      `- Guia do convênio: ${session.serviceType === "INSURANCE" ? (documentKinds.has("insuranceAuthorization") ? "anexada" : "não anexada") : "não aplicável"}`,
+      `- Regulação SUS: ${session.serviceType === "SUS" ? (documentKinds.has("susAuthorization") ? "anexada" : "pendente") : "não aplicável"}`,
+      `- Cartão SUS: ${session.serviceType === "SUS" ? (documentKinds.has("susCard") ? "anexado" : "não anexado") : "não aplicável"}`,
+      "",
+      `Data preferencial: ${dates.map(formatDate).join("; ")}`,
+      `Períodos: ${periods.map((period) => periodLabels[period as PreferredPeriod]).join(", ")}`,
+      `Observação: ${observations || "Não informada"}`,
+      "",
       "Acesso seguro aos dados e documentos:",
       protectedUrl,
-      "",
-      "Aguardo a confirmação da equipe. Obrigado(a)!",
     ]
       .filter((line): line is string => line !== null)
       .join("\n");

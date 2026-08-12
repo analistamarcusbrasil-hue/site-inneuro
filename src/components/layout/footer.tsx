@@ -125,53 +125,50 @@ export function Footer({
         </div>
       </Container>
       <div className="border-t border-white/10">
-        <Container className="grid justify-items-center gap-5 py-5 text-center text-xs text-white/70 lg:grid-cols-[1fr_auto_1fr] lg:items-center lg:text-left">
+        <Container className="grid justify-items-center gap-4 py-5 text-center text-xs text-white/70 lg:grid-cols-[1fr_auto] lg:items-end lg:text-left">
           <p className="lg:justify-self-start">
             © {year} INNEURO — Instituto de Neurologia do Amapá.
           </p>
-          <div className="flex flex-col items-center">
-            <span className="mb-2 text-center text-[0.68rem] font-medium tracking-wide text-white/55">
-              Desenvolvido por
-            </span>
-            <a
-              href={vegaWhatsAppUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Falar com a VEGA Tecnologia pelo WhatsApp"
-              className="group focus-visible:ring-tech relative inline-flex cursor-pointer flex-col items-center rounded-md focus-visible:ring-2 focus-visible:ring-offset-4 focus-visible:ring-offset-[#03251b] focus-visible:outline-none"
+          <div className="flex flex-col items-center gap-2 lg:items-end lg:justify-self-end">
+            <nav
+              aria-label="Informações legais"
+              className="flex flex-wrap justify-center gap-x-5 gap-y-1 lg:justify-end"
             >
-              <Image
-                src="/images/vega-logo-footer.webp"
-                alt="VEGA Tecnologia"
-                width={1322}
-                height={606}
-                sizes="(max-width: 639px) 135px, (max-width: 1023px) 155px, 175px"
-                className="h-auto w-[135px] object-contain transition-[opacity,transform] duration-200 group-hover:scale-[1.015] group-hover:opacity-90 sm:w-[155px] lg:w-[175px]"
-              />
-              <span className="-mt-2 text-center text-[0.62rem] font-light tracking-[0.12em] text-[#91c5a7] sm:-mt-2.5 sm:text-[0.66rem] lg:-mt-3 lg:text-[0.7rem]">
-                Tecnologia
-              </span>
-              <ExternalLink
-                aria-hidden="true"
-                size={11}
-                className="absolute -top-0.5 -right-4 text-[#91c5a7]/70 transition-colors group-hover:text-[#b7dec6]"
-              />
-            </a>
-          </div>
-          <nav
-            aria-label="Informações legais"
-            className="flex flex-wrap justify-center gap-x-5 gap-y-2 lg:justify-self-end"
-          >
-            {legalLinks.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="inline-flex min-h-11 items-center hover:text-white"
+              {legalLinks.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="inline-flex min-h-9 items-center hover:text-white"
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
+            <div className="flex items-center gap-2 text-[0.68rem] text-white/50">
+              <span>Tecnologia por</span>
+              <a
+                href={vegaWhatsAppUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Falar com a VEGA Tecnologia pelo WhatsApp"
+                className="group focus-visible:ring-tech relative inline-flex cursor-pointer items-center rounded-md opacity-75 transition-[opacity,transform] duration-200 hover:scale-[1.015] hover:opacity-95 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#03251b] focus-visible:outline-none"
               >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
+                <Image
+                  src="/images/vega-logo-footer.webp"
+                  alt="VEGA Tecnologia"
+                  width={1322}
+                  height={606}
+                  sizes="(max-width: 1023px) 72px, 86px"
+                  className="h-auto w-[72px] object-contain lg:w-[86px]"
+                />
+                <ExternalLink
+                  aria-hidden="true"
+                  size={9}
+                  className="absolute -top-0.5 -right-2.5 text-[#91c5a7]/65"
+                />
+              </a>
+            </div>
+          </div>
         </Container>
       </div>
     </footer>

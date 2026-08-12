@@ -1,3 +1,5 @@
+import type { ServiceSchedule } from "@/types/clinical-service";
+
 export const schedulingDayOptions = [
   ["monday", "Segunda-feira"],
   ["tuesday", "Terça-feira"],
@@ -27,11 +29,26 @@ export const defaultSchedulingSettings: SchedulingSettings = {
   days: schedulingDayOptions.map(([value]) => value),
   periods: schedulingPeriodOptions.map(([value]) => value),
   publicText:
-    "Realizamos exames de segunda a domingo, nos períodos da manhã, tarde e noite, mediante agendamento.",
-  shortText: "Exames todos os dias — manhã, tarde e noite.",
-  note: "A data e o horário serão confirmados pela equipe da INNEURO.",
+    "A INNEURO realiza atendimentos, agendamentos e exames todos os dias. Segunda a sábado: até 22h. Domingo: até 19h.",
+  shortText: "Todos os dias • Seg. a sáb. até 22h • Domingo até 19h",
+  note: "Esta é uma solicitação de agendamento. Nossa equipe confirmará a data e o horário do exame.",
   susAuthorizationRequired: false,
 };
+
+export function createGeneralExamSchedules(): ServiceSchedule[] {
+  return [
+    {
+      label: "Atendimentos, agendamentos e exames",
+      days: "Segunda a sábado",
+      periods: [{ start: "Até 22h", end: "" }],
+    },
+    {
+      label: "Atendimentos, agendamentos e exames",
+      days: "Domingo",
+      periods: [{ start: "Até 19h", end: "" }],
+    },
+  ];
+}
 
 export function parseSchedulingSettings(value: unknown): SchedulingSettings {
   const source =

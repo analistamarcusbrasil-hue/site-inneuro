@@ -13,6 +13,7 @@ import type { Exame } from "@/types/exame";
 import type { Modality, ModalityIcon } from "@/types/modality";
 import type { ClinicalService } from "@/types/clinical-service";
 import {
+  createGeneralExamSchedules,
   defaultSchedulingSettings,
   parseSchedulingSettings,
   type SchedulingSettings,
@@ -45,6 +46,9 @@ export async function getPublicSchedulingExams(): Promise<
   const { data, error } = await supabase
     .from("exams")
     .select("id,name,modality")
+    .eq("active", true)
+    .eq("status", "published")
+    .is("deleted_at", null)
     .order("name");
   if (error) return [];
   return (data ?? []).map((item) => ({
@@ -390,13 +394,7 @@ export async function getPublicPreparations(): Promise<ClinicalService[]> {
     attendanceLabel: item.attendance_label,
     schedules:
       item.use_general_schedule !== false
-        ? [
-            {
-              label: "Mediante agendamento",
-              days: "Segunda a domingo",
-              periods: [{ start: "Manhã, tarde e noite", end: "" }],
-            },
-          ]
+        ? createGeneralExamSchedules()
         : Array.isArray(item.schedules) && item.schedules.length
           ? (item.schedules as ClinicalService["schedules"])
           : Array.isArray(item.override_days) &&

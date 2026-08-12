@@ -8,8 +8,10 @@ export const documentKinds = [
   "photoId",
   "medicalOrder",
   "susAuthorization",
+  "susCard",
   "insuranceCardFront",
   "insuranceCardBack",
+  "insuranceAuthorization",
   "other",
 ] as const;
 export type DocumentKind = (typeof documentKinds)[number];
@@ -18,10 +20,66 @@ export const documentLabels: Record<DocumentKind, string> = {
   photoId: "Documento com foto",
   medicalOrder: "Pedido médico",
   susAuthorization: "Autorização da regulação",
+  susCard: "Cartão SUS",
   insuranceCardFront: "Carteirinha do convênio — frente",
   insuranceCardBack: "Carteirinha do convênio — verso",
+  insuranceAuthorization: "Autorização ou guia do convênio",
   other: "Outro documento",
 };
+
+export const schedulingModalities = [
+  { id: "CT", label: "Tomografia" },
+  { id: "MRI", label: "Ressonância Magnética" },
+  { id: "BRAIN_MAPPING", label: "Mapeamento Cerebral" },
+  { id: "XRAY", label: "Raio-X" },
+] as const;
+export type SchedulingModality = (typeof schedulingModalities)[number]["id"];
+
+export type SchedulingExamInput = {
+  modality: SchedulingModality;
+  description: string;
+  examId: string | null;
+  order: number;
+};
+
+export function getSchedulingModalityLabel(value: SchedulingModality) {
+  return schedulingModalities.find((item) => item.id === value)?.label ?? value;
+}
+
+export function inferSchedulingModality(
+  value: string,
+): SchedulingModality | null {
+  const normalized = value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("pt-BR");
+  if (normalized.includes("tomografia")) return "CT";
+  if (normalized.includes("ressonancia")) return "MRI";
+  if (normalized.includes("mapeamento")) return "BRAIN_MAPPING";
+  if (normalized.includes("raio") || normalized.includes("raios"))
+    return "XRAY";
+  return null;
+}
+
+export function isValidCpf(value: string) {
+  const digits = value.replace(/\D/g, "");
+  if (digits.length !== 11 || /^(\d)\1{10}$/.test(digits)) return false;
+  const calculateDigit = (length: number) => {
+    const sum = digits
+      .slice(0, length)
+      .split("")
+      .reduce(
+        (total, digit, index) => total + Number(digit) * (length + 1 - index),
+        0,
+      );
+    const remainder = (sum * 10) % 11;
+    return remainder === 10 ? 0 : remainder;
+  };
+  return (
+    calculateDigit(9) === Number(digits[9]) &&
+    calculateDigit(10) === Number(digits[10])
+  );
+}
 
 export const allowedMimeTypes = [
   "application/pdf",

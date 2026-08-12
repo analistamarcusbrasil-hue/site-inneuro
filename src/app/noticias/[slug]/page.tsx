@@ -44,6 +44,14 @@ export async function generateMetadata({
     title: item.seoTitle || `${item.title} | INNEURO`,
     description: item.seoDescription || item.summary,
     path: `/noticias/${item.slug}`,
+    image: item.coverUrl
+      ? {
+          url: item.coverUrl,
+          alt: item.coverAlt,
+          width: 1200,
+          height: 800,
+        }
+      : undefined,
   });
 }
 

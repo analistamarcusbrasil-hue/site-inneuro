@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 import { CalendarClock, FileCheck2, ShieldCheck } from "lucide-react";
 import { Container } from "@/components/layout/container";
-import { documentLabels } from "@/lib/scheduling/shared";
+import {
+  documentLabels,
+  getSchedulingModalityLabel,
+  schedulingModalities,
+} from "@/lib/scheduling/shared";
 import { getSchedulingRequest } from "@/lib/scheduling/server";
 
 export const dynamic = "force-dynamic";
@@ -139,15 +143,21 @@ export default async function SchedulingRequestPage({
                     Exames solicitados ({manifest.exams.length})
                   </h3>
                   <ul className="mt-3 space-y-2">
-                    {manifest.exams.map((exam) => (
+                    {manifest.exams.map((exam, index) => (
                       <li
-                        key={exam.id}
+                        key={`${exam.id ?? "livre"}-${exam.order ?? index}-${exam.name}`}
                         className="bg-surface rounded-xl p-3 text-sm"
                       >
                         <strong>{exam.name}</strong>
                         {exam.modality ? (
                           <span className="text-muted mt-1 block">
-                            {exam.modality}
+                            {schedulingModalities.some(
+                              (item) => item.id === exam.modality,
+                            )
+                              ? getSchedulingModalityLabel(
+                                  exam.modality as (typeof schedulingModalities)[number]["id"],
+                                )
+                              : exam.modality}
                           </span>
                         ) : null}
                       </li>

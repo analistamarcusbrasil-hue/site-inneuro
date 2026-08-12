@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   CalendarCheck,
   Check,
@@ -7,8 +8,10 @@ import {
   ChevronRight,
   LockKeyhole,
   MessageCircle,
-  Search,
+  Pencil,
+  Plus,
   ShieldCheck,
+  Trash2,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Container } from "@/components/layout/container";
@@ -21,33 +24,32 @@ import type { SiteConfig } from "@/config/site";
 import type { SchedulingExamOption } from "@/lib/cms/public-content";
 import type { SchedulingSettings } from "@/lib/scheduling/settings";
 import {
+  getSchedulingModalityLabel,
+  inferSchedulingModality,
+  isValidCpf,
   MAX_REQUEST_SIZE,
+  schedulingModalities,
   type DocumentKind,
   type FinalizeSchedulingResponse,
   type PrepareUploadResponse,
   type PreferredPeriod,
+  type SchedulingExamInput,
+  type SchedulingModality,
   type ServiceType,
   validateFileDescriptor,
 } from "@/lib/scheduling/shared";
 import { normalizeWhatsAppNumber } from "@/lib/whatsapp";
 import type { Convenio } from "@/types/convenio";
 
-type Channel = "primary" | "secondary";
 type SubmitPhase = "idle" | "uploading" | "saving";
+type ExamEntry = SchedulingExamInput & { clientId: string };
 type Success = FinalizeSchedulingResponse & {
   examCount: number;
   serviceType: ServiceType;
   authorizationPending: boolean;
 };
 
-const steps = [
-  "Exames",
-  "Paciente",
-  "Atendimento",
-  "Documentos",
-  "Disponibilidade",
-  "Revisão",
-];
+const steps = ["Exames", "Seus dados", "Finalizar"];
 const inputClasses =
   "mt-2 min-h-12 w-full rounded-2xl border border-border-light bg-white px-4 text-base text-ink outline-none transition-colors placeholder:text-muted/65 focus:border-brand focus:ring-2 focus:ring-tech/25";
 const serviceLabels: Record<ServiceType, string> = {
@@ -59,8 +61,11 @@ const periodLabels: Record<PreferredPeriod, string> = {
   MORNING: "Manhã",
   AFTERNOON: "Tarde",
   EVENING: "Noite",
-  ANY: "Qualquer período",
+  ANY: "Qualquer horário",
 };
+const emptyDrafts = Object.fromEntries(
+  schedulingModalities.map((item) => [item.id, ""]),
+) as Record<SchedulingModality, string>;
 
 function formatPhone(value: string) {
   const digits = value.replace(/\D/g, "").slice(0, 11);
@@ -69,6 +74,27 @@ function formatPhone(value: string) {
   if (digits.length <= 10)
     return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
   return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+}
+
+function formatCpf(value: string) {
+  const digits = value.replace(/\D/g, "").slice(0, 11);
+  return digits
+    .replace(/^(\d{3})(\d)/, "$1.$2")
+    .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
+    .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+}
+
+function maskCpf(value: string) {
+  const digits = value.replace(/\D/g, "");
+  return digits.length === 11
+    ? `***.***.${digits.slice(6, 9)}-${digits.slice(9)}`
+    : value;
+}
+
+function formatDate(value: string) {
+  if (!value) return "";
+  const [year, month, day] = value.split("-");
+  return `${day}/${month}/${year}`;
 }
 
 function readJsonResponse<T>(response: Response): Promise<T> {
@@ -94,23 +120,24 @@ function uploadFileToSignedUrl(
     data.append("", file);
     request.open("PUT", signedUrl);
     request.timeout = 5 * 60 * 1000;
-    request.upload.addEventListener(
-      "progress",
-      (event) =>
-        event.lengthComputable &&
+    request.upload.addEventListener("progress", (event) => {
+      if (event.lengthComputable)
         onProgress(
           Math.min(99, Math.round((event.loaded / event.total) * 100)),
-        ),
-    );
-    request.addEventListener("load", () =>
-      request.status >= 200 && request.status < 300
-        ? (onProgress(100), resolve())
-        : reject(
-            new Error(
-              "Um documento não pôde ser enviado. Verifique sua conexão.",
-            ),
+        );
+    });
+    request.addEventListener("load", () => {
+      if (request.status >= 200 && request.status < 300) {
+        onProgress(100);
+        resolve();
+      } else {
+        reject(
+          new Error(
+            "Um documento não pôde ser enviado. Verifique sua conexão.",
           ),
-    );
+        );
+      }
+    });
     request.addEventListener("error", () =>
       reject(
         new Error("O envio foi interrompido. Seus dados foram preservados."),
@@ -123,12 +150,6 @@ function uploadFileToSignedUrl(
     );
     request.send(data);
   });
-}
-
-function formatDate(value: string) {
-  if (!value) return "";
-  const [year, month, day] = value.split("-");
-  return `${day}/${month}/${year}`;
 }
 
 export function Scheduling({
@@ -145,120 +166,234 @@ export function Scheduling({
   settings: SchedulingSettings;
 }) {
   const [step, setStep] = useState(0);
-  const [selectedExamIds, setSelectedExamIds] = useState<string[]>([]);
-  const [examSearch, setExamSearch] = useState("");
-  const [modality, setModality] = useState("");
-  const [serviceType, setServiceType] = useState<ServiceType | "">("");
-  const [files, setFiles] = useState<SelectedSchedulingFile[]>([]);
-  const [progress, setProgress] = useState<Record<string, number>>({});
-  const [dates, setDates] = useState([""]);
-  const [periods, setPeriods] = useState<PreferredPeriod[]>([]);
+  const [selectedModalities, setSelectedModalities] = useState<
+    SchedulingModality[]
+  >([]);
+  const [examEntries, setExamEntries] = useState<ExamEntry[]>([]);
+  const [examDrafts, setExamDrafts] = useState(emptyDrafts);
+  const [editingExamId, setEditingExamId] = useState("");
+  const [editingExamText, setEditingExamText] = useState("");
+  const [patientName, setPatientName] = useState("");
+  const [cpf, setCpf] = useState("");
+  const [birthDate, setBirthDate] = useState("");
   const [phone, setPhone] = useState("");
-  const [observations, setObservations] = useState("");
+  const [serviceType, setServiceType] = useState<ServiceType | "">("");
+  const [insuranceSearch, setInsuranceSearch] = useState("");
   const [insuranceId, setInsuranceId] = useState("");
   const [insuranceOther, setInsuranceOther] = useState("");
+  const [files, setFiles] = useState<SelectedSchedulingFile[]>([]);
+  const [progress, setProgress] = useState<Record<string, number>>({});
   const [authorizationPending, setAuthorizationPending] = useState(false);
-  const [channel, setChannel] = useState<Channel>("primary");
+  const [dates, setDates] = useState([""]);
+  const [periods, setPeriods] = useState<PreferredPeriod[]>([]);
+  const [observations, setObservations] = useState("");
   const [consent, setConsent] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const [phase, setPhase] = useState<SubmitPhase>("idle");
   const [success, setSuccess] = useState<Success | null>(null);
   const [startedAt] = useState(() => Date.now());
   const isSubmitting = phase !== "idle";
 
-  const modalities = useMemo(
-    () => [...new Set(exams.map((exam) => exam.modality))].sort(),
-    [exams],
-  );
-  const selectedExams = useMemo(
+  const activePartners = useMemo(
     () =>
-      selectedExamIds
-        .map((id) => exams.find((exam) => exam.id === id))
-        .filter((exam): exam is SchedulingExamOption => Boolean(exam)),
-    [selectedExamIds, exams],
+      partners.filter(
+        (partner) => partner.category === "convenio" && partner.active,
+      ),
+    [partners],
   );
-  const filteredExams = useMemo(() => {
-    const term = examSearch.trim().toLocaleLowerCase("pt-BR");
-    return exams.filter(
-      (exam) =>
-        (!modality || exam.modality === modality) &&
-        (!term ||
-          `${exam.name} ${exam.modality}`
-            .toLocaleLowerCase("pt-BR")
-            .includes(term)),
+  const filteredPartners = useMemo(() => {
+    const term = insuranceSearch.trim().toLocaleLowerCase("pt-BR");
+    return activePartners.filter(
+      (partner) =>
+        !term || partner.name.toLocaleLowerCase("pt-BR").includes(term),
     );
-  }, [examSearch, exams, modality]);
-  const activePartners = partners.filter(
-    (partner) => partner.category === "convenio" && partner.active,
-  );
+  }, [activePartners, insuranceSearch]);
   const selectedPartner = activePartners.find(
     (partner) => partner.id === insuranceId,
   );
 
   useEffect(() => {
-    const stored = window.sessionStorage.getItem("inneuro-selected-exams");
-    let storedIds: unknown = [];
+    let storedEntries: ExamEntry[] = [];
     try {
-      storedIds = stored ? JSON.parse(stored) : [];
+      const stored = window.sessionStorage.getItem(
+        "inneuro-scheduling-exams-v3",
+      );
+      const parsed = stored ? JSON.parse(stored) : [];
+      if (Array.isArray(parsed))
+        storedEntries = parsed.filter(
+          (item): item is ExamEntry =>
+            item &&
+            typeof item.clientId === "string" &&
+            schedulingModalities.some(
+              (modality) => modality.id === item.modality,
+            ) &&
+            typeof item.description === "string",
+        );
     } catch {
-      storedIds = [];
+      storedEntries = [];
     }
-    const initial = exams.find(
+    const initialOfficial = exams.find(
       (exam) =>
+        exam.id === initialExam ||
         exam.name.toLocaleLowerCase("pt-BR") ===
-          initialExam.toLocaleLowerCase("pt-BR") || exam.id === initialExam,
+          initialExam.toLocaleLowerCase("pt-BR"),
     );
-    const validStored = Array.isArray(storedIds)
-      ? storedIds
-          .map(String)
-          .filter((id) => exams.some((exam) => exam.id === id))
-      : [];
-    window.queueMicrotask(() =>
-      setSelectedExamIds([
-        ...new Set([...validStored, ...(initial ? [initial.id] : [])]),
-      ]),
+    const initialModality = inferSchedulingModality(
+      initialOfficial?.modality || initialExam,
     );
+    if (initialExam && initialModality) {
+      const description = initialOfficial?.name || initialExam;
+      const duplicate = storedEntries.some(
+        (item) =>
+          item.modality === initialModality &&
+          item.description.toLocaleLowerCase("pt-BR") ===
+            description.toLocaleLowerCase("pt-BR"),
+      );
+      if (!duplicate)
+        storedEntries.push({
+          clientId: crypto.randomUUID(),
+          modality: initialModality,
+          description,
+          examId: initialOfficial?.id ?? null,
+          order: storedEntries.length,
+        });
+    }
+    window.queueMicrotask(() => {
+      setExamEntries(storedEntries);
+      setSelectedModalities([
+        ...new Set(storedEntries.map((item) => item.modality)),
+      ]);
+    });
   }, [exams, initialExam]);
 
   useEffect(() => {
     window.sessionStorage.setItem(
-      "inneuro-selected-exams",
-      JSON.stringify(selectedExamIds),
+      "inneuro-scheduling-exams-v3",
+      JSON.stringify(examEntries),
     );
-  }, [selectedExamIds]);
+  }, [examEntries]);
 
-  function toggleExam(id: string) {
-    setSelectedExamIds((current) =>
-      current.includes(id)
-        ? current.filter((item) => item !== id)
-        : [...current, id],
-    );
+  function toggleModality(modality: SchedulingModality) {
+    if (selectedModalities.includes(modality)) {
+      if (examEntries.some((exam) => exam.modality === modality)) {
+        setErrors(["Remova os exames desta modalidade antes de desmarcá-la."]);
+        return;
+      }
+      setSelectedModalities((current) =>
+        current.filter((item) => item !== modality),
+      );
+    } else {
+      setSelectedModalities((current) => [...current, modality]);
+    }
     setErrors([]);
+  }
+
+  function addExam(
+    modality: SchedulingModality,
+    descriptionValue: string,
+    examId: string | null = null,
+  ) {
+    const description = descriptionValue.trim().replace(/\s+/g, " ");
+    if (description.length < 2) {
+      setErrors(["Digite o nome do exame como aparece no pedido médico."]);
+      return;
+    }
+    const duplicate = examEntries.some(
+      (item) =>
+        item.modality === modality &&
+        item.description.toLocaleLowerCase("pt-BR") ===
+          description.toLocaleLowerCase("pt-BR"),
+    );
+    if (duplicate) {
+      setErrors(["Este exame já foi adicionado."]);
+      return;
+    }
+    setExamEntries((current) => [
+      ...current,
+      {
+        clientId: crypto.randomUUID(),
+        modality,
+        description,
+        examId,
+        order: current.length,
+      },
+    ]);
+    setExamDrafts((current) => ({ ...current, [modality]: "" }));
+    setErrors([]);
+  }
+
+  function removeExam(clientId: string) {
+    setExamEntries((current) =>
+      current
+        .filter((item) => item.clientId !== clientId)
+        .map((item, order) => ({ ...item, order })),
+    );
+    setEditingExamId("");
+  }
+
+  function saveEditedExam(entry: ExamEntry) {
+    const description = editingExamText.trim().replace(/\s+/g, " ");
+    if (description.length < 2) {
+      setErrors(["Informe o nome do exame antes de salvar."]);
+      return;
+    }
+    const duplicate = examEntries.some(
+      (item) =>
+        item.clientId !== entry.clientId &&
+        item.modality === entry.modality &&
+        item.description.toLocaleLowerCase("pt-BR") ===
+          description.toLocaleLowerCase("pt-BR"),
+    );
+    if (duplicate) {
+      setErrors(["Este exame já foi adicionado."]);
+      return;
+    }
+    setExamEntries((current) =>
+      current.map((item) =>
+        item.clientId === entry.clientId
+          ? {
+              ...item,
+              description,
+              examId: description === item.description ? item.examId : null,
+            }
+          : item,
+      ),
+    );
+    setEditingExamId("");
+    setErrors([]);
+  }
+
+  function validateSelectedFile(kind: DocumentKind, file: File) {
+    const id = crypto.randomUUID();
+    const error = validateFileDescriptor({
+      id,
+      kind,
+      name: file.name,
+      size: file.size,
+      type: file.type,
+    });
+    return { id, error };
   }
 
   function addFiles(kind: DocumentKind, incoming: File[]) {
     const nextErrors: string[] = [];
     const accepted = incoming.slice(0, 12).flatMap((file) => {
-      const id = crypto.randomUUID();
-      const error = validateFileDescriptor({
-        id,
-        kind,
-        name: file.name,
-        size: file.size,
-        type: file.type,
-      });
+      const { id, error } = validateSelectedFile(kind, file);
       if (error) {
         nextErrors.push(`${file.name}: ${error}`);
         return [];
       }
       return [{ id, kind, file }];
     });
+    const singleKinds: DocumentKind[] = [
+      "photoId",
+      "insuranceCardFront",
+      "insuranceCardBack",
+      "susCard",
+    ];
     setFiles((current) => {
-      const base = [
-        "photoId",
-        "insuranceCardFront",
-        "insuranceCardBack",
-      ].includes(kind)
+      const base = singleKinds.includes(kind)
         ? current.filter((item) => item.kind !== kind)
         : current;
       const result = [...base, ...accepted].slice(0, 12);
@@ -276,75 +411,141 @@ export function Scheduling({
       setAuthorizationPending(false);
   }
 
-  function validateStep(target: number, form?: HTMLFormElement) {
-    const next: string[] = [];
-    const data = form ? new FormData(form) : null;
-    if (target === 0 && !selectedExamIds.length)
-      next.push("Selecione pelo menos um exame.");
-    if (target === 1 && data) {
-      if (String(data.get("name") ?? "").trim().length < 2)
-        next.push("Informe o nome completo do paciente.");
-      if (!String(data.get("birthDate") ?? ""))
-        next.push("Informe a data de nascimento.");
-      if (phone.replace(/\D/g, "").length < 10)
-        next.push("Informe um telefone válido com DDD.");
+  function replaceFile(id: string, kind: DocumentKind, file: File) {
+    const checked = validateSelectedFile(kind, file);
+    if (checked.error) {
+      setErrors([`${file.name}: ${checked.error}`]);
+      return;
     }
-    if (target === 2) {
-      if (!serviceType) next.push("Escolha a forma de atendimento.");
+    setFiles((current) => {
+      const result = current.map((item) =>
+        item.id === id ? { id: checked.id, kind, file } : item,
+      );
+      if (
+        result.reduce((total, item) => total + item.file.size, 0) >
+        MAX_REQUEST_SIZE
+      ) {
+        setErrors(["O total dos arquivos pode ter no máximo 25 MB."]);
+        return current;
+      }
+      return result;
+    });
+    setErrors([]);
+  }
+
+  function selectService(type: ServiceType) {
+    setServiceType(type);
+    setAuthorizationPending(false);
+    setFiles((current) =>
+      current.filter(
+        (item) =>
+          item.kind === "medicalOrder" ||
+          item.kind === "photoId" ||
+          (type === "INSURANCE" &&
+            [
+              "insuranceCardFront",
+              "insuranceCardBack",
+              "insuranceAuthorization",
+            ].includes(item.kind)) ||
+          (type === "SUS" &&
+            ["susAuthorization", "susCard"].includes(item.kind)),
+      ),
+    );
+    setErrors([]);
+  }
+
+  const fileGroup = (kind: DocumentKind) =>
+    files.filter((item) => item.kind === kind);
+
+  function validateStep(target: number) {
+    const next: string[] = [];
+    if (target === 0) {
+      if (!selectedModalities.length)
+        next.push("Escolha pelo menos uma modalidade.");
+      if (!examEntries.length) next.push("Adicione pelo menos um exame.");
+      for (const modality of selectedModalities)
+        if (!examEntries.some((exam) => exam.modality === modality))
+          next.push(
+            `Adicione um exame em ${getSchedulingModalityLabel(modality)}.`,
+          );
+    }
+    if (target === 1) {
+      if (patientName.trim().length < 2) next.push("Informe o nome completo.");
+      if (!isValidCpf(cpf)) next.push("Confira o CPF informado.");
+      if (!birthDate) next.push("Informe a data de nascimento.");
+      else if (birthDate > new Date().toISOString().slice(0, 10))
+        next.push("A data de nascimento não pode estar no futuro.");
+      if (!/^\d{10,11}$/.test(phone.replace(/\D/g, "")))
+        next.push("Informe um Telefone / WhatsApp válido com DDD.");
+      if (!serviceType) next.push("Escolha como será o atendimento.");
       if (serviceType === "INSURANCE" && !insuranceId)
-        next.push("Selecione um convênio.");
+        next.push("Selecione o convênio.");
       if (
         serviceType === "INSURANCE" &&
         insuranceId === "OTHER" &&
         !insuranceOther.trim()
       )
-        next.push("Informe o nome do convênio.");
+        next.push("Digite o nome do convênio.");
     }
-    if (target === 3) {
+    if (target === 2) {
       if (!files.some((item) => item.kind === "medicalOrder"))
         next.push("Anexe o pedido médico.");
+      if (!files.some((item) => item.kind === "photoId"))
+        next.push("Anexe um documento oficial com foto.");
       if (
-        serviceType === "SUS" &&
-        settings.susAuthorizationRequired &&
-        !files.some((item) => item.kind === "susAuthorization")
+        serviceType === "INSURANCE" &&
+        !files.some((item) => item.kind === "insuranceCardFront")
       )
-        next.push("Anexe a autorização da regulação.");
+        next.push("Anexe a carteirinha do convênio.");
       if (
         serviceType === "SUS" &&
         !files.some((item) => item.kind === "susAuthorization") &&
         !authorizationPending
       )
         next.push(
-          "Anexe a autorização ou marque que ainda não possui o documento.",
+          "Anexe a autorização do SISREG ou marque que ainda não a possui.",
         );
-    }
-    if (target === 4) {
-      if (!dates.some(Boolean))
-        next.push("Escolha pelo menos uma data preferencial.");
+      if (
+        serviceType === "SUS" &&
+        settings.susAuthorizationRequired &&
+        !files.some((item) => item.kind === "susAuthorization")
+      )
+        next.push("A autorização da Regulação / SISREG é obrigatória.");
+      if (!dates.some(Boolean)) next.push("Escolha uma data preferencial.");
       if (!periods.length) next.push("Selecione ao menos um período.");
+      if (!consent)
+        next.push("Confirme o uso dos dados para enviar a solicitação.");
     }
-    if (target === 5 && !consent)
-      next.push("Autorize o uso dos dados e documentos para continuar.");
     setErrors(next);
     return next.length === 0;
   }
 
-  function goNext(form: HTMLFormElement) {
-    if (validateStep(step, form))
-      setStep((current) => Math.min(5, current + 1));
+  function goNext() {
+    if (validateStep(step)) {
+      setStep((current) => Math.min(2, current + 1));
+      setReviewing(false);
+      document
+        .getElementById("pre-agendamento")
+        ?.scrollIntoView({ behavior: "smooth" });
+    }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = event.currentTarget;
-    if (step < 5) {
-      goNext(form);
+    if (step < 2) {
+      goNext();
       return;
     }
-    if (!validateStep(5, form) || isSubmitting) return;
-    const data = new FormData(form);
+    if (!reviewing) {
+      if (validateStep(2)) setReviewing(true);
+      return;
+    }
+    if (!validateStep(2) || isSubmitting || !serviceType) return;
+    const data = new FormData(event.currentTarget);
     const insuranceName =
-      insuranceId === "OTHER" ? insuranceOther : (selectedPartner?.name ?? "");
+      insuranceId === "OTHER"
+        ? insuranceOther.trim()
+        : (selectedPartner?.name ?? "");
     try {
       setPhase("uploading");
       const prepared = await fetch("/api/pre-agendamento/preparar", {
@@ -368,7 +569,7 @@ export function Scheduling({
         prepared.uploads.map(async (upload) => {
           const selected = files.find((item) => item.id === upload.id);
           if (!selected)
-            throw new Error("Um arquivo selecionado não está mais disponível.");
+            throw new Error("Um arquivo selecionado não está disponível.");
           setProgress((current) => ({ ...current, [upload.id]: 0 }));
           await uploadFileToSignedUrl(
             upload.signedUrl,
@@ -386,40 +587,33 @@ export function Scheduling({
           sessionToken: prepared.sessionToken,
           website: data.get("website"),
           consent,
-          name: data.get("name"),
-          cpf: data.get("cpf"),
-          birthDate: data.get("birthDate"),
+          name: patientName,
+          cpf,
+          birthDate,
           phone,
-          email: data.get("email"),
-          city: data.get("city"),
-          responsibleName: data.get("responsibleName"),
-          examIds: selectedExamIds,
+          exams: examEntries.map(
+            ({ modality, description, examId, order }) => ({
+              modality,
+              description,
+              examId,
+              order,
+            }),
+          ),
           insuranceId: insuranceId === "OTHER" ? null : insuranceId,
           insuranceName,
-          insuranceCardNumber: data.get("insuranceCardNumber"),
-          susCardNumber: data.get("susCardNumber"),
-          regulationNumber: data.get("regulationNumber"),
-          susAuthorizationNumber: data.get("susAuthorizationNumber"),
-          susRequestNumber: data.get("susRequestNumber"),
-          sisregCode: data.get("sisregCode"),
-          originCity: data.get("originCity"),
-          requestingUnit: data.get("requestingUnit"),
-          requestingProfessional: data.get("requestingProfessional"),
-          authorizationDate: data.get("authorizationDate"),
-          authorizationExpiry: data.get("authorizationExpiry"),
           preferredDates: dates.filter(Boolean),
           preferredPeriods: periods,
           observations,
-          channel,
+          channel: "primary",
         }),
       }).then((response) =>
         readJsonResponse<FinalizeSchedulingResponse>(response),
       );
-      window.sessionStorage.removeItem("inneuro-selected-exams");
+      window.sessionStorage.removeItem("inneuro-scheduling-exams-v3");
       setSuccess({
         ...finalized,
-        examCount: selectedExamIds.length,
-        serviceType: serviceType as ServiceType,
+        examCount: examEntries.length,
+        serviceType,
         authorizationPending,
       });
     } catch (error) {
@@ -449,71 +643,40 @@ export function Scheduling({
               id="scheduling-success-title"
               className="font-heading text-ink mt-5 text-3xl font-semibold"
             >
-              Solicitação enviada com sucesso
+              Solicitação recebida!
             </h1>
             <p className="text-muted mt-3 leading-relaxed">
-              Recebemos sua solicitação de agendamento. Nossa equipe analisará
-              os exames, os documentos e a disponibilidade informada e entrará
-              em contato para confirmar as datas e os horários.
+              Recebemos sua solicitação. Nossa equipe analisará os exames e
+              documentos enviados e entrará em contato pelo WhatsApp para
+              confirmar a data e o horário.
             </p>
-            <p className="text-ink mt-5 font-semibold">
-              Você solicitou o agendamento de {success.examCount}{" "}
-              {success.examCount === 1 ? "exame" : "exames"}.
-            </p>
-            {success.serviceType === "SUS" ? (
-              <p className="text-muted mt-2">
-                {success.authorizationPending
-                  ? "Sua solicitação foi registrada com pendência de autorização da regulação."
-                  : "Os dados e a autorização da regulação serão analisados pela equipe."}
-              </p>
-            ) : null}
             <p className="text-brand mt-6 rounded-2xl bg-white p-4 font-bold">
               Protocolo: {success.protocol}
             </p>
-            <a
-              href={success.whatsappUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="bg-brand hover:bg-brand-dark focus-visible:ring-tech mt-6 inline-flex min-h-12 items-center justify-center gap-2 rounded-full px-7 font-bold text-white focus-visible:ring-2 focus-visible:outline-none"
-            >
-              <MessageCircle aria-hidden="true" size={18} /> Enviar também pelo
-              WhatsApp
-            </a>
+            <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <a
+                href={success.whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-brand hover:bg-brand-dark focus-visible:ring-tech inline-flex min-h-12 items-center justify-center gap-2 rounded-full px-7 font-bold text-white focus-visible:ring-2 focus-visible:outline-none"
+              >
+                <MessageCircle aria-hidden="true" size={18} /> Falar com a
+                INNEURO pelo WhatsApp
+              </a>
+              <Link
+                href="/"
+                className="border-brand text-brand inline-flex min-h-12 items-center justify-center rounded-full border px-7 font-bold"
+              >
+                Voltar ao início
+              </Link>
+            </div>
           </div>
         </Container>
       </section>
     );
 
-  const fileGroup = (kind: DocumentKind) =>
-    files.filter((item) => item.kind === kind);
-  const field = (
-    name: string,
-    label: string,
-    options: {
-      type?: string;
-      required?: boolean;
-      placeholder?: string;
-      autoComplete?: string;
-    } = {},
-  ) => (
-    <label className="text-ink text-sm font-semibold">
-      {label}
-      {options.required ? (
-        <span className="text-error" aria-hidden="true">
-          {" "}
-          *
-        </span>
-      ) : null}
-      <input
-        name={name}
-        type={options.type ?? "text"}
-        required={options.required}
-        placeholder={options.placeholder}
-        autoComplete={options.autoComplete}
-        className={inputClasses}
-      />
-    </label>
-  );
+  const documentStatus = (kind: DocumentKind, fallback = "Pendente") =>
+    files.some((item) => item.kind === kind) ? "Anexado" : fallback;
 
   return (
     <section
@@ -522,7 +685,7 @@ export function Scheduling({
       className="scroll-mt-24 bg-white pt-20 pb-12 sm:pt-24 xl:scroll-mt-28"
     >
       <Container>
-        <div className="grid items-start gap-6 lg:grid-cols-[.78fr_1.22fr] lg:gap-10">
+        <div className="grid items-start gap-6 lg:grid-cols-[.72fr_1.28fr] lg:gap-10">
           <div className="lg:sticky lg:top-28">
             <Badge>Pré-agendamento</Badge>
             <h1
@@ -532,8 +695,8 @@ export function Scheduling({
               Organize sua solicitação de exame.
             </h1>
             <p className="text-muted mt-3 leading-relaxed">
-              Selecione um ou vários exames. A equipe confirmará as datas e os
-              horários após analisar sua solicitação.
+              Informe somente o necessário. A equipe da INNEURO conferirá os
+              detalhes e confirmará o atendimento pelo WhatsApp.
             </p>
             <div className="bg-mint mt-5 rounded-3xl p-4">
               <CalendarCheck
@@ -542,11 +705,19 @@ export function Scheduling({
                 size={22}
               />
               <p className="text-ink mt-2 font-semibold">
-                {settings.publicText}
+                Realizamos exames todos os dias.
               </p>
-              <p className="text-muted mt-1 text-sm">{settings.note}</p>
+              <p className="text-muted mt-1 text-sm">
+                Segunda a sábado: até 22h.
+              </p>
+              <p className="text-muted text-sm">Domingo: até 19h.</p>
+              <p className="text-muted mt-2 text-sm">
+                A data e o horário serão confirmados pela equipe da INNEURO pelo
+                WhatsApp.
+              </p>
             </div>
           </div>
+
           <form
             noValidate
             onSubmit={handleSubmit}
@@ -562,26 +733,27 @@ export function Scheduling({
               </label>
             </div>
             <ol
-              className="mb-7 grid grid-cols-6 gap-1"
+              className="mb-7 grid grid-cols-3 gap-2"
               aria-label="Progresso da solicitação"
             >
               {steps.map((label, index) => (
                 <li
                   key={label}
                   aria-current={step === index ? "step" : undefined}
-                  className="min-w-0 text-center"
+                  className="text-center"
                 >
                   <span
-                    className={`mx-auto grid h-8 w-8 place-items-center rounded-full text-xs font-bold ${index <= step ? "bg-brand text-white" : "text-muted bg-white"}`}
+                    className={`mx-auto grid h-9 w-9 place-items-center rounded-full text-sm font-bold ${index <= step ? "bg-brand text-white" : "text-muted bg-white"}`}
                   >
                     {index + 1}
                   </span>
-                  <span className="text-muted mt-1 hidden truncate text-[.65rem] sm:block">
+                  <span className="text-muted mt-1 block text-xs font-semibold">
                     {label}
                   </span>
                 </li>
               ))}
             </ol>
+
             {errors.length ? (
               <div
                 role="alert"
@@ -598,191 +770,318 @@ export function Scheduling({
 
             <div hidden={step !== 0}>
               <h2 className="font-heading text-ink text-2xl font-semibold">
-                Quais exames você precisa realizar?
+                Qual exame você precisa realizar?
               </h2>
               <p className="text-muted mt-2 text-sm">
-                Pesquise e marque todos os exames do pedido médico.
+                Escolha o tipo de exame e informe os exames que aparecem no seu
+                pedido médico.
               </p>
-              <div className="mt-5 grid gap-3 sm:grid-cols-[1fr_15rem]">
-                <label className="relative">
-                  <span className="sr-only">Buscar exame</span>
-                  <Search
-                    aria-hidden="true"
-                    className="text-muted absolute top-5 left-4"
-                    size={17}
-                  />
-                  <input
-                    value={examSearch}
-                    onChange={(event) => setExamSearch(event.target.value)}
-                    placeholder="Buscar por nome"
-                    className={`${inputClasses} mt-0 pl-11`}
-                  />
-                </label>
-                <label>
-                  <span className="sr-only">Filtrar modalidade</span>
-                  <select
-                    value={modality}
-                    onChange={(event) => setModality(event.target.value)}
-                    className={`${inputClasses} mt-0`}
-                  >
-                    <option value="">Todas as modalidades</option>
-                    {modalities.map((item) => (
-                      <option key={item}>{item}</option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-              <p
-                className="text-brand mt-4 text-sm font-bold"
-                aria-live="polite"
-              >
-                {selectedExamIds.length}{" "}
-                {selectedExamIds.length === 1
-                  ? "exame selecionado"
-                  : "exames selecionados"}
-              </p>
-              {selectedExams.length ? (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {selectedExams.map((exam) => (
-                    <button
-                      type="button"
-                      key={exam.id}
-                      onClick={() => toggleExam(exam.id)}
-                      className="bg-mint text-brand-dark rounded-full px-3 py-2 text-left text-xs font-semibold"
-                    >
-                      {exam.name} <span aria-hidden="true">×</span>
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-              <div className="mt-5 max-h-80 space-y-2 overflow-y-auto pr-1">
-                {filteredExams.map((exam) => {
-                  const checked = selectedExamIds.includes(exam.id);
+              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                {schedulingModalities.map((item) => {
+                  const selected = selectedModalities.includes(item.id);
                   return (
-                    <label
-                      key={exam.id}
-                      className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-4 ${checked ? "border-brand bg-mint/60" : "border-border-light bg-white"}`}
+                    <button
+                      key={item.id}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => toggleModality(item.id)}
+                      className={`flex min-h-20 items-center gap-3 rounded-2xl border p-4 text-left font-bold ${selected ? "border-brand bg-mint text-brand-dark" : "border-border-light text-ink bg-white"}`}
                     >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => toggleExam(exam.id)}
-                        className="text-brand focus:ring-tech mt-1 h-5 w-5 rounded"
-                      />
-                      <span>
-                        <span className="text-ink block font-semibold">
-                          {exam.name}
-                        </span>
-                        <span className="text-muted mt-1 block text-xs">
-                          {exam.modality}
-                        </span>
+                      <span
+                        className={`grid h-7 w-7 shrink-0 place-items-center rounded-full ${selected ? "bg-brand text-white" : "bg-surface text-muted"}`}
+                      >
+                        {selected ? (
+                          <Check aria-hidden="true" size={16} />
+                        ) : (
+                          <Plus aria-hidden="true" size={16} />
+                        )}
                       </span>
-                    </label>
+                      {item.label}
+                    </button>
                   );
                 })}
-                {!filteredExams.length ? (
-                  <p className="text-muted py-8 text-center">
-                    Nenhum exame encontrado.
-                  </p>
-                ) : null}
               </div>
+
+              {selectedModalities.map((selectedModality) => {
+                const draft = examDrafts[selectedModality];
+                const term = draft.trim().toLocaleLowerCase("pt-BR");
+                const suggestions =
+                  term.length >= 2
+                    ? exams
+                        .filter(
+                          (exam) =>
+                            inferSchedulingModality(exam.modality) ===
+                              selectedModality &&
+                            exam.name.toLocaleLowerCase("pt-BR").includes(term),
+                        )
+                        .slice(0, 5)
+                    : [];
+                return (
+                  <section
+                    key={selectedModality}
+                    className="border-border-light mt-6 rounded-3xl border bg-white p-4 sm:p-5"
+                  >
+                    <h3 className="font-heading text-ink text-lg font-semibold">
+                      {getSchedulingModalityLabel(selectedModality)}
+                    </h3>
+                    <label className="text-ink mt-4 block text-sm font-semibold">
+                      Digite o nome do exame
+                      <input
+                        value={draft}
+                        onChange={(event) =>
+                          setExamDrafts((current) => ({
+                            ...current,
+                            [selectedModality]: event.target.value.slice(
+                              0,
+                              180,
+                            ),
+                          }))
+                        }
+                        placeholder={
+                          selectedModality === "MRI"
+                            ? "Ex.: Ressonância magnética de crânio"
+                            : "Digite como aparece no pedido médico"
+                        }
+                        className={inputClasses}
+                      />
+                    </label>
+                    <p className="text-muted mt-2 text-xs">
+                      Digite o exame como aparece no seu pedido médico. As
+                      sugestões são opcionais.
+                    </p>
+                    {suggestions.length ? (
+                      <div className="bg-surface mt-3 rounded-2xl p-3">
+                        <p className="text-muted text-xs font-bold">
+                          Sugestões do cadastro
+                        </p>
+                        <div className="mt-2 flex flex-col gap-2">
+                          {suggestions.map((suggestion) => (
+                            <button
+                              key={suggestion.id}
+                              type="button"
+                              onClick={() =>
+                                addExam(
+                                  selectedModality,
+                                  suggestion.name,
+                                  suggestion.id,
+                                )
+                              }
+                              className="text-brand min-h-10 rounded-xl bg-white px-3 text-left text-sm font-semibold"
+                            >
+                              + {suggestion.name}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                    {draft.trim() ? (
+                      <p className="text-muted mt-3 text-xs">
+                        Você também pode usar exatamente: “{draft.trim()}”.
+                      </p>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => addExam(selectedModality, draft)}
+                      className="border-brand text-brand mt-4 inline-flex min-h-11 items-center gap-2 rounded-full border px-5 text-sm font-bold"
+                    >
+                      <Plus aria-hidden="true" size={17} /> Adicionar exame
+                    </button>
+                  </section>
+                );
+              })}
+
+              {examEntries.length ? (
+                <section className="mt-7">
+                  <h3 className="font-heading text-ink text-xl font-semibold">
+                    Seus exames
+                  </h3>
+                  <div className="mt-3 space-y-4">
+                    {schedulingModalities.map((modalityItem) => {
+                      const items = examEntries.filter(
+                        (exam) => exam.modality === modalityItem.id,
+                      );
+                      if (!items.length) return null;
+                      return (
+                        <div
+                          key={modalityItem.id}
+                          className="rounded-2xl bg-white p-4"
+                        >
+                          <p className="text-brand text-xs font-bold tracking-wide uppercase">
+                            {modalityItem.label}
+                          </p>
+                          <ul className="mt-2 space-y-2">
+                            {items.map((entry) => (
+                              <li
+                                key={entry.clientId}
+                                className="border-border-light rounded-xl border p-3"
+                              >
+                                {editingExamId === entry.clientId ? (
+                                  <div>
+                                    <input
+                                      value={editingExamText}
+                                      onChange={(event) =>
+                                        setEditingExamText(
+                                          event.target.value.slice(0, 180),
+                                        )
+                                      }
+                                      className={`${inputClasses} mt-0`}
+                                      aria-label={`Editar ${entry.description}`}
+                                    />
+                                    <div className="mt-2 flex gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => saveEditedExam(entry)}
+                                        className="text-brand min-h-10 px-3 text-sm font-bold"
+                                      >
+                                        Salvar
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditingExamId("")}
+                                        className="text-muted min-h-10 px-3 text-sm font-bold"
+                                      >
+                                        Cancelar
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-start gap-3">
+                                    <Check
+                                      aria-hidden="true"
+                                      className="text-brand mt-0.5 shrink-0"
+                                      size={17}
+                                    />
+                                    <span className="text-ink min-w-0 flex-1 text-sm font-semibold">
+                                      {entry.description}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setEditingExamId(entry.clientId);
+                                        setEditingExamText(entry.description);
+                                      }}
+                                      aria-label={`Editar ${entry.description}`}
+                                      className="text-brand grid h-10 w-10 shrink-0 place-items-center rounded-full"
+                                    >
+                                      <Pencil aria-hidden="true" size={16} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => removeExam(entry.clientId)}
+                                      aria-label={`Remover ${entry.description}`}
+                                      className="text-error grid h-10 w-10 shrink-0 place-items-center rounded-full"
+                                    >
+                                      <Trash2 aria-hidden="true" size={16} />
+                                    </button>
+                                  </div>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              ) : null}
             </div>
 
             <div hidden={step !== 1}>
               <h2 className="font-heading text-ink text-2xl font-semibold">
-                Dados do paciente
+                Seus dados
               </h2>
               <p className="text-muted mt-2 text-sm">
-                Preencha somente os dados necessários para a equipe entrar em
-                contato.
+                Precisamos somente dos dados necessários para identificar você e
+                entrar em contato.
               </p>
               <div className="mt-5 grid gap-5 sm:grid-cols-2">
-                {field("name", "Nome completo", {
-                  required: true,
-                  autoComplete: "name",
-                })}
-                {field("cpf", "CPF (opcional)", {
-                  placeholder: "000.000.000-00",
-                })}
-                {field("birthDate", "Data de nascimento", {
-                  type: "date",
-                  required: true,
-                  autoComplete: "bday",
-                })}
-                <label className="text-ink text-sm font-semibold">
-                  Telefone/WhatsApp <span className="text-error">*</span>
+                <label className="text-ink text-sm font-semibold sm:col-span-2">
+                  Nome completo <span className="text-error">*</span>
                   <input
-                    name="phone"
+                    value={patientName}
+                    onChange={(event) =>
+                      setPatientName(event.target.value.slice(0, 120))
+                    }
+                    autoComplete="name"
+                    className={inputClasses}
+                  />
+                </label>
+                <label className="text-ink text-sm font-semibold">
+                  CPF <span className="text-error">*</span>
+                  <input
+                    value={cpf}
+                    onChange={(event) => setCpf(formatCpf(event.target.value))}
+                    inputMode="numeric"
+                    autoComplete="off"
+                    placeholder="000.000.000-00"
+                    className={inputClasses}
+                  />
+                </label>
+                <label className="text-ink text-sm font-semibold">
+                  Data de nascimento <span className="text-error">*</span>
+                  <input
+                    type="date"
+                    value={birthDate}
+                    max={new Date().toISOString().slice(0, 10)}
+                    onChange={(event) => setBirthDate(event.target.value)}
+                    autoComplete="bday"
+                    className={inputClasses}
+                  />
+                </label>
+                <label className="text-ink text-sm font-semibold sm:col-span-2">
+                  Telefone / WhatsApp <span className="text-error">*</span>
+                  <input
                     type="tel"
                     value={phone}
                     onChange={(event) =>
                       setPhone(formatPhone(event.target.value))
                     }
+                    inputMode="tel"
                     autoComplete="tel"
                     placeholder="(00) 00000-0000"
                     className={inputClasses}
                   />
                 </label>
-                {field("email", "E-mail (opcional)", {
-                  type: "email",
-                  autoComplete: "email",
-                })}
-                {field("city", "Cidade (opcional)", {
-                  autoComplete: "address-level2",
-                })}
-                <div className="sm:col-span-2">
-                  {field(
-                    "responsibleName",
-                    "Nome do responsável (se necessário)",
+              </div>
+
+              <fieldset className="mt-8">
+                <legend className="font-heading text-ink text-xl font-semibold">
+                  Como será seu atendimento?
+                </legend>
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  {(["PARTICULAR", "INSURANCE", "SUS"] as ServiceType[]).map(
+                    (type) => (
+                      <button
+                        key={type}
+                        type="button"
+                        aria-pressed={serviceType === type}
+                        onClick={() => selectService(type)}
+                        className={`min-h-16 rounded-2xl border p-4 font-bold ${serviceType === type ? "border-brand bg-mint text-brand-dark" : "border-border-light text-ink bg-white"}`}
+                      >
+                        {serviceLabels[type]}
+                      </button>
+                    ),
                   )}
                 </div>
-              </div>
-            </div>
+              </fieldset>
 
-            <div hidden={step !== 2}>
-              <h2 className="font-heading text-ink text-2xl font-semibold">
-                Como será o atendimento?
-              </h2>
-              <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                {(["PARTICULAR", "INSURANCE", "SUS"] as ServiceType[]).map(
-                  (type) => (
-                    <label
-                      key={type}
-                      className={`cursor-pointer rounded-2xl border p-4 text-center font-semibold ${serviceType === type ? "border-brand bg-mint text-brand-dark" : "border-border-light text-ink bg-white"}`}
-                    >
-                      <input
-                        type="radio"
-                        name="serviceType"
-                        value={type}
-                        checked={serviceType === type}
-                        onChange={() => {
-                          setServiceType(type);
-                          setAuthorizationPending(false);
-                          setFiles((current) =>
-                            current.filter(
-                              (item) =>
-                                item.kind === "medicalOrder" ||
-                                item.kind === "photoId" ||
-                                item.kind === "other" ||
-                                (type === "INSURANCE" &&
-                                  (item.kind === "insuranceCardFront" ||
-                                    item.kind === "insuranceCardBack")) ||
-                                (type === "SUS" &&
-                                  item.kind === "susAuthorization"),
-                            ),
-                          );
-                          setErrors([]);
-                        }}
-                        className="sr-only"
-                      />
-                      {serviceLabels[type]}
-                    </label>
-                  ),
-                )}
-              </div>
               {serviceType === "INSURANCE" ? (
-                <div className="border-border-light mt-6 grid gap-5 rounded-2xl border bg-white p-5 sm:grid-cols-2">
-                  <label className="text-ink text-sm font-semibold sm:col-span-2">
+                <section className="border-border-light mt-6 rounded-2xl border bg-white p-5">
+                  <h3 className="font-heading text-ink text-lg font-semibold">
+                    Qual é o seu convênio?
+                  </h3>
+                  <label className="text-ink mt-4 block text-sm font-semibold">
+                    Buscar convênio
+                    <input
+                      value={insuranceSearch}
+                      onChange={(event) =>
+                        setInsuranceSearch(event.target.value)
+                      }
+                      placeholder="Digite o nome"
+                      className={inputClasses}
+                    />
+                  </label>
+                  <label className="text-ink mt-4 block text-sm font-semibold">
                     Convênio <span className="text-error">*</span>
                     <select
                       value={insuranceId}
@@ -790,7 +1089,7 @@ export function Scheduling({
                       className={inputClasses}
                     >
                       <option value="">Selecione</option>
-                      {activePartners.map((partner) => (
+                      {filteredPartners.map((partner) => (
                         <option key={partner.id} value={partner.id}>
                           {partner.name}
                         </option>
@@ -799,379 +1098,404 @@ export function Scheduling({
                     </select>
                   </label>
                   {insuranceId === "OTHER" ? (
-                    <label className="text-ink text-sm font-semibold sm:col-span-2">
-                      Nome do convênio <span className="text-error">*</span>
+                    <label className="text-ink mt-4 block text-sm font-semibold">
+                      Digite o nome do convênio{" "}
+                      <span className="text-error">*</span>
                       <input
                         value={insuranceOther}
                         onChange={(event) =>
-                          setInsuranceOther(event.target.value)
+                          setInsuranceOther(event.target.value.slice(0, 100))
                         }
                         className={inputClasses}
                       />
                     </label>
                   ) : null}
-                  {field(
-                    "insuranceCardNumber",
-                    "Número da carteirinha (opcional)",
-                  )}
-                  {field("insuranceHolderName", "Nome do titular (opcional)")}
-                  {field("insuranceCardExpiry", "Validade (se houver)", {
-                    type: "date",
-                  })}
-                </div>
+                </section>
               ) : null}
-              {serviceType === "SUS" ? (
-                <div className="border-border-light mt-6 rounded-2xl border bg-white p-5">
-                  <h3 className="font-heading text-ink text-lg font-semibold">
-                    Dados e documentos do atendimento pelo SUS
-                  </h3>
+            </div>
+
+            <div hidden={step !== 2}>
+              {!reviewing ? (
+                <>
+                  <h2 className="font-heading text-ink text-2xl font-semibold">
+                    Envie seus documentos
+                  </h2>
                   <p className="text-muted mt-2 text-sm">
-                    Para solicitar o agendamento pelo SUS, informe os dados
-                    disponíveis e anexe a autorização emitida pela regulação.
+                    Envie fotos legíveis ou arquivos dos documentos necessários.
                   </p>
-                  <div className="mt-5 grid gap-5 sm:grid-cols-2">
-                    {field(
-                      "susCardNumber",
-                      "Cartão Nacional de Saúde — CNS (opcional)",
-                      { placeholder: "15 números" },
-                    )}
-                    {field(
-                      "regulationNumber",
-                      "Número da autorização ou regulação",
-                      { placeholder: "Autorização, regulação ou SISREG" },
-                    )}
-                    {field(
-                      "susAuthorizationNumber",
-                      "Número da autorização (opcional)",
-                    )}
-                    {field(
-                      "susRequestNumber",
-                      "Número da solicitação (opcional)",
-                    )}
-                    {field("sisregCode", "Chave ou senha do SISREG (opcional)")}
-                    {field("originCity", "Município de origem (opcional)")}
-                    {field("requestingUnit", "Unidade solicitante (opcional)")}
-                    {field(
-                      "requestingProfessional",
-                      "Profissional solicitante (opcional)",
-                    )}
-                    {field(
-                      "authorizationDate",
-                      "Data da autorização (opcional)",
-                      { type: "date" },
-                    )}
-                    {field(
-                      "authorizationExpiry",
-                      "Validade da autorização (opcional)",
-                      { type: "date" },
-                    )}
-                  </div>
-                </div>
-              ) : null}
-            </div>
-
-            <div hidden={step !== 3}>
-              <h2 className="font-heading text-ink text-2xl font-semibold">
-                Documentos
-              </h2>
-              <p className="text-muted mt-2 text-sm">
-                Os arquivos ficam privados e disponíveis temporariamente para a
-                equipe autorizada.
-              </p>
-              <div className="mt-6 space-y-7">
-                <MultiDocumentUploadField
-                  kind="medicalOrder"
-                  label="Pedido médico"
-                  description="Anexe o pedido médico. Um mesmo pedido pode conter vários exames e várias páginas."
-                  required
-                  multiple
-                  files={fileGroup("medicalOrder")}
-                  progress={progress}
-                  disabled={isSubmitting}
-                  onAdd={addFiles}
-                  onRemove={(id) =>
-                    setFiles((current) =>
-                      current.filter((item) => item.id !== id),
-                    )
-                  }
-                />
-                {serviceType === "SUS" ? (
-                  <>
+                  <p className="bg-mint text-brand-dark mt-4 rounded-2xl p-4 text-sm font-semibold">
+                    Seu pedido médico pode conter vários exames. Não é
+                    necessário enviar um pedido diferente para cada exame.
+                  </p>
+                  <div className="mt-6 space-y-7">
                     <MultiDocumentUploadField
-                      kind="susAuthorization"
-                      label="Autorização da regulação"
-                      description="Anexe a autorização da regulação ou documento do SISREG. Você pode enviar várias páginas."
-                      required={settings.susAuthorizationRequired}
+                      kind="medicalOrder"
+                      label="Pedido médico"
+                      description="Pode conter vários exames e várias páginas."
+                      required
                       multiple
-                      files={fileGroup("susAuthorization")}
+                      files={fileGroup("medicalOrder")}
                       progress={progress}
                       disabled={isSubmitting}
                       onAdd={addFiles}
+                      onReplace={replaceFile}
                       onRemove={(id) =>
                         setFiles((current) =>
                           current.filter((item) => item.id !== id),
                         )
                       }
                     />
-                    {!settings.susAuthorizationRequired ? (
-                      <label className="text-ink flex items-start gap-3 text-sm">
-                        <input
-                          type="checkbox"
-                          checked={authorizationPending}
-                          onChange={(event) =>
-                            setAuthorizationPending(event.target.checked)
+                    <MultiDocumentUploadField
+                      kind="photoId"
+                      label="Documento oficial com foto"
+                      description="Envie RG, CNH ou outro documento oficial com foto."
+                      required
+                      files={fileGroup("photoId")}
+                      progress={progress}
+                      disabled={isSubmitting}
+                      onAdd={addFiles}
+                      onReplace={replaceFile}
+                      onRemove={(id) =>
+                        setFiles((current) =>
+                          current.filter((item) => item.id !== id),
+                        )
+                      }
+                    />
+                    {serviceType === "INSURANCE" ? (
+                      <>
+                        <div className="grid gap-6 md:grid-cols-2">
+                          <MultiDocumentUploadField
+                            kind="insuranceCardFront"
+                            label="Carteirinha — frente"
+                            description="Envie uma imagem legível da frente."
+                            required
+                            files={fileGroup("insuranceCardFront")}
+                            progress={progress}
+                            disabled={isSubmitting}
+                            onAdd={addFiles}
+                            onReplace={replaceFile}
+                            onRemove={(id) =>
+                              setFiles((current) =>
+                                current.filter((item) => item.id !== id),
+                              )
+                            }
+                          />
+                          <MultiDocumentUploadField
+                            kind="insuranceCardBack"
+                            label="Carteirinha — verso"
+                            description="Opcional. Envie se houver informações no verso."
+                            files={fileGroup("insuranceCardBack")}
+                            progress={progress}
+                            disabled={isSubmitting}
+                            onAdd={addFiles}
+                            onReplace={replaceFile}
+                            onRemove={(id) =>
+                              setFiles((current) =>
+                                current.filter((item) => item.id !== id),
+                              )
+                            }
+                          />
+                        </div>
+                        <MultiDocumentUploadField
+                          kind="insuranceAuthorization"
+                          label="Autorização ou guia do convênio"
+                          description="Opcional nesta primeira solicitação."
+                          multiple
+                          files={fileGroup("insuranceAuthorization")}
+                          progress={progress}
+                          disabled={isSubmitting}
+                          onAdd={addFiles}
+                          onReplace={replaceFile}
+                          onRemove={(id) =>
+                            setFiles((current) =>
+                              current.filter((item) => item.id !== id),
+                            )
                           }
-                          className="text-brand focus:ring-tech mt-0.5 h-5 w-5 rounded"
                         />
-                        Ainda não tenho o documento. Registrar como pendência
-                        para envio posterior.
-                      </label>
+                      </>
                     ) : null}
-                  </>
-                ) : null}
-                {serviceType === "INSURANCE" ? (
-                  <div className="grid gap-6 md:grid-cols-2">
-                    <MultiDocumentUploadField
-                      kind="insuranceCardFront"
-                      label="Carteirinha — frente"
-                      description="Opcional. Envie uma imagem legível."
-                      files={fileGroup("insuranceCardFront")}
-                      progress={progress}
-                      disabled={isSubmitting}
-                      onAdd={addFiles}
-                      onRemove={(id) =>
-                        setFiles((current) =>
-                          current.filter((item) => item.id !== id),
-                        )
-                      }
-                    />
-                    <MultiDocumentUploadField
-                      kind="insuranceCardBack"
-                      label="Carteirinha — verso"
-                      description="Opcional. Envie se houver informações no verso."
-                      files={fileGroup("insuranceCardBack")}
-                      progress={progress}
-                      disabled={isSubmitting}
-                      onAdd={addFiles}
-                      onRemove={(id) =>
-                        setFiles((current) =>
-                          current.filter((item) => item.id !== id),
-                        )
-                      }
-                    />
+                    {serviceType === "SUS" ? (
+                      <>
+                        <MultiDocumentUploadField
+                          kind="susAuthorization"
+                          label="Autorização da Regulação / SISREG"
+                          description="Envie todas as páginas disponíveis."
+                          required={settings.susAuthorizationRequired}
+                          multiple
+                          files={fileGroup("susAuthorization")}
+                          progress={progress}
+                          disabled={isSubmitting}
+                          onAdd={addFiles}
+                          onReplace={replaceFile}
+                          onRemove={(id) =>
+                            setFiles((current) =>
+                              current.filter((item) => item.id !== id),
+                            )
+                          }
+                        />
+                        {!settings.susAuthorizationRequired ? (
+                          <label className="text-ink flex items-start gap-3 text-sm">
+                            <input
+                              type="checkbox"
+                              checked={authorizationPending}
+                              onChange={(event) =>
+                                setAuthorizationPending(event.target.checked)
+                              }
+                              className="text-brand focus:ring-tech mt-0.5 h-5 w-5 rounded"
+                            />
+                            Não tenho este documento agora. Registrar como
+                            pendência para envio posterior.
+                          </label>
+                        ) : null}
+                        <MultiDocumentUploadField
+                          kind="susCard"
+                          label="Cartão SUS"
+                          description="Opcional."
+                          files={fileGroup("susCard")}
+                          progress={progress}
+                          disabled={isSubmitting}
+                          onAdd={addFiles}
+                          onReplace={replaceFile}
+                          onRemove={(id) =>
+                            setFiles((current) =>
+                              current.filter((item) => item.id !== id),
+                            )
+                          }
+                        />
+                      </>
+                    ) : null}
                   </div>
-                ) : null}
-                <MultiDocumentUploadField
-                  kind="other"
-                  label="Outros documentos"
-                  description="Opcional. Inclua somente arquivos úteis para analisar esta solicitação."
-                  multiple
-                  files={fileGroup("other")}
-                  progress={progress}
-                  disabled={isSubmitting}
-                  onAdd={addFiles}
-                  onRemove={(id) =>
-                    setFiles((current) =>
-                      current.filter((item) => item.id !== id),
-                    )
-                  }
-                />
-              </div>
-            </div>
 
-            <div hidden={step !== 4}>
-              <h2 className="font-heading text-ink text-2xl font-semibold">
-                Datas e períodos disponíveis
-              </h2>
-              <p className="text-muted mt-2 text-sm">
-                Selecione os períodos em que você tem disponibilidade. A equipe
-                confirmará a data e o horário.
-              </p>
-              <fieldset className="mt-6">
-                <legend className="text-ink text-sm font-semibold">
-                  Datas preferenciais
-                </legend>
-                <div className="mt-2 grid gap-3 sm:grid-cols-3">
-                  {dates.map((date, index) => (
-                    <label key={index} className="text-muted text-xs">
-                      {index === 0 ? "Preferencial" : `Alternativa ${index}`}
-                      <input
-                        type="date"
-                        value={date}
-                        min={new Date().toISOString().slice(0, 10)}
+                  <section className="border-border-light mt-9 rounded-3xl border bg-white p-5">
+                    <h3 className="font-heading text-ink text-xl font-semibold">
+                      Quando você prefere realizar seus exames?
+                    </h3>
+                    <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                      {dates.map((date, index) => (
+                        <label
+                          key={index}
+                          className="text-ink text-sm font-semibold"
+                        >
+                          {index === 0
+                            ? "Data preferencial"
+                            : "Outra data (opcional)"}
+                          <input
+                            type="date"
+                            value={date}
+                            min={new Date().toISOString().slice(0, 10)}
+                            onChange={(event) =>
+                              setDates((current) =>
+                                current.map((item, itemIndex) =>
+                                  itemIndex === index
+                                    ? event.target.value
+                                    : item,
+                                ),
+                              )
+                            }
+                            className={inputClasses}
+                          />
+                        </label>
+                      ))}
+                    </div>
+                    {dates.length < 2 ? (
+                      <button
+                        type="button"
+                        onClick={() => setDates((current) => [...current, ""])}
+                        className="text-brand mt-3 min-h-10 text-sm font-bold"
+                      >
+                        + Adicionar outra data
+                      </button>
+                    ) : null}
+                    <fieldset className="mt-6">
+                      <legend className="text-ink text-sm font-semibold">
+                        Período
+                      </legend>
+                      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                        {(
+                          [
+                            "MORNING",
+                            "AFTERNOON",
+                            "EVENING",
+                            "ANY",
+                          ] as PreferredPeriod[]
+                        ).map((period) => (
+                          <button
+                            key={period}
+                            type="button"
+                            aria-pressed={periods.includes(period)}
+                            onClick={() =>
+                              setPeriods((current) =>
+                                period === "ANY"
+                                  ? current.includes("ANY")
+                                    ? []
+                                    : ["ANY"]
+                                  : current.includes(period)
+                                    ? current.filter((item) => item !== period)
+                                    : [
+                                        ...current.filter(
+                                          (item) => item !== "ANY",
+                                        ),
+                                        period,
+                                      ],
+                              )
+                            }
+                            className={`min-h-12 rounded-2xl border p-3 text-sm font-semibold ${periods.includes(period) ? "border-brand bg-mint text-brand-dark" : "border-border-light text-ink bg-white"}`}
+                          >
+                            {periodLabels[period]}
+                          </button>
+                        ))}
+                      </div>
+                    </fieldset>
+                    <div className="bg-mint mt-6 rounded-2xl p-4 text-sm">
+                      <p className="text-ink font-semibold">
+                        Realizamos exames todos os dias.
+                      </p>
+                      <p className="text-muted mt-1">
+                        Segunda a sábado: até 22h. Domingo: até 19h.
+                      </p>
+                    </div>
+                    <label className="text-ink mt-6 block text-sm font-semibold">
+                      Deseja informar mais alguma coisa?{" "}
+                      <span className="text-muted font-normal">(opcional)</span>
+                      <textarea
+                        value={observations}
                         onChange={(event) =>
-                          setDates((current) =>
-                            current.map((item, itemIndex) =>
-                              itemIndex === index ? event.target.value : item,
-                            ),
-                          )
+                          setObservations(event.target.value.slice(0, 500))
                         }
-                        className={inputClasses}
+                        rows={4}
+                        placeholder="Ex.: preciso realizar os exames no mesmo dia."
+                        className={`${inputClasses} py-3`}
                       />
+                      <span className="text-muted mt-1 block text-right text-xs">
+                        {observations.length}/500
+                      </span>
                     </label>
-                  ))}
-                </div>
-                {dates.length < 3 ? (
+                  </section>
+
+                  <label className="text-ink mt-6 flex cursor-pointer items-start gap-3 text-sm leading-relaxed">
+                    <input
+                      type="checkbox"
+                      checked={consent}
+                      onChange={(event) => setConsent(event.target.checked)}
+                      className="text-brand focus:ring-tech mt-0.5 h-5 w-5 shrink-0 rounded"
+                    />
+                    <span>
+                      Ao enviar esta solicitação, você concorda com o uso dos
+                      dados e documentos informados pela INNEURO exclusivamente
+                      para análise e contato relacionado ao seu atendimento.{" "}
+                      <Link
+                        href="/politica-de-privacidade"
+                        className="text-brand font-bold underline"
+                      >
+                        Política de Privacidade
+                      </Link>
+                    </span>
+                  </label>
+                </>
+              ) : (
+                <>
+                  <h2 className="font-heading text-ink text-2xl font-semibold">
+                    Revise sua solicitação
+                  </h2>
+                  <p className="text-muted mt-2 text-sm">
+                    Confira as informações antes de enviar.
+                  </p>
+                  <div className="mt-5 space-y-4 text-sm">
+                    <section className="rounded-2xl bg-white p-4">
+                      <h3 className="text-brand font-bold">EXAMES</h3>
+                      {schedulingModalities.map((modalityItem) => {
+                        const items = examEntries.filter(
+                          (exam) => exam.modality === modalityItem.id,
+                        );
+                        return items.length ? (
+                          <div key={modalityItem.id} className="mt-3">
+                            <p className="text-ink font-bold">
+                              {modalityItem.label}
+                            </p>
+                            <ul className="text-muted mt-1 list-disc pl-5">
+                              {items.map((item) => (
+                                <li key={item.clientId}>{item.description}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : null;
+                      })}
+                    </section>
+                    <section className="rounded-2xl bg-white p-4">
+                      <h3 className="text-brand font-bold">PACIENTE</h3>
+                      <p className="text-ink mt-2">{patientName}</p>
+                      <p className="text-muted">CPF: {maskCpf(cpf)}</p>
+                      <p className="text-muted">
+                        Nascimento: {formatDate(birthDate)}
+                      </p>
+                      <p className="text-muted">WhatsApp: {phone}</p>
+                    </section>
+                    <section className="rounded-2xl bg-white p-4">
+                      <h3 className="text-brand font-bold">ATENDIMENTO</h3>
+                      <p className="text-ink mt-2">
+                        {serviceType
+                          ? serviceLabels[serviceType]
+                          : "Não informado"}
+                        {serviceType === "INSURANCE"
+                          ? ` — ${insuranceId === "OTHER" ? insuranceOther : (selectedPartner?.name ?? "")}`
+                          : ""}
+                      </p>
+                    </section>
+                    <section className="rounded-2xl bg-white p-4">
+                      <h3 className="text-brand font-bold">DOCUMENTOS</h3>
+                      <ul className="text-muted mt-2 space-y-1">
+                        <li>
+                          ✓ Pedido médico: {documentStatus("medicalOrder")}
+                        </li>
+                        <li>
+                          ✓ Documento com foto: {documentStatus("photoId")}
+                        </li>
+                        {serviceType === "INSURANCE" ? (
+                          <li>
+                            ✓ Carteirinha:{" "}
+                            {documentStatus("insuranceCardFront")}
+                          </li>
+                        ) : null}
+                        {serviceType === "SUS" ? (
+                          <li>
+                            ✓ Regulação/SISREG:{" "}
+                            {authorizationPending
+                              ? "Pendente"
+                              : documentStatus("susAuthorization")}
+                          </li>
+                        ) : null}
+                      </ul>
+                    </section>
+                    <section className="rounded-2xl bg-white p-4">
+                      <h3 className="text-brand font-bold">DISPONIBILIDADE</h3>
+                      <p className="text-ink mt-2">
+                        {dates.filter(Boolean).map(formatDate).join(" · ")}
+                      </p>
+                      <p className="text-muted mt-1">
+                        {periods
+                          .map((period) => periodLabels[period])
+                          .join(" · ")}
+                      </p>
+                    </section>
+                  </div>
+                  <p className="text-muted mt-5 flex items-start gap-2 text-sm leading-relaxed">
+                    <LockKeyhole
+                      aria-hidden="true"
+                      className="text-brand mt-0.5 shrink-0"
+                      size={17}
+                    />
+                    Seus documentos ficam privados e acessíveis somente à equipe
+                    autorizada.
+                  </p>
                   <button
                     type="button"
-                    onClick={() => setDates((current) => [...current, ""])}
-                    className="text-brand mt-3 text-sm font-bold"
+                    onClick={() => setReviewing(false)}
+                    className="text-brand mt-5 min-h-11 rounded-full px-4 font-bold"
                   >
-                    + Adicionar outra data
+                    Editar informações
                   </button>
-                ) : null}
-              </fieldset>
-              <fieldset className="mt-7">
-                <legend className="text-ink text-sm font-semibold">
-                  Períodos
-                </legend>
-                <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  {(
-                    [
-                      "MORNING",
-                      "AFTERNOON",
-                      "EVENING",
-                      "ANY",
-                    ] as PreferredPeriod[]
-                  ).map((period) => (
-                    <label
-                      key={period}
-                      className={`cursor-pointer rounded-2xl border p-3 text-center text-sm font-semibold ${periods.includes(period) ? "border-brand bg-mint text-brand-dark" : "border-border-light text-ink bg-white"}`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={periods.includes(period)}
-                        onChange={() =>
-                          setPeriods((current) =>
-                            period === "ANY"
-                              ? current.includes("ANY")
-                                ? []
-                                : ["ANY"]
-                              : current.includes(period)
-                                ? current.filter((item) => item !== period)
-                                : [
-                                    ...current.filter((item) => item !== "ANY"),
-                                    period,
-                                  ],
-                          )
-                        }
-                        className="sr-only"
-                      />
-                      {periodLabels[period]}
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-              <label className="text-ink mt-7 block text-sm font-semibold">
-                Observações{" "}
-                <span className="text-muted font-normal">(opcional)</span>
-                <textarea
-                  name="observations"
-                  value={observations}
-                  onChange={(event) =>
-                    setObservations(event.target.value.slice(0, 1000))
-                  }
-                  rows={4}
-                  className={`${inputClasses} py-3`}
-                />
-                <span className="text-muted mt-1 block text-right text-xs">
-                  {observations.length}/1000
-                </span>
-              </label>
-              <label className="text-ink mt-5 block text-sm font-semibold">
-                Canal de WhatsApp
-                <select
-                  value={channel}
-                  onChange={(event) =>
-                    setChannel(event.target.value as Channel)
-                  }
-                  className={inputClasses}
-                >
-                  <option value="primary">
-                    {whatsapp.primary.label} — {whatsapp.primary.display}
-                  </option>
-                  <option value="secondary">
-                    {whatsapp.secondary.label} — {whatsapp.secondary.display}
-                  </option>
-                </select>
-              </label>
-            </div>
-
-            <div hidden={step !== 5}>
-              <h2 className="font-heading text-ink text-2xl font-semibold">
-                Revise sua solicitação
-              </h2>
-              <p className="text-muted mt-2 text-sm">
-                Volte para editar qualquer informação antes de enviar.
-              </p>
-              <div className="mt-5 space-y-4 text-sm">
-                <section className="rounded-2xl bg-white p-4">
-                  <h3 className="text-brand font-bold">
-                    EXAMES — {selectedExams.length}
-                  </h3>
-                  <ul className="text-ink mt-2 list-disc space-y-1 pl-5">
-                    {selectedExams.map((exam) => (
-                      <li key={exam.id}>
-                        {exam.name}{" "}
-                        <span className="text-muted">— {exam.modality}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-                <section className="rounded-2xl bg-white p-4">
-                  <h3 className="text-brand font-bold">ATENDIMENTO</h3>
-                  <p className="text-ink mt-2">
-                    {serviceType ? serviceLabels[serviceType] : "Não informado"}
-                    {serviceType === "INSURANCE"
-                      ? ` — ${insuranceId === "OTHER" ? insuranceOther : (selectedPartner?.name ?? "")}`
-                      : ""}
-                  </p>
-                  {serviceType === "SUS" && authorizationPending ? (
-                    <p className="text-warning mt-1 font-semibold">
-                      Autorização da regulação pendente
-                    </p>
-                  ) : null}
-                </section>
-                <section className="rounded-2xl bg-white p-4">
-                  <h3 className="text-brand font-bold">DOCUMENTOS</h3>
-                  <ul className="text-ink mt-2 list-disc pl-5">
-                    {files.map((item) => (
-                      <li key={item.id}>{item.file.name}</li>
-                    ))}
-                  </ul>
-                </section>
-                <section className="rounded-2xl bg-white p-4">
-                  <h3 className="text-brand font-bold">DISPONIBILIDADE</h3>
-                  <p className="text-ink mt-2">
-                    {dates.filter(Boolean).map(formatDate).join(" · ")}
-                  </p>
-                  <p className="text-muted mt-1">
-                    {periods.map((period) => periodLabels[period]).join(" · ")}
-                  </p>
-                </section>
-              </div>
-              <p className="text-muted mt-5 flex items-start gap-2 text-sm leading-relaxed">
-                <LockKeyhole
-                  aria-hidden="true"
-                  className="text-brand mt-0.5 shrink-0"
-                  size={17}
-                />
-                Seus dados e documentos serão usados exclusivamente para
-                organizar esta solicitação, com acesso restrito à equipe
-                autorizada.
-              </p>
-              <label className="text-ink mt-5 flex cursor-pointer items-start gap-3 text-sm">
-                <input
-                  type="checkbox"
-                  checked={consent}
-                  onChange={(event) => setConsent(event.target.checked)}
-                  className="text-brand focus:ring-tech mt-0.5 h-5 w-5 shrink-0 rounded"
-                />
-                <span>
-                  Autorizo o uso dos meus dados e documentos para análise e
-                  organização do atendimento pela INNEURO.
-                </span>
-              </label>
+                </>
+              )}
             </div>
 
             <div className="border-border-light mt-8 flex items-center justify-between gap-3 border-t pt-6">
@@ -1180,6 +1504,7 @@ export function Scheduling({
                   type="button"
                   onClick={() => {
                     setErrors([]);
+                    setReviewing(false);
                     setStep((current) => current - 1);
                   }}
                   disabled={isSubmitting}
@@ -1190,30 +1515,35 @@ export function Scheduling({
               ) : (
                 <span />
               )}
-              {step < 5 ? (
-                <button
-                  type="submit"
-                  className="bg-brand hover:bg-brand-dark focus-visible:ring-tech inline-flex min-h-12 items-center gap-2 rounded-full px-6 font-bold text-white focus-visible:ring-2 focus-visible:outline-none"
-                >
-                  Continuar <ChevronRight aria-hidden="true" size={18} />
-                </button>
-              ) : (
-                <button
-                  type="submit"
-                  disabled={
-                    isSubmitting ||
-                    !normalizeWhatsAppNumber(whatsapp[channel].number)
-                  }
-                  className="bg-brand hover:bg-brand-dark focus-visible:ring-tech inline-flex min-h-12 items-center gap-2 rounded-full px-6 font-bold text-white focus-visible:ring-2 focus-visible:outline-none disabled:opacity-50"
-                >
-                  <ShieldCheck aria-hidden="true" size={18} />
-                  {phase === "uploading"
-                    ? "Enviando documentos…"
-                    : phase === "saving"
-                      ? "Salvando solicitação…"
-                      : "Enviar solicitação"}
-                </button>
-              )}
+              <button
+                type="submit"
+                disabled={
+                  isSubmitting ||
+                  (reviewing &&
+                    !normalizeWhatsAppNumber(whatsapp.primary.number))
+                }
+                className="bg-brand hover:bg-brand-dark focus-visible:ring-tech inline-flex min-h-12 items-center gap-2 rounded-full px-6 font-bold text-white focus-visible:ring-2 focus-visible:outline-none disabled:opacity-50"
+              >
+                {step < 2 ? (
+                  <>
+                    Continuar <ChevronRight aria-hidden="true" size={18} />
+                  </>
+                ) : !reviewing ? (
+                  <>
+                    Revisar solicitação{" "}
+                    <ChevronRight aria-hidden="true" size={18} />
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck aria-hidden="true" size={18} />
+                    {phase === "uploading"
+                      ? "Enviando documentos…"
+                      : phase === "saving"
+                        ? "Salvando solicitação…"
+                        : "Enviar solicitação"}
+                  </>
+                )}
+              </button>
             </div>
           </form>
         </div>

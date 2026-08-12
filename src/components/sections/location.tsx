@@ -61,7 +61,7 @@ export function Location({
             </div>
             <div>
               <h3 className="font-heading text-xl font-semibold">
-                Realização dos exames
+                Atendimento e realização dos exames
               </h3>
               <p className="mt-2 text-sm text-white/65">
                 {scheduling.publicText}

@@ -106,14 +106,10 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
           </div>
           <section className="mt-10">
             <h2 className="font-heading text-ink text-3xl font-semibold">
-              Realização dos exames
+              Atendimento e realização dos exames
             </h2>
             <p className="text-muted mt-3">{schedulingSettings.publicText}</p>
-            <p className="text-muted mt-2 text-sm">
-              {schedulingSettings.note} Esta informação refere-se à realização
-              dos exames e não ao horário da recepção ou dos canais
-              administrativos.
-            </p>
+            <p className="text-muted mt-2 text-sm">{schedulingSettings.note}</p>
           </section>
           <section className="border-border-light mt-10 rounded-3xl border bg-white p-7">
             <MapPin aria-hidden="true" className="text-brand" />

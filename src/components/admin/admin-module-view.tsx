@@ -84,7 +84,7 @@ export async function AdminModuleView({
             options: [
               { label: "Nenhuma matéria", value: "" },
               ...(newsRows ?? []).map((item) => ({
-                label: `${item.title} (${item.status})`,
+                label: `${item.title} (${statusLabels[item.status] ?? item.status})`,
                 value: item.id,
               })),
             ],
