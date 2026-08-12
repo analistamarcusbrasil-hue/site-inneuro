@@ -8,10 +8,8 @@ import {
   ChevronRight,
   LockKeyhole,
   MessageCircle,
-  Pencil,
   Plus,
   ShieldCheck,
-  Trash2,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Container } from "@/components/layout/container";
@@ -42,7 +40,6 @@ import { normalizeWhatsAppNumber } from "@/lib/whatsapp";
 import type { Convenio } from "@/types/convenio";
 
 type SubmitPhase = "idle" | "uploading" | "saving";
-type ExamEntry = SchedulingExamInput & { clientId: string };
 type Success = FinalizeSchedulingResponse & {
   examCount: number;
   serviceType: ServiceType;
@@ -63,9 +60,18 @@ const periodLabels: Record<PreferredPeriod, string> = {
   EVENING: "Noite",
   ANY: "Qualquer horário",
 };
-const emptyDrafts = Object.fromEntries(
-  schedulingModalities.map((item) => [item.id, ""]),
-) as Record<SchedulingModality, string>;
+const schedulingSessionKey = "inneuro-scheduling-modalities-v4";
+const legacySchedulingSessionKey = "inneuro-scheduling-exams-v3";
+const publicSchedulingModalities: SchedulingModality[] = [
+  "MRI",
+  "CT",
+  "XRAY",
+  "BRAIN_MAPPING",
+];
+
+function isSchedulingModality(value: unknown): value is SchedulingModality {
+  return schedulingModalities.some((modality) => modality.id === value);
+}
 
 function formatPhone(value: string) {
   const digits = value.replace(/\D/g, "").slice(0, 11);
@@ -169,10 +175,6 @@ export function Scheduling({
   const [selectedModalities, setSelectedModalities] = useState<
     SchedulingModality[]
   >([]);
-  const [examEntries, setExamEntries] = useState<ExamEntry[]>([]);
-  const [examDrafts, setExamDrafts] = useState(emptyDrafts);
-  const [editingExamId, setEditingExamId] = useState("");
-  const [editingExamText, setEditingExamText] = useState("");
   const [patientName, setPatientName] = useState("");
   const [cpf, setCpf] = useState("");
   const [birthDate, setBirthDate] = useState("");
@@ -212,26 +214,34 @@ export function Scheduling({
   const selectedPartner = activePartners.find(
     (partner) => partner.id === insuranceId,
   );
+  const examEntries = useMemo<SchedulingExamInput[]>(
+    () =>
+      selectedModalities.map((modality, order) => ({
+        modality,
+        description: getSchedulingModalityLabel(modality),
+        examId: null,
+        order,
+      })),
+    [selectedModalities],
+  );
 
   useEffect(() => {
-    let storedEntries: ExamEntry[] = [];
+    let storedModalities: SchedulingModality[] = [];
     try {
-      const stored = window.sessionStorage.getItem(
-        "inneuro-scheduling-exams-v3",
+      const currentStored = window.sessionStorage.getItem(schedulingSessionKey);
+      const legacyStored = window.sessionStorage.getItem(
+        legacySchedulingSessionKey,
       );
-      const parsed = stored ? JSON.parse(stored) : [];
-      if (Array.isArray(parsed))
-        storedEntries = parsed.filter(
-          (item): item is ExamEntry =>
-            item &&
-            typeof item.clientId === "string" &&
-            schedulingModalities.some(
-              (modality) => modality.id === item.modality,
-            ) &&
-            typeof item.description === "string",
-        );
+      const currentParsed = currentStored ? JSON.parse(currentStored) : null;
+      const legacyParsed = legacyStored ? JSON.parse(legacyStored) : [];
+      const candidates = Array.isArray(currentParsed)
+        ? currentParsed
+        : Array.isArray(legacyParsed)
+          ? legacyParsed.map((item) => item?.modality)
+          : [];
+      storedModalities = candidates.filter(isSchedulingModality);
     } catch {
-      storedEntries = [];
+      storedModalities = [];
     }
     const initialOfficial = exams.find(
       (exam) =>
@@ -242,125 +252,26 @@ export function Scheduling({
     const initialModality = inferSchedulingModality(
       initialOfficial?.modality || initialExam,
     );
-    if (initialExam && initialModality) {
-      const description = initialOfficial?.name || initialExam;
-      const duplicate = storedEntries.some(
-        (item) =>
-          item.modality === initialModality &&
-          item.description.toLocaleLowerCase("pt-BR") ===
-            description.toLocaleLowerCase("pt-BR"),
-      );
-      if (!duplicate)
-        storedEntries.push({
-          clientId: crypto.randomUUID(),
-          modality: initialModality,
-          description,
-          examId: initialOfficial?.id ?? null,
-          order: storedEntries.length,
-        });
-    }
+    if (initialExam && initialModality) storedModalities.push(initialModality);
     window.queueMicrotask(() => {
-      setExamEntries(storedEntries);
-      setSelectedModalities([
-        ...new Set(storedEntries.map((item) => item.modality)),
-      ]);
+      setSelectedModalities([...new Set(storedModalities)]);
+      window.sessionStorage.removeItem(legacySchedulingSessionKey);
     });
   }, [exams, initialExam]);
 
   useEffect(() => {
     window.sessionStorage.setItem(
-      "inneuro-scheduling-exams-v3",
-      JSON.stringify(examEntries),
+      schedulingSessionKey,
+      JSON.stringify(selectedModalities),
     );
-  }, [examEntries]);
+  }, [selectedModalities]);
 
   function toggleModality(modality: SchedulingModality) {
-    if (selectedModalities.includes(modality)) {
-      if (examEntries.some((exam) => exam.modality === modality)) {
-        setErrors(["Remova os exames desta modalidade antes de desmarcá-la."]);
-        return;
-      }
-      setSelectedModalities((current) =>
-        current.filter((item) => item !== modality),
-      );
-    } else {
-      setSelectedModalities((current) => [...current, modality]);
-    }
-    setErrors([]);
-  }
-
-  function addExam(
-    modality: SchedulingModality,
-    descriptionValue: string,
-    examId: string | null = null,
-  ) {
-    const description = descriptionValue.trim().replace(/\s+/g, " ");
-    if (description.length < 2) {
-      setErrors(["Digite o nome do exame como aparece no pedido médico."]);
-      return;
-    }
-    const duplicate = examEntries.some(
-      (item) =>
-        item.modality === modality &&
-        item.description.toLocaleLowerCase("pt-BR") ===
-          description.toLocaleLowerCase("pt-BR"),
+    setSelectedModalities((current) =>
+      current.includes(modality)
+        ? current.filter((item) => item !== modality)
+        : [...current, modality],
     );
-    if (duplicate) {
-      setErrors(["Este exame já foi adicionado."]);
-      return;
-    }
-    setExamEntries((current) => [
-      ...current,
-      {
-        clientId: crypto.randomUUID(),
-        modality,
-        description,
-        examId,
-        order: current.length,
-      },
-    ]);
-    setExamDrafts((current) => ({ ...current, [modality]: "" }));
-    setErrors([]);
-  }
-
-  function removeExam(clientId: string) {
-    setExamEntries((current) =>
-      current
-        .filter((item) => item.clientId !== clientId)
-        .map((item, order) => ({ ...item, order })),
-    );
-    setEditingExamId("");
-  }
-
-  function saveEditedExam(entry: ExamEntry) {
-    const description = editingExamText.trim().replace(/\s+/g, " ");
-    if (description.length < 2) {
-      setErrors(["Informe o nome do exame antes de salvar."]);
-      return;
-    }
-    const duplicate = examEntries.some(
-      (item) =>
-        item.clientId !== entry.clientId &&
-        item.modality === entry.modality &&
-        item.description.toLocaleLowerCase("pt-BR") ===
-          description.toLocaleLowerCase("pt-BR"),
-    );
-    if (duplicate) {
-      setErrors(["Este exame já foi adicionado."]);
-      return;
-    }
-    setExamEntries((current) =>
-      current.map((item) =>
-        item.clientId === entry.clientId
-          ? {
-              ...item,
-              description,
-              examId: description === item.description ? item.examId : null,
-            }
-          : item,
-      ),
-    );
-    setEditingExamId("");
     setErrors([]);
   }
 
@@ -461,13 +372,7 @@ export function Scheduling({
     const next: string[] = [];
     if (target === 0) {
       if (!selectedModalities.length)
-        next.push("Escolha pelo menos uma modalidade.");
-      if (!examEntries.length) next.push("Adicione pelo menos um exame.");
-      for (const modality of selectedModalities)
-        if (!examEntries.some((exam) => exam.modality === modality))
-          next.push(
-            `Adicione um exame em ${getSchedulingModalityLabel(modality)}.`,
-          );
+        next.push("Escolha pelo menos um tipo de exame.");
     }
     if (target === 1) {
       if (patientName.trim().length < 2) next.push("Informe o nome completo.");
@@ -609,7 +514,8 @@ export function Scheduling({
       }).then((response) =>
         readJsonResponse<FinalizeSchedulingResponse>(response),
       );
-      window.sessionStorage.removeItem("inneuro-scheduling-exams-v3");
+      window.sessionStorage.removeItem(schedulingSessionKey);
+      window.sessionStorage.removeItem(legacySchedulingSessionKey);
       setSuccess({
         ...finalized,
         examCount: examEntries.length,
@@ -773,18 +679,18 @@ export function Scheduling({
                 Qual exame você precisa realizar?
               </h2>
               <p className="text-muted mt-2 text-sm">
-                Escolha o tipo de exame e informe os exames que aparecem no seu
-                pedido médico.
+                Selecione o tipo de exame que deseja realizar. Nossa equipe
+                identificará os detalhes pelo seu pedido médico.
               </p>
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                {schedulingModalities.map((item) => {
-                  const selected = selectedModalities.includes(item.id);
+                {publicSchedulingModalities.map((modality) => {
+                  const selected = selectedModalities.includes(modality);
                   return (
                     <button
-                      key={item.id}
+                      key={modality}
                       type="button"
                       aria-pressed={selected}
-                      onClick={() => toggleModality(item.id)}
+                      onClick={() => toggleModality(modality)}
                       className={`flex min-h-20 items-center gap-3 rounded-2xl border p-4 text-left font-bold ${selected ? "border-brand bg-mint text-brand-dark" : "border-border-light text-ink bg-white"}`}
                     >
                       <span
@@ -796,194 +702,11 @@ export function Scheduling({
                           <Plus aria-hidden="true" size={16} />
                         )}
                       </span>
-                      {item.label}
+                      {getSchedulingModalityLabel(modality)}
                     </button>
                   );
                 })}
               </div>
-
-              {selectedModalities.map((selectedModality) => {
-                const draft = examDrafts[selectedModality];
-                const term = draft.trim().toLocaleLowerCase("pt-BR");
-                const suggestions =
-                  term.length >= 2
-                    ? exams
-                        .filter(
-                          (exam) =>
-                            inferSchedulingModality(exam.modality) ===
-                              selectedModality &&
-                            exam.name.toLocaleLowerCase("pt-BR").includes(term),
-                        )
-                        .slice(0, 5)
-                    : [];
-                return (
-                  <section
-                    key={selectedModality}
-                    className="border-border-light mt-6 rounded-3xl border bg-white p-4 sm:p-5"
-                  >
-                    <h3 className="font-heading text-ink text-lg font-semibold">
-                      {getSchedulingModalityLabel(selectedModality)}
-                    </h3>
-                    <label className="text-ink mt-4 block text-sm font-semibold">
-                      Digite o nome do exame
-                      <input
-                        value={draft}
-                        onChange={(event) =>
-                          setExamDrafts((current) => ({
-                            ...current,
-                            [selectedModality]: event.target.value.slice(
-                              0,
-                              180,
-                            ),
-                          }))
-                        }
-                        placeholder={
-                          selectedModality === "MRI"
-                            ? "Ex.: Ressonância magnética de crânio"
-                            : "Digite como aparece no pedido médico"
-                        }
-                        className={inputClasses}
-                      />
-                    </label>
-                    <p className="text-muted mt-2 text-xs">
-                      Digite o exame como aparece no seu pedido médico. As
-                      sugestões são opcionais.
-                    </p>
-                    {suggestions.length ? (
-                      <div className="bg-surface mt-3 rounded-2xl p-3">
-                        <p className="text-muted text-xs font-bold">
-                          Sugestões do cadastro
-                        </p>
-                        <div className="mt-2 flex flex-col gap-2">
-                          {suggestions.map((suggestion) => (
-                            <button
-                              key={suggestion.id}
-                              type="button"
-                              onClick={() =>
-                                addExam(
-                                  selectedModality,
-                                  suggestion.name,
-                                  suggestion.id,
-                                )
-                              }
-                              className="text-brand min-h-10 rounded-xl bg-white px-3 text-left text-sm font-semibold"
-                            >
-                              + {suggestion.name}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null}
-                    {draft.trim() ? (
-                      <p className="text-muted mt-3 text-xs">
-                        Você também pode usar exatamente: “{draft.trim()}”.
-                      </p>
-                    ) : null}
-                    <button
-                      type="button"
-                      onClick={() => addExam(selectedModality, draft)}
-                      className="border-brand text-brand mt-4 inline-flex min-h-11 items-center gap-2 rounded-full border px-5 text-sm font-bold"
-                    >
-                      <Plus aria-hidden="true" size={17} /> Adicionar exame
-                    </button>
-                  </section>
-                );
-              })}
-
-              {examEntries.length ? (
-                <section className="mt-7">
-                  <h3 className="font-heading text-ink text-xl font-semibold">
-                    Seus exames
-                  </h3>
-                  <div className="mt-3 space-y-4">
-                    {schedulingModalities.map((modalityItem) => {
-                      const items = examEntries.filter(
-                        (exam) => exam.modality === modalityItem.id,
-                      );
-                      if (!items.length) return null;
-                      return (
-                        <div
-                          key={modalityItem.id}
-                          className="rounded-2xl bg-white p-4"
-                        >
-                          <p className="text-brand text-xs font-bold tracking-wide uppercase">
-                            {modalityItem.label}
-                          </p>
-                          <ul className="mt-2 space-y-2">
-                            {items.map((entry) => (
-                              <li
-                                key={entry.clientId}
-                                className="border-border-light rounded-xl border p-3"
-                              >
-                                {editingExamId === entry.clientId ? (
-                                  <div>
-                                    <input
-                                      value={editingExamText}
-                                      onChange={(event) =>
-                                        setEditingExamText(
-                                          event.target.value.slice(0, 180),
-                                        )
-                                      }
-                                      className={`${inputClasses} mt-0`}
-                                      aria-label={`Editar ${entry.description}`}
-                                    />
-                                    <div className="mt-2 flex gap-2">
-                                      <button
-                                        type="button"
-                                        onClick={() => saveEditedExam(entry)}
-                                        className="text-brand min-h-10 px-3 text-sm font-bold"
-                                      >
-                                        Salvar
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => setEditingExamId("")}
-                                        className="text-muted min-h-10 px-3 text-sm font-bold"
-                                      >
-                                        Cancelar
-                                      </button>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div className="flex items-start gap-3">
-                                    <Check
-                                      aria-hidden="true"
-                                      className="text-brand mt-0.5 shrink-0"
-                                      size={17}
-                                    />
-                                    <span className="text-ink min-w-0 flex-1 text-sm font-semibold">
-                                      {entry.description}
-                                    </span>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setEditingExamId(entry.clientId);
-                                        setEditingExamText(entry.description);
-                                      }}
-                                      aria-label={`Editar ${entry.description}`}
-                                      className="text-brand grid h-10 w-10 shrink-0 place-items-center rounded-full"
-                                    >
-                                      <Pencil aria-hidden="true" size={16} />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => removeExam(entry.clientId)}
-                                      aria-label={`Remover ${entry.description}`}
-                                      className="text-error grid h-10 w-10 shrink-0 place-items-center rounded-full"
-                                    >
-                                      <Trash2 aria-hidden="true" size={16} />
-                                    </button>
-                                  </div>
-                                )}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </section>
-              ) : null}
             </div>
 
             <div hidden={step !== 1}>
@@ -1403,23 +1126,21 @@ export function Scheduling({
                   <div className="mt-5 space-y-4 text-sm">
                     <section className="rounded-2xl bg-white p-4">
                       <h3 className="text-brand font-bold">EXAMES</h3>
-                      {schedulingModalities.map((modalityItem) => {
-                        const items = examEntries.filter(
-                          (exam) => exam.modality === modalityItem.id,
-                        );
-                        return items.length ? (
-                          <div key={modalityItem.id} className="mt-3">
-                            <p className="text-ink font-bold">
-                              {modalityItem.label}
-                            </p>
-                            <ul className="text-muted mt-1 list-disc pl-5">
-                              {items.map((item) => (
-                                <li key={item.clientId}>{item.description}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        ) : null;
-                      })}
+                      <ul className="text-ink mt-3 space-y-2 font-semibold">
+                        {selectedModalities.map((modality) => (
+                          <li
+                            key={modality}
+                            className="flex items-center gap-2"
+                          >
+                            <Check
+                              aria-hidden="true"
+                              className="text-brand shrink-0"
+                              size={17}
+                            />
+                            {getSchedulingModalityLabel(modality)}
+                          </li>
+                        ))}
+                      </ul>
                     </section>
                     <section className="rounded-2xl bg-white p-4">
                       <h3 className="text-brand font-bold">PACIENTE</h3>
