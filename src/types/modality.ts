@@ -4,7 +4,10 @@ export type ModalityIcon =
   | "x-ray"
   | "nuclear-medicine"
   | "scintigraphy"
-  | "brain-mapping";
+  | "brain-mapping"
+  | "functional-exam"
+  | "monitoring"
+  | "medical-care";
 
 export type Modality = {
   slug: string;

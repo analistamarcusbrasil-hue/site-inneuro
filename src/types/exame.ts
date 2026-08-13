@@ -9,5 +9,6 @@ export type Exame = {
   howPerformed?: string;
   generalGuidance?: string;
   documents?: string;
+  badge?: "Exclusivo";
   active: boolean;
 };

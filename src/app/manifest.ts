@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "INNEURO | Instituto de Neurologia do Amapá",
     short_name: "INNEURO",
     description:
-      "Diagnóstico por imagem, neurologia e medicina nuclear com tecnologia, precisão e cuidado.",
+      "Exames e serviços de diagnóstico com tecnologia, precisão e cuidado.",
     start_url: "/",
     display: "standalone",
     background_color: "#F7FAF8",

@@ -62,12 +62,8 @@ const periodLabels: Record<PreferredPeriod, string> = {
 };
 const schedulingSessionKey = "inneuro-scheduling-modalities-v4";
 const legacySchedulingSessionKey = "inneuro-scheduling-exams-v3";
-const publicSchedulingModalities: SchedulingModality[] = [
-  "MRI",
-  "CT",
-  "XRAY",
-  "BRAIN_MAPPING",
-];
+const publicSchedulingModalities: SchedulingModality[] =
+  schedulingModalities.map((modality) => modality.id);
 
 function isSchedulingModality(value: unknown): value is SchedulingModality {
   return schedulingModalities.some((modality) => modality.id === value);
@@ -614,9 +610,9 @@ export function Scheduling({
                 Realizamos exames todos os dias.
               </p>
               <p className="text-muted mt-1 text-sm">
-                Segunda a sábado: até 22h.
+                Segunda a sábado: 07h às 22h.
               </p>
-              <p className="text-muted text-sm">Domingo: até 19h.</p>
+              <p className="text-muted text-sm">Domingo: 07h às 19h.</p>
               <p className="text-muted mt-2 text-sm">
                 A data e o horário serão confirmados pela equipe da INNEURO pelo
                 WhatsApp.
@@ -1074,7 +1070,7 @@ export function Scheduling({
                         Realizamos exames todos os dias.
                       </p>
                       <p className="text-muted mt-1">
-                        Segunda a sábado: até 22h. Domingo: até 19h.
+                        Segunda a sábado: 07h às 22h. Domingo: 07h às 19h.
                       </p>
                     </div>
                     <label className="text-ink mt-6 block text-sm font-semibold">

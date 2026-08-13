@@ -2,51 +2,35 @@ import type { Modality } from "@/types/modality";
 
 export const modalities: Modality[] = [
   {
-    slug: "ressonancia-magnetica",
-    name: "Ressonância Magnética",
-    shortDescription:
-      "Modalidade de diagnóstico por imagem realizada conforme indicação e solicitação médica.",
-    icon: "magnetic-resonance",
-    active: true,
-  },
-  {
-    slug: "tomografia-computadorizada",
-    name: "Tomografia Computadorizada",
-    shortDescription:
-      "Exame de imagem realizado para diferentes regiões do corpo, conforme solicitação médica.",
+    slug: "diagnostico-por-imagem",
+    name: "Diagnóstico por imagem",
+    shortDescription: "Tomografia, ressonância magnética, Raio-X e mamografia.",
     icon: "computed-tomography",
     active: true,
+    featured: true,
   },
   {
-    slug: "raios-x",
-    name: "Raios X",
-    shortDescription:
-      "Exames radiográficos para diferentes regiões, realizados de acordo com a solicitação médica.",
-    icon: "x-ray",
+    slug: "neurofisiologia-exames-funcionais",
+    name: "Neurofisiologia / exames funcionais",
+    shortDescription: "Eletroneuromiografia e eletroencefalograma.",
+    icon: "functional-exam",
     active: true,
+    featured: true,
   },
   {
-    slug: "medicina-nuclear",
-    name: "Medicina Nuclear",
-    shortDescription:
-      "Área dedicada a procedimentos de medicina nuclear indicados pelo médico responsável.",
-    icon: "nuclear-medicine",
+    slug: "outros",
+    name: "Outros",
+    shortDescription: "MAPA.",
+    icon: "monitoring",
     active: true,
+    featured: true,
   },
   {
-    slug: "cintilografia",
-    name: "Cintilografia",
-    shortDescription:
-      "Exames realizados conforme indicação médica e orientações específicas para cada procedimento.",
-    icon: "scintigraphy",
+    slug: "atendimento-medico",
+    name: "Atendimento médico",
+    shortDescription: "Consultas.",
+    icon: "medical-care",
     active: true,
-  },
-  {
-    slug: "mapeamento-cerebral",
-    name: "Mapeamento Cerebral",
-    shortDescription:
-      "Exame para registro da atividade elétrica cerebral, realizado conforme solicitação médica.",
-    icon: "brain-mapping",
-    active: true,
+    featured: true,
   },
 ];

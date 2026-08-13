@@ -1,12 +1,15 @@
 import {
+  Activity,
   ArrowRight,
   Atom,
   BrainCircuit,
   CalendarPlus,
+  HeartPulse,
   Magnet,
   Orbit,
   Radiation,
   ScanLine,
+  Stethoscope,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -19,6 +22,9 @@ const icons: Record<ModalityIcon, LucideIcon> = {
   "nuclear-medicine": Atom,
   scintigraphy: Orbit,
   "brain-mapping": BrainCircuit,
+  "functional-exam": Activity,
+  monitoring: HeartPulse,
+  "medical-care": Stethoscope,
 };
 
 type ModalityCardProps = {

@@ -2,13 +2,16 @@ import { Container } from "@/components/layout/container";
 import { Section } from "@/components/layout/section";
 import { SectionHeader } from "@/components/sections/section-header";
 import { ModalityCard } from "@/components/ui/modality-card";
+import Link from "next/link";
 import type { Modality } from "@/types/modality";
 
 export function Modalities({
   compactTop = false,
+  showAllLink = false,
   items,
 }: {
   compactTop?: boolean;
+  showAllLink?: boolean;
   items: Modality[];
 }) {
   const featuredSlugs = new Set([
@@ -34,15 +37,25 @@ export function Modalities({
     >
       <Container>
         <SectionHeader
-          eyebrow="Modalidades"
-          title="Principais exames"
-          description="Acesse informações objetivas sobre modalidades disponíveis na INNEURO."
+          eyebrow="Exames e serviços"
+          title="Estrutura ampla de diagnóstico"
+          description="Consulte as categorias de exames e serviços realizados pela INNEURO."
         />
         <div className="mt-10 grid items-stretch gap-5 md:grid-cols-2 xl:grid-cols-4">
           {activeModalities.map((modality) => (
             <ModalityCard key={modality.slug} modality={modality} />
           ))}
         </div>
+        {showAllLink ? (
+          <div className="mt-8 text-center">
+            <Link
+              href="/exames"
+              className="border-brand/25 text-brand-dark hover:bg-mint focus-visible:ring-tech inline-flex min-h-12 items-center justify-center rounded-full border bg-white px-6 text-sm font-bold focus-visible:ring-2 focus-visible:outline-none"
+            >
+              Ver todos os exames
+            </Link>
+          </div>
+        ) : null}
       </Container>
     </Section>
   );

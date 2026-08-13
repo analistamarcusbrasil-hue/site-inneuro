@@ -27,7 +27,7 @@ export const metadata: Metadata = {
     template: "%s",
   },
   description:
-    "Diagnóstico por imagem, neurologia e medicina nuclear com tecnologia, precisão e cuidado.",
+    "Exames e serviços de diagnóstico com tecnologia, precisão e cuidado.",
   applicationName: "INNEURO",
   manifest: "/manifest.webmanifest",
   robots: {
@@ -40,7 +40,7 @@ export const metadata: Metadata = {
     siteName: "INNEURO",
     title: "INNEURO | Diagnóstico por Imagem em Macapá",
     description:
-      "Diagnóstico por imagem, neurologia e medicina nuclear com tecnologia, precisão e cuidado.",
+      "Exames e serviços de diagnóstico com tecnologia, precisão e cuidado.",
     images: [
       {
         url: "/opengraph-image.png",
@@ -54,7 +54,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "INNEURO | Diagnóstico por Imagem em Macapá",
     description:
-      "Diagnóstico por imagem, neurologia e medicina nuclear com tecnologia, precisão e cuidado.",
+      "Exames e serviços de diagnóstico com tecnologia, precisão e cuidado.",
     images: ["/twitter-image.png"],
   },
 };
@@ -111,12 +111,16 @@ export default async function RootLayout({
                 contactType: "customer service",
               })),
               knowsAbout: [
+                "Consultas",
                 "Ressonância Magnética",
-                "Tomografia Computadorizada",
-                "Raios X",
-                "Medicina Nuclear",
-                "Cintilografia",
-                "Mapeamento Cerebral",
+                "Tomografia",
+                "Eletroneuromiografia",
+                "Eletroencefalograma",
+                "MAPA",
+                "Raio-X",
+                "Mamografia",
+                "Ressonância Magnética Multiparamétrica da Próstata",
+                "Ressonância do Coração",
               ],
             }).replace(/</g, "\\u003c"),
           }}

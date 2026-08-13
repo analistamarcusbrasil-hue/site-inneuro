@@ -38,7 +38,7 @@ export default async function Home() {
         <CompanyHighlightsSection items={highlights} />
       ) : null}
       <QuickActions />
-      <Modalities items={examContent.modalities} />
+      <Modalities items={examContent.modalities} showAllLink />
       <Insurance
         partners={partners}
         whatsappNumber={institutional.config.whatsapp.primary.number}

@@ -29,8 +29,8 @@ export const defaultSchedulingSettings: SchedulingSettings = {
   days: schedulingDayOptions.map(([value]) => value),
   periods: schedulingPeriodOptions.map(([value]) => value),
   publicText:
-    "A INNEURO realiza atendimentos, agendamentos e exames todos os dias. Segunda a sábado: até 22h. Domingo: até 19h.",
-  shortText: "Todos os dias • Seg. a sáb. até 22h • Domingo até 19h",
+    "A INNEURO realiza atendimentos, agendamentos e exames todos os dias. Segunda a sábado, das 07h às 22h. Domingo, das 07h às 19h.",
+  shortText: "Todos os dias • Seg. a sáb., 07h às 22h • Domingo, 07h às 19h",
   note: "Esta é uma solicitação de agendamento. Nossa equipe confirmará a data e o horário do exame.",
   susAuthorizationRequired: false,
 };
@@ -40,12 +40,12 @@ export function createGeneralExamSchedules(): ServiceSchedule[] {
     {
       label: "Atendimentos, agendamentos e exames",
       days: "Segunda a sábado",
-      periods: [{ start: "Até 22h", end: "" }],
+      periods: [{ start: "07h", end: "22h" }],
     },
     {
       label: "Atendimentos, agendamentos e exames",
       days: "Domingo",
-      periods: [{ start: "Até 19h", end: "" }],
+      periods: [{ start: "07h", end: "19h" }],
     },
   ];
 }
@@ -65,17 +65,21 @@ export function parseSchedulingSettings(value: unknown): SchedulingSettings {
         .map(String)
         .filter((period) => allowedPeriods.has(period as never))
     : [];
+  const savedPublicText =
+    typeof source.public_text === "string" ? source.public_text.trim() : "";
+  const savedShortText =
+    typeof source.short_text === "string" ? source.short_text.trim() : "";
+  const hasCurrentHours = (text: string) =>
+    text.includes("07h") && text.includes("22h") && text.includes("19h");
   return {
     days: days.length ? days : defaultSchedulingSettings.days,
     periods: periods.length ? periods : defaultSchedulingSettings.periods,
-    publicText:
-      typeof source.public_text === "string" && source.public_text.trim()
-        ? source.public_text.trim().slice(0, 300)
-        : defaultSchedulingSettings.publicText,
-    shortText:
-      typeof source.short_text === "string" && source.short_text.trim()
-        ? source.short_text.trim().slice(0, 160)
-        : defaultSchedulingSettings.shortText,
+    publicText: hasCurrentHours(savedPublicText)
+      ? savedPublicText.slice(0, 300)
+      : defaultSchedulingSettings.publicText,
+    shortText: hasCurrentHours(savedShortText)
+      ? savedShortText.slice(0, 160)
+      : defaultSchedulingSettings.shortText,
     note:
       typeof source.note === "string" && source.note.trim()
         ? source.note.trim().slice(0, 240)

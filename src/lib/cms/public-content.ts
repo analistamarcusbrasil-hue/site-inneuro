@@ -10,7 +10,7 @@ import { createSupabasePublicClient } from "@/lib/supabase/server";
 import type { CompanyHighlight } from "@/types/company-highlight";
 import type { Convenio } from "@/types/convenio";
 import type { Exame } from "@/types/exame";
-import type { Modality, ModalityIcon } from "@/types/modality";
+import type { Modality } from "@/types/modality";
 import type { ClinicalService } from "@/types/clinical-service";
 import {
   createGeneralExamSchedules,
@@ -334,40 +334,32 @@ export async function getPublicExams(): Promise<{
     )
     .order("sort_order");
   if (error) return { exams: exames, modalities };
-  if (!data?.length) {
-    return (await hasCompleteCms(supabase))
-      ? { exams: [], modalities: [] }
-      : { exams: exames, modalities };
-  }
-  const publicExams: Exame[] = data.map((item) => ({
-    slug: item.slug,
-    name: item.name,
-    modality: item.modality,
-    modalitySlug: item.modality_slug,
-    shortDescription: item.short_description,
-    preparationSlug: item.preparation_slug ?? undefined,
-    purpose: item.purpose ?? undefined,
-    howPerformed: item.how_performed ?? undefined,
-    generalGuidance: item.general_guidance ?? undefined,
-    documents: item.documents ?? undefined,
-    active: true,
-  }));
-  const publicModalities: Modality[] = data.map((item) => ({
-    slug: item.modality_slug,
-    name: item.modality,
-    shortDescription: item.short_description,
-    icon: item.icon as ModalityIcon,
-    active: true,
-    featured: item.featured,
-  }));
-  return { exams: publicExams, modalities: publicModalities };
+  const publicExams = exames.map((exam) => {
+    const saved = data?.find((item) => item.slug === exam.slug);
+    if (!saved) return exam;
+    return {
+      ...exam,
+      shortDescription:
+        saved.short_description?.trim() || exam.shortDescription,
+      preparationSlug:
+        saved.preparation_slug ?? exam.preparationSlug ?? undefined,
+      purpose: saved.purpose ?? undefined,
+      howPerformed: saved.how_performed ?? undefined,
+      generalGuidance: saved.general_guidance ?? undefined,
+      documents: saved.documents ?? undefined,
+    } satisfies Exame;
+  });
+  return { exams: publicExams, modalities };
 }
 
 export async function getPublicExamBySlug(slug: string) {
   const content = await getPublicExams();
+  const exam = content.exams.find((item) => item.slug === slug) ?? null;
   return {
-    exam: content.exams.find((item) => item.slug === slug) ?? null,
-    modality: content.modalities.find((item) => item.slug === slug) ?? null,
+    exam,
+    modality:
+      content.modalities.find((item) => item.slug === exam?.modalitySlug) ??
+      null,
   };
 }
 
@@ -451,13 +443,19 @@ function settingText(
   return typeof value[key] === "string" ? String(value[key]) : fallback;
 }
 
+function publicServiceText(value: string, fallback: string) {
+  return /medicina nuclear|cintilografia|mapeamento cerebral/i.test(value)
+    ? fallback
+    : value;
+}
+
 export async function getPublicInstitutionalContent(): Promise<PublicInstitutionalContent> {
   const fallback = {
     config: siteConfig,
     about: {
       title: "Tecnologia, precisão e cuidado.",
       description:
-        "O Instituto de Neurologia do Amapá reúne diagnóstico por imagem, neurologia e medicina nuclear em Macapá.",
+        "O Instituto de Neurologia do Amapá reúne exames e serviços de diagnóstico em Macapá.",
       purpose:
         "Facilitar o acesso a informações sobre exames, preparos, convênios e canais oficiais da INNEURO.",
       technology:
@@ -504,7 +502,10 @@ export async function getPublicInstitutionalContent(): Promise<PublicInstitution
   const config: SiteConfig = {
     ...siteConfig,
     fullName: settingText(value, "full_name", siteConfig.fullName),
-    description: settingText(value, "description", siteConfig.description),
+    description: publicServiceText(
+      settingText(value, "description", siteConfig.description),
+      siteConfig.description,
+    ),
     phone: settingText(value, "phone", siteConfig.phone),
     email: settingText(value, "email", siteConfig.email),
     openingHours: settingText(value, "opening_hours", siteConfig.openingHours),
@@ -561,9 +562,8 @@ export async function getPublicInstitutionalContent(): Promise<PublicInstitution
     config,
     about: {
       title: settingText(value, "about_title", fallback.about.title),
-      description: settingText(
-        value,
-        "about_description",
+      description: publicServiceText(
+        settingText(value, "about_description", fallback.about.description),
         fallback.about.description,
       ),
       purpose: settingText(value, "about_purpose", fallback.about.purpose),

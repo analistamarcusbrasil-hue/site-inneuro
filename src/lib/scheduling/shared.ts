@@ -28,10 +28,14 @@ export const documentLabels: Record<DocumentKind, string> = {
 };
 
 export const schedulingModalities = [
+  { id: "CONSULTATION", label: "Consultas" },
   { id: "CT", label: "Tomografia" },
   { id: "MRI", label: "Ressonância Magnética" },
-  { id: "BRAIN_MAPPING", label: "Mapeamento Cerebral" },
+  { id: "ENMG", label: "Eletroneuromiografia" },
+  { id: "EEG", label: "Eletroencefalograma" },
+  { id: "MAPA", label: "MAPA" },
   { id: "XRAY", label: "Raio-X" },
+  { id: "MAMMOGRAPHY", label: "Mamografia" },
 ] as const;
 export type SchedulingModality = (typeof schedulingModalities)[number]["id"];
 
@@ -53,11 +57,15 @@ export function inferSchedulingModality(
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLocaleLowerCase("pt-BR");
+  if (normalized.includes("consulta")) return "CONSULTATION";
   if (normalized.includes("tomografia")) return "CT";
   if (normalized.includes("ressonancia")) return "MRI";
-  if (normalized.includes("mapeamento")) return "BRAIN_MAPPING";
+  if (normalized.includes("eletroneuromiografia")) return "ENMG";
+  if (normalized.includes("eletroencefalograma")) return "EEG";
+  if (/\bmapa\b/.test(normalized)) return "MAPA";
   if (normalized.includes("raio") || normalized.includes("raios"))
     return "XRAY";
+  if (normalized.includes("mamografia")) return "MAMMOGRAPHY";
   return null;
 }
 

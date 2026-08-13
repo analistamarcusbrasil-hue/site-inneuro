@@ -11,9 +11,9 @@ import {
 } from "@/lib/cms/public-content";
 
 export const metadata = createPageMetadata({
-  title: "Exames de imagem em Macapá | INNEURO",
+  title: "Exames e Serviços | INNEURO",
   description:
-    "Consulte modalidades de exames e informações disponíveis na INNEURO em Macapá, Amapá.",
+    "Conheça os exames e serviços realizados pela INNEURO em Macapá, incluindo ressonância magnética, tomografia, Raio-X, mamografia e exames de neurofisiologia.",
   path: "/exames",
 });
 
@@ -26,8 +26,8 @@ export default async function ExamsPage() {
     <main id="main-content" tabIndex={-1}>
       <InternalHero
         eyebrow="Exames"
-        title="Encontre a modalidade que você procura."
-        description="Pesquise e filtre as modalidades de exames confirmadas da INNEURO."
+        title="Exames e serviços da INNEURO."
+        description="Consulte os exames e serviços atualmente realizados pela clínica."
       />
       <Modalities compactTop items={content.modalities} />
       <section className="bg-surface py-14 sm:py-18 lg:py-24">
@@ -39,7 +39,7 @@ export default async function ExamsPage() {
             <div>
               <p className="eyebrow mb-2">Catálogo completo</p>
               <h2 className="font-heading text-ink text-3xl font-semibold sm:text-4xl">
-                Todos os exames
+                Todos os exames e serviços
               </h2>
             </div>
             <Link

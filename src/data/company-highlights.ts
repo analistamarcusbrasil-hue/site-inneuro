@@ -32,7 +32,7 @@ export const companyHighlights: CompanyHighlight[] = [
   },
   {
     id: "tomografia-computadorizada",
-    title: "Tomografia Computadorizada",
+    title: "Tomografia",
     description:
       "Tecnologia e agilidade com atendimento cuidadoso em cada etapa.",
     category: "Exames",
@@ -48,12 +48,12 @@ export const companyHighlights: CompanyHighlight[] = [
   },
   {
     id: "raios-x",
-    title: "Raios X",
+    title: "Raio-X",
     description:
       "Atendimento prático para diferentes necessidades de diagnóstico por imagem.",
     category: "Exames",
     image: "/images/carrossel/raios-x.webp",
-    imageAlt: "Imagem ilustrativa de sala e equipamento de Raios X",
+    imageAlt: "Imagem ilustrativa de sala e equipamento de Raio-X",
     focalPosition: "center",
     href: "/exames/raios-x",
     ctaLabel: "Saiba mais",

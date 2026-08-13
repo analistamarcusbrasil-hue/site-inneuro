@@ -45,7 +45,7 @@ export const siteConfig: SiteConfig = {
   name: "INNEURO",
   fullName: "Instituto de Neurologia do Amapá",
   description:
-    "Diagnóstico por imagem, neurologia e medicina nuclear com tecnologia, precisão e cuidado.",
+    "Exames e serviços de diagnóstico com tecnologia, precisão e cuidado.",
   url:
     process.env.NEXT_PUBLIC_SITE_URL || "https://site-inneuro-91b3.vercel.app",
   patientPortalUrl,
