@@ -3,7 +3,7 @@ import {
   BrainCircuit,
   CalendarPlus,
   MapPin,
-  ScanLine,
+  UsersRound,
 } from "lucide-react";
 import Link from "next/link";
 import { InternalHero } from "@/components/layout/internal-hero";
@@ -42,13 +42,29 @@ export default async function AboutPage() {
             {scheduling.publicText}
           </p>
           <div className="grid gap-5 lg:grid-cols-3">
-            <article className="border-border-light rounded-3xl border bg-white p-7">
-              <ScanLine aria-hidden="true" className="text-brand" />
+            <Link
+              href="/equipe-medica"
+              className="border-border-light hover:border-brand/35 group focus-visible:ring-tech cursor-pointer rounded-3xl border bg-white p-7 transition-[border-color,box-shadow,transform] duration-300 hover:-translate-y-1 hover:shadow-[0_18px_45px_rgba(3,37,27,0.09)] focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+              aria-label="Conheça a equipe técnica da INNEURO"
+            >
+              <UsersRound aria-hidden="true" className="text-brand" />
               <h2 className="font-heading text-ink mt-5 text-2xl font-semibold">
-                Propósito
+                Equipe Técnica
               </h2>
-              <p className="text-muted mt-3 leading-relaxed">{about.purpose}</p>
-            </article>
+              <p className="text-muted mt-3 leading-relaxed">
+                Uma equipe médica especializada em diagnóstico por imagem,
+                unindo experiência, precisão e tecnologia para oferecer
+                segurança em cada diagnóstico.
+              </p>
+              <span className="text-brand mt-5 inline-flex min-h-11 items-center gap-2 text-sm font-bold">
+                Conheça nossa equipe
+                <ArrowRight
+                  aria-hidden="true"
+                  size={17}
+                  className="transition-transform duration-300 group-hover:translate-x-1"
+                />
+              </span>
+            </Link>
             <article className="border-border-light rounded-3xl border bg-white p-7">
               <BrainCircuit aria-hidden="true" className="text-brand" />
               <h2 className="font-heading text-ink mt-5 text-2xl font-semibold">
