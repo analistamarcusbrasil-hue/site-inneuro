@@ -4,10 +4,10 @@ import { Container } from "@/components/layout/container";
 import { InternalHero } from "@/components/layout/internal-hero";
 import {
   getPublicInstitutionalContent,
-  getPublicPartners,
   getPublicSchedulingSettings,
 } from "@/lib/cms/public-content";
 import { PartnerLogoCard } from "@/components/partners/partner-logo-card";
+import { convenios } from "@/data/convenios";
 import { createPageMetadata } from "@/lib/metadata";
 import { createWhatsAppUrl } from "@/lib/whatsapp";
 
@@ -22,8 +22,7 @@ export const metadata = createPageMetadata({
 });
 
 export default async function InsurancePage() {
-  const [convenios, institutional, scheduling] = await Promise.all([
-    getPublicPartners(),
+  const [institutional, scheduling] = await Promise.all([
     getPublicInstitutionalContent(),
     getPublicSchedulingSettings(),
   ]);
@@ -44,11 +43,15 @@ export default async function InsurancePage() {
             A INNEURO também recebe solicitações pelo SUS em um fluxo próprio de
             atendimento. {scheduling.publicText}
           </p>
-          <ul className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
+          <ul className="grid grid-cols-1 gap-4 min-[380px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
             {convenios
               .filter((item) => item.active)
               .map((item) => (
-                <PartnerLogoCard key={item.id} partner={item} />
+                <PartnerLogoCard
+                  key={item.id}
+                  partner={item}
+                  variant="detailed"
+                />
               ))}
           </ul>
           <div className="border-warning/25 mt-8 rounded-3xl border bg-white p-6 text-sm leading-relaxed">
