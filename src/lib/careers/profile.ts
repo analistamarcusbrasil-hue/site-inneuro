@@ -9,6 +9,7 @@ export type CandidateProfessionalProfile = {
   professional_objective: string | null;
   about: string | null;
   availability: string | null;
+  field_sources?: Record<string, "manual" | "resume">;
   created_at: string;
   updated_at: string;
 };
@@ -23,6 +24,9 @@ export type CandidateExperience = {
   is_current: boolean;
   activities: string;
   sort_order: number;
+  data_source?: "manual" | "resume";
+  source_extraction_id?: string | null;
+  source_item_index?: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -37,6 +41,9 @@ export type CandidateEducation = {
   end_date: string | null;
   in_progress: boolean;
   sort_order: number;
+  data_source?: "manual" | "resume";
+  source_extraction_id?: string | null;
+  source_item_index?: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -49,6 +56,9 @@ export type CandidateCertification = {
   completion_year: number;
   expires_at: string | null;
   sort_order: number;
+  data_source?: "manual" | "resume";
+  source_extraction_id?: string | null;
+  source_item_index?: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -58,6 +68,9 @@ export type CandidateSkill = {
   candidate_id: string;
   name: string;
   sort_order: number;
+  data_source?: "manual" | "resume";
+  source_extraction_id?: string | null;
+  source_item_index?: number | null;
   created_at: string;
 };
 

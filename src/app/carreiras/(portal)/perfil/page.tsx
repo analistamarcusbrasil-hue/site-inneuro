@@ -31,6 +31,7 @@ import {
   type CandidateResume,
   type CandidateSkill,
 } from "@/lib/careers/profile";
+import { resumeExtractionRecordSchema } from "@/lib/careers/resume-extraction";
 
 export const metadata: Metadata = {
   title: "Perfil profissional | Carreiras INNEURO",
@@ -49,6 +50,10 @@ const statusMessages: Record<string, string> = {
   "skill-saved": "Habilidade adicionada.",
   "skill-deleted": "Habilidade excluída.",
   "resume-saved": "Currículo PDF enviado com segurança.",
+  "resume-analysis-applied":
+    "Informações selecionadas do currículo adicionadas ao perfil.",
+  "resume-analysis-ignored":
+    "As sugestões do currículo foram ignoradas. Seu perfil não foi alterado.",
   "resume-deleted": "Versão do currículo excluída.",
   "order-saved": "Ordem atualizada.",
   "order-unchanged": "O item já está nessa posição.",
@@ -76,6 +81,10 @@ const errorMessages: Record<string, string> = {
   "resume-type": "Envie somente um arquivo PDF válido.",
   "resume-upload": "Não foi possível enviar o currículo.",
   "resume-save": "O arquivo foi enviado, mas não pôde ser registrado.",
+  "resume-analysis":
+    "O currículo foi enviado, mas a análise não pôde ser registrada. Você pode completar o perfil manualmente.",
+  "resume-analysis-failed":
+    "Não conseguimos identificar todas as informações do currículo. Você pode completar seu perfil manualmente.",
   "resume-delete": "Não foi possível excluir esta versão do currículo.",
   reorder: "Não foi possível alterar a ordem.",
 };
@@ -116,6 +125,7 @@ export default async function CandidateProfilePage({
     certificationsResult,
     skillsResult,
     resumesResult,
+    extractionsResult,
   ] = await Promise.all([
     supabase
       .from("candidate_profiles")
@@ -151,6 +161,12 @@ export default async function CandidateProfilePage({
       .select("*")
       .eq("candidate_id", user.id)
       .order("version", { ascending: false }),
+    supabase
+      .from("candidate_resume_extractions")
+      .select("*")
+      .eq("candidate_id", user.id)
+      .in("status", ["ready", "partial"])
+      .order("created_at", { ascending: false }),
   ]);
 
   const profile =
@@ -162,6 +178,10 @@ export default async function CandidateProfilePage({
     (certificationsResult.data as CandidateCertification[] | null) ?? [];
   const skills = (skillsResult.data as CandidateSkill[] | null) ?? [];
   const resumes = (resumesResult.data as CandidateResume[] | null) ?? [];
+  const pendingExtractions = (extractionsResult.data ?? []).flatMap((item) => {
+    const parsed = resumeExtractionRecordSchema.safeParse(item);
+    return parsed.success ? [parsed.data] : [];
+  });
   const resumeLinks = await Promise.all(
     resumes.map(async (resume) => {
       const { data } = await supabase.storage
@@ -562,8 +582,30 @@ export default async function CandidateProfilePage({
 
           <ProfileSection
             title="Currículo"
-            description="Envie somente PDF, com até 10 MB. O arquivo fica em armazenamento privado e cada envio cria uma nova versão."
+            description="Envie somente PDF com texto selecionável, com até 10 MB. O arquivo fica privado; antes de atualizar seu perfil, você revisará tudo o que for identificado."
           >
+            {pendingExtractions.length ? (
+              <div className="bg-mint text-brand-dark mb-5 rounded-2xl p-5">
+                <p className="font-bold">
+                  Você tem {pendingExtractions.length} análise(s) para revisar.
+                </p>
+                <ul className="mt-3 grid gap-2">
+                  {pendingExtractions.map((extraction) => (
+                    <li key={extraction.id}>
+                      <a
+                        className="text-brand text-sm font-bold hover:underline"
+                        href={`/carreiras/perfil/revisar-curriculo/${extraction.id}`}
+                      >
+                        Revisar informações identificadas em{" "}
+                        {new Date(extraction.created_at).toLocaleString(
+                          "pt-BR",
+                        )}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
             <form
               action={uploadCandidateResumeAction}
               className="border-brand/20 bg-mint/30 rounded-2xl border p-5"

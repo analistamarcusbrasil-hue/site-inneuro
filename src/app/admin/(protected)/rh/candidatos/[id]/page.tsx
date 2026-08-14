@@ -41,6 +41,16 @@ function DetailSection({
   );
 }
 
+function OriginBadge({ source }: { source?: "manual" | "resume" | null }) {
+  return (
+    <span className="bg-surface text-muted mt-2 inline-flex rounded-full px-2.5 py-1 text-[0.65rem] font-bold tracking-wide uppercase">
+      {source === "resume"
+        ? "Origem: extraído do currículo"
+        : "Origem: informado manualmente"}
+    </span>
+  );
+}
+
 export default async function HrCandidateDetailPage({
   params,
 }: {
@@ -150,30 +160,38 @@ export default async function HrCandidateDetailPage({
 
       <div className="grid gap-5 xl:grid-cols-2">
         <DetailSection title="Dados pessoais e objetivo">
+          <p className="text-muted mb-5 text-xs">
+            Dados confirmados pelo candidato antes de serem incorporados ao
+            perfil.
+          </p>
           <dl className="grid gap-4 text-sm sm:grid-cols-2">
             <div>
               <dt className="text-muted">E-mail</dt>
               <dd className="text-ink mt-1 font-bold break-all">
                 {email ?? "Não disponível"}
               </dd>
+              <OriginBadge source={profile?.field_sources?.email} />
             </div>
             <div>
               <dt className="text-muted">WhatsApp</dt>
               <dd className="text-ink mt-1 font-bold">
                 {profile?.whatsapp ?? "Não informado"}
               </dd>
+              <OriginBadge source={profile?.field_sources?.whatsapp} />
             </div>
             <div>
               <dt className="text-muted">Cidade</dt>
               <dd className="text-ink mt-1 font-bold">
                 {profile?.city ?? "Não informada"}
               </dd>
+              <OriginBadge source={profile?.field_sources?.city} />
             </div>
             <div>
               <dt className="text-muted">UF</dt>
               <dd className="text-ink mt-1 font-bold">
                 {profile?.state ?? "Não informada"}
               </dd>
+              <OriginBadge source={profile?.field_sources?.state} />
             </div>
           </dl>
           <div className="border-border-light mt-5 border-t pt-5">
@@ -183,6 +201,9 @@ export default async function HrCandidateDetailPage({
             <p className="text-ink mt-2 text-sm leading-relaxed whitespace-pre-line">
               {profile?.professional_objective ?? "Não informado"}
             </p>
+            <OriginBadge
+              source={profile?.field_sources?.professional_objective}
+            />
           </div>
           <div className="border-border-light mt-5 border-t pt-5">
             <h3 className="text-muted text-xs font-bold tracking-wide uppercase">
@@ -191,6 +212,7 @@ export default async function HrCandidateDetailPage({
             <p className="text-ink mt-2 text-sm leading-relaxed whitespace-pre-line">
               {profile?.about ?? "Não informado"}
             </p>
+            <OriginBadge source={profile?.field_sources?.about} />
           </div>
           <div className="border-border-light mt-5 border-t pt-5">
             <h3 className="text-muted text-xs font-bold tracking-wide uppercase">
@@ -211,6 +233,9 @@ export default async function HrCandidateDetailPage({
                   className="bg-mint text-brand-dark rounded-full px-4 py-2 text-sm font-bold"
                 >
                   {skill.name}
+                  <span className="text-brand/70 text-[0.65rem] font-semibold">
+                    {skill.data_source === "resume" ? "currículo" : "manual"}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -242,6 +267,7 @@ export default async function HrCandidateDetailPage({
                   <p className="text-ink mt-3 text-sm leading-relaxed whitespace-pre-line">
                     {item.activities}
                   </p>
+                  <OriginBadge source={item.data_source} />
                 </li>
               ))}
             </ol>
@@ -268,6 +294,7 @@ export default async function HrCandidateDetailPage({
                       ? "em andamento"
                       : formatCandidateMonth(item.end_date)}
                   </p>
+                  <OriginBadge source={item.data_source} />
                 </li>
               ))}
             </ol>
@@ -296,6 +323,7 @@ export default async function HrCandidateDetailPage({
                       ).toLocaleDateString("pt-BR")}
                     </p>
                   ) : null}
+                  <OriginBadge source={item.data_source} />
                 </li>
               ))}
             </ol>

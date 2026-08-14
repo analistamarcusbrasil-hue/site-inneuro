@@ -18,6 +18,12 @@ import {
   candidatePersonalProfileSchema,
   candidateSkillSchema,
 } from "@/lib/careers/profile-validation";
+import {
+  parseResumeText,
+  RESUME_PARSER_VERSION,
+  type ResumeExtraction,
+} from "@/lib/careers/resume-extraction";
+import { extractCandidateResumePdf } from "@/lib/careers/resume-pdf";
 
 const profilePath = "/carreiras/perfil";
 
@@ -88,6 +94,16 @@ export async function saveCandidateProfileAction(formData: FormData) {
         professional_objective: parsed.data.professionalObjective,
         about: parsed.data.about,
         availability: parsed.data.availability,
+        field_sources: {
+          full_name: "manual",
+          email: "manual",
+          whatsapp: "manual",
+          city: "manual",
+          state: "manual",
+          professional_objective: "manual",
+          about: "manual",
+          availability: "manual",
+        },
       },
       { onConflict: "candidate_id" },
     ),
@@ -117,6 +133,9 @@ export async function saveCandidateExperienceAction(formData: FormData) {
     end_date: parsed.data.isCurrent ? null : monthToDate(parsed.data.endMonth),
     is_current: parsed.data.isCurrent,
     activities: parsed.data.activities,
+    data_source: "manual",
+    source_extraction_id: null,
+    source_item_index: null,
   };
 
   if (parsed.data.id) {
@@ -181,6 +200,9 @@ export async function saveCandidateEducationAction(formData: FormData) {
     start_date: monthToDate(parsed.data.startMonth),
     end_date: parsed.data.inProgress ? null : monthToDate(parsed.data.endMonth),
     in_progress: parsed.data.inProgress,
+    data_source: "manual",
+    source_extraction_id: null,
+    source_item_index: null,
   };
 
   if (parsed.data.id) {
@@ -285,6 +307,9 @@ export async function saveCandidateCertificationAction(formData: FormData) {
     institution: parsed.data.institution,
     completion_year: parsed.data.completionYear,
     expires_at: parsed.data.expiresAt,
+    data_source: "manual",
+    source_extraction_id: null,
+    source_item_index: null,
   };
 
   if (parsed.data.id) {
@@ -339,6 +364,7 @@ export async function addCandidateSkillAction(formData: FormData) {
     candidate_id: user.id,
     name: parsed.data.name,
     sort_order: count ?? 0,
+    data_source: "manual",
   });
   if (error) fail(error.code === "23505" ? "skill-duplicate" : "skill-save");
   finish("skill-saved");
@@ -370,7 +396,8 @@ export async function uploadCandidateResumeAction(formData: FormData) {
   ) {
     fail("resume-type");
   }
-  const signature = new Uint8Array(await file.slice(0, 5).arrayBuffer());
+  const fileBytes = new Uint8Array(await file.arrayBuffer());
+  const signature = fileBytes.slice(0, 5);
   if (!hasPdfMagicNumber(signature)) fail("resume-type");
 
   const { data: latest } = await supabase
@@ -396,7 +423,7 @@ export async function uploadCandidateResumeAction(formData: FormData) {
       .replace(/[\u0000-\u001f\u007f]/g, "")
       .trim()
       .slice(0, 255) || "curriculo.pdf";
-  const { error: metadataError } = await supabase
+  const { data: resume, error: metadataError } = await supabase
     .from("candidate_resumes")
     .insert({
       candidate_id: user.id,
@@ -405,12 +432,54 @@ export async function uploadCandidateResumeAction(formData: FormData) {
       size_bytes: file.size,
       mime_type: "application/pdf",
       version,
-    });
-  if (metadataError) {
+    })
+    .select("id")
+    .single();
+  if (metadataError || !resume) {
     await supabase.storage.from(CANDIDATE_RESUME_BUCKET).remove([storagePath]);
     fail("resume-save");
   }
-  finish("resume-saved");
+
+  let extraction: {
+    data: ResumeExtraction;
+    textHash: string | null;
+    totalPages: number | null;
+    warnings: string[];
+    status: "ready" | "partial" | "failed";
+  };
+  try {
+    extraction = await extractCandidateResumePdf(fileBytes);
+  } catch {
+    extraction = {
+      data: parseResumeText(""),
+      textHash: null,
+      totalPages: null,
+      warnings: [
+        "Não foi possível ler o texto deste PDF. Complete o perfil manualmente.",
+      ],
+      status: "failed",
+    };
+  }
+  const { data: review, error: extractionError } = await supabase
+    .from("candidate_resume_extractions")
+    .insert({
+      candidate_id: user.id,
+      resume_id: resume.id,
+      status: extraction.status,
+      extracted_data: extraction.data,
+      warnings: extraction.warnings,
+      parser_version: RESUME_PARSER_VERSION,
+      text_sha256: extraction.textHash,
+      total_pages: extraction.totalPages,
+    })
+    .select("id")
+    .single();
+  if (extractionError || !review) fail("resume-analysis");
+  revalidatePath(profilePath);
+  if (extraction.status === "failed") {
+    redirect(`${profilePath}?error=resume-analysis-failed`);
+  }
+  redirect(`/carreiras/perfil/revisar-curriculo/${review.id}`);
 }
 
 export async function deleteCandidateResumeAction(formData: FormData) {
