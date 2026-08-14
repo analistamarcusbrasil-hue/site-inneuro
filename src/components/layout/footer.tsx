@@ -22,6 +22,7 @@ const footerLinks = [
   { label: "Sobre", href: "/sobre" },
   { label: "Contato", href: "/contato" },
   { label: "Fale Conosco", href: "/fale-conosco" },
+  { label: "Trabalhe Conosco", href: "/carreiras" },
 ] as const;
 const generalMessage =
   "Olá! Acessei o site da INNEURO e gostaria de informações sobre exames.";

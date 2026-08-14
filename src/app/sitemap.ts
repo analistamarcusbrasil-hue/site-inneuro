@@ -23,6 +23,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     "/convenios",
     "/sobre",
     "/equipe-medica",
+    "/carreiras",
     "/contato",
     "/politica-de-privacidade",
     "/termos-de-uso",

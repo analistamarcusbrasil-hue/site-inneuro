@@ -92,6 +92,7 @@ export const siteConfig: SiteConfig = {
     { label: "Preparos", href: "/preparos" },
     { label: "Convênios", href: "/convenios" },
     { label: "Sobre a INNEURO", href: "/sobre" },
+    { label: "Trabalhe Conosco", href: "/carreiras" },
     { label: "Contato", href: "/contato" },
   ],
 };
