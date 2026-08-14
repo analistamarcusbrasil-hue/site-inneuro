@@ -1,10 +1,11 @@
 # Carreiras INNEURO — roadmap interno
 
-## Estado atual: Fase 1
+## Estado atual: Fase 2 — infraestrutura de autenticação
 
 A rota institucional pública `/carreiras` apresenta o projeto e informa que o
-portal está em desenvolvimento. Esta fase não disponibiliza cadastro, login,
-vagas, candidaturas, currículos ou Banco de Talentos.
+portal está em desenvolvimento. A infraestrutura de conta do candidato utiliza
+Supabase Auth e permanece bloqueada pela feature flag. Currículos, vagas,
+candidaturas e Banco de Talentos não estão disponíveis.
 
 ## Controle de liberação
 
@@ -31,10 +32,11 @@ Essas rotas não existem na Fase 1 e não devem ser criadas como telas vazias.
 
 ## Próximas fases
 
-### Fase 2 — Autenticação e conta do candidato
+### Fase 2 — Autenticação e conta do candidato (infraestrutura concluída)
 
-Definir autenticação, recuperação de acesso, consentimentos e requisitos de
-segurança antes de criar qualquer conta.
+Foi preparada autenticação por e-mail/senha e Google, recuperação de senha,
+sessão server-side, logout, proteção de rotas e a tabela mínima
+`candidate_accounts` com RLS. O portal continua bloqueado em produção.
 
 ### Fase 3 — Perfil profissional e currículo
 
