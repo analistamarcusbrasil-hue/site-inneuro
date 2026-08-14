@@ -6,6 +6,7 @@ import {
   getPublicInstitutionalContent,
   getPublicNews,
 } from "@/lib/cms/public-content";
+import { createExamGroups } from "@/lib/exams/groups";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [news, examContent, institutional] = await Promise.all([
@@ -39,12 +40,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         url: `${siteUrl}/exames/${exam.slug}`,
         changeFrequency: "monthly" as const,
       })),
-    ...examContent.modalities
-      .filter((item) => item.active)
-      .map((modality) => ({
-        url: `${siteUrl}/preparos/${modality.slug}`,
+    ...createExamGroups(examContent.exams, examContent.modalities).map(
+      (group) => ({
+        url: `${siteUrl}/exames/${group.slug}`,
         changeFrequency: "monthly" as const,
-      })),
+      }),
+    ),
     ...news.map((item) => ({
       url: `${siteUrl}/noticias/${item.slug}`,
       lastModified: item.publishedAt ?? undefined,

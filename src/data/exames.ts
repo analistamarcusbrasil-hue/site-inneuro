@@ -1,4 +1,5 @@
 import type { Exame } from "@/types/exame";
+import { hasExamDetails } from "@/lib/exams/groups";
 
 const magneticResonanceDescription =
   "Modalidade de diagnóstico por imagem realizada conforme indicação e solicitação médica.";
@@ -93,12 +94,5 @@ export const exames: Exame[] = [
 ];
 
 export function hasIndexableExamContent(exam: Exame) {
-  return Boolean(
-    exam.shortDescription ||
-    exam.purpose ||
-    exam.howPerformed ||
-    exam.generalGuidance ||
-    exam.documents ||
-    exam.preparationSlug,
-  );
+  return hasExamDetails(exam);
 }

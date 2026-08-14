@@ -13,6 +13,7 @@ import {
   getPublicInstitutionalContent,
   getPublicSchedulingSettings,
 } from "@/lib/cms/public-content";
+import { createExamGroups } from "@/lib/exams/groups";
 import { createPageMetadata } from "@/lib/metadata";
 
 export const metadata = createPageMetadata({
@@ -30,6 +31,10 @@ export default async function Home() {
       getPublicSchedulingSettings(),
       getPublicInstitutionalContent(),
     ]);
+  const examGroups = createExamGroups(
+    examContent.exams,
+    examContent.modalities,
+  );
   return (
     <main id="main-content" tabIndex={-1}>
       <Hero patientPortalUrl={institutional.config.patientPortal.url} />
@@ -37,7 +42,7 @@ export default async function Home() {
         <CompanyHighlightsSection items={highlights} />
       ) : null}
       <QuickActions />
-      <Modalities items={examContent.modalities} showAllLink />
+      <Modalities groups={examGroups} showAllLink />
       <Insurance
         partners={convenios}
         whatsappNumber={institutional.config.whatsapp.primary.number}

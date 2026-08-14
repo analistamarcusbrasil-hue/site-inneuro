@@ -13,7 +13,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
-import type { Modality, ModalityIcon } from "@/types/modality";
+import type { ExamGroup } from "@/lib/exams/groups";
+import type { ModalityIcon } from "@/types/modality";
 
 const icons: Record<ModalityIcon, LucideIcon> = {
   "magnetic-resonance": Magnet,
@@ -28,11 +29,12 @@ const icons: Record<ModalityIcon, LucideIcon> = {
 };
 
 type ModalityCardProps = {
-  modality: Modality;
+  group: ExamGroup;
 };
 
-export function ModalityCard({ modality }: ModalityCardProps) {
-  const Icon = icons[modality.icon];
+export function ModalityCard({ group }: ModalityCardProps) {
+  const Icon = icons[group.icon];
+  const countLabel = `${group.exams.length} ${group.exams.length === 1 ? "exame" : "exames"}`;
 
   return (
     <article className="group border-border-light hover:border-brand/35 flex min-h-[430px] flex-col overflow-hidden rounded-3xl border bg-white transition-[border-color,transform] duration-300 hover:-translate-y-1 min-[440px]:min-h-[386px] md:min-h-[366px] lg:min-h-[350px]">
@@ -50,21 +52,24 @@ export function ModalityCard({ modality }: ModalityCardProps) {
       </div>
       <div className="flex flex-1 flex-col p-6 sm:p-7">
         <h3 className="font-heading text-ink text-xl font-semibold tracking-[-0.03em]">
-          {modality.name}
+          {group.name}
         </h3>
         <p className="text-muted mt-3 text-sm leading-relaxed">
-          {modality.shortDescription}
+          {group.shortDescription}
+        </p>
+        <p className="text-brand mt-4 text-xs font-bold tracking-[0.12em] uppercase">
+          {countLabel}
         </p>
         <div className="mt-auto flex flex-col gap-2 pt-7 min-[440px]:flex-row min-[440px]:flex-wrap">
           <Link
-            href={`/exames?modalidade=${modality.slug}`}
+            href={`/exames/${group.slug}`}
             className="bg-brand hover:bg-brand-dark focus-visible:ring-tech inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full px-4 text-sm font-bold text-white transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
           >
             Conhecer exames <ArrowRight aria-hidden="true" size={16} />
           </Link>
           <Link
-            href={`/contato?exame=${encodeURIComponent(modality.name)}#pre-agendamento`}
-            aria-label={`Agendar ${modality.name}`}
+            href={`/contato?exame=${encodeURIComponent(group.name)}#pre-agendamento`}
+            aria-label={`Agendar ${group.name}`}
             className="border-brand/22 text-brand-dark hover:bg-mint focus-visible:ring-tech inline-flex min-h-11 items-center justify-center gap-2 rounded-full border px-4 text-sm font-bold transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
           >
             <CalendarPlus aria-hidden="true" size={16} /> Agendar

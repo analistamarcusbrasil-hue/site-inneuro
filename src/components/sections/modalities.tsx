@@ -3,29 +3,17 @@ import { Section } from "@/components/layout/section";
 import { SectionHeader } from "@/components/sections/section-header";
 import { ModalityCard } from "@/components/ui/modality-card";
 import Link from "next/link";
-import type { Modality } from "@/types/modality";
+import type { ExamGroup } from "@/lib/exams/groups";
 
 export function Modalities({
   compactTop = false,
   showAllLink = false,
-  items,
+  groups,
 }: {
   compactTop?: boolean;
   showAllLink?: boolean;
-  items: Modality[];
+  groups: ExamGroup[];
 }) {
-  const featuredSlugs = new Set([
-    "ressonancia-magnetica",
-    "tomografia-computadorizada",
-    "raios-x",
-    "mapeamento-cerebral",
-  ]);
-  const activeModalities = items.filter(
-    (modality) =>
-      modality.active &&
-      (modality.featured ?? featuredSlugs.has(modality.slug)),
-  );
-
   return (
     <Section
       aria-label="Modalidades de exames"
@@ -42,8 +30,8 @@ export function Modalities({
           description="Consulte as categorias de exames e serviços realizados pela INNEURO."
         />
         <div className="mt-10 grid items-stretch gap-5 md:grid-cols-2 xl:grid-cols-4">
-          {activeModalities.map((modality) => (
-            <ModalityCard key={modality.slug} modality={modality} />
+          {groups.map((group) => (
+            <ModalityCard key={group.slug} group={group} />
           ))}
         </div>
         {showAllLink ? (

@@ -2,31 +2,50 @@ import type { Metadata } from "next";
 import { ArrowLeft, CalendarPlus, MessageCircle } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ExamGroupPage } from "@/components/exams/exam-group-page";
 import { InternalHero } from "@/components/layout/internal-hero";
 import { Container } from "@/components/layout/container";
 import { hasIndexableExamContent } from "@/data/exames";
 import { exames as staticExams } from "@/data/exames";
+import { modalities as staticModalities } from "@/data/modalidades";
 import {
-  getPublicExamBySlug,
+  getPublicExams,
   getPublicInstitutionalContent,
   getPublicPreparationBySlug,
 } from "@/lib/cms/public-content";
+import { createExamGroups, findExamGroup } from "@/lib/exams/groups";
 import { normalizeWhatsAppNumber } from "@/lib/whatsapp";
 import { createPageMetadata } from "@/lib/metadata";
 
 type ExamPageProps = { params: Promise<{ slug: string }> };
 
 export function generateStaticParams() {
-  return staticExams
+  const groupSlugs = createExamGroups(staticExams, staticModalities).map(
+    (group) => group.slug,
+  );
+  const examSlugs = staticExams
     .filter((exam) => exam.active)
-    .map((exam) => ({ slug: exam.slug }));
+    .map((exam) => exam.slug);
+  return [...new Set([...groupSlugs, ...examSlugs])].map((slug) => ({ slug }));
 }
 
 export async function generateMetadata({
   params,
 }: ExamPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const { exam } = await getPublicExamBySlug(slug);
+  const content = await getPublicExams();
+  const group = findExamGroup(
+    createExamGroups(content.exams, content.modalities),
+    slug,
+  );
+  if (group) {
+    return createPageMetadata({
+      title: `${group.name} | INNEURO`,
+      description: `Conheça os exames e serviços de ${group.name} disponíveis na INNEURO.`,
+      path: `/exames/${group.slug}`,
+    });
+  }
+  const exam = content.exams.find((item) => item.slug === slug) ?? null;
   if (!exam) return {};
   return createPageMetadata({
     title: `${exam.name} em Macapá | INNEURO`,
@@ -38,12 +57,17 @@ export async function generateMetadata({
 
 export default async function ExamPage({ params }: ExamPageProps) {
   const { slug } = await params;
-  const [{ exam }, service, institutional] = await Promise.all([
-    getPublicExamBySlug(slug),
+  const content = await getPublicExams();
+  const groups = createExamGroups(content.exams, content.modalities);
+  const group = findExamGroup(groups, slug);
+  if (group) return <ExamGroupPage group={group} groups={groups} />;
+
+  const exam = content.exams.find((item) => item.slug === slug) ?? null;
+  if (!exam) notFound();
+  const [service, institutional] = await Promise.all([
     getPublicPreparationBySlug(slug),
     getPublicInstitutionalContent(),
   ]);
-  if (!exam) notFound();
   const whatsappNumber = normalizeWhatsAppNumber(
     institutional.config.whatsapp.primary.number,
   );

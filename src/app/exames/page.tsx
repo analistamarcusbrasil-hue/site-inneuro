@@ -9,6 +9,7 @@ import {
   getPublicExams,
   getPublicSchedulingSettings,
 } from "@/lib/cms/public-content";
+import { createExamGroups } from "@/lib/exams/groups";
 
 export const metadata = createPageMetadata({
   title: "Exames e Serviços | INNEURO",
@@ -22,6 +23,7 @@ export default async function ExamsPage() {
     getPublicExams(),
     getPublicSchedulingSettings(),
   ]);
+  const examGroups = createExamGroups(content.exams, content.modalities);
   return (
     <main id="main-content" tabIndex={-1}>
       <InternalHero
@@ -29,7 +31,7 @@ export default async function ExamsPage() {
         title="Exames e serviços da INNEURO."
         description="Consulte os exames e serviços atualmente realizados pela clínica."
       />
-      <Modalities compactTop items={content.modalities} />
+      <Modalities compactTop groups={examGroups} />
       <section className="bg-surface py-14 sm:py-18 lg:py-24">
         <Container>
           <p className="bg-mint text-brand-dark mb-8 rounded-2xl p-4 text-sm font-semibold">
