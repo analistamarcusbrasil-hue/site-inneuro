@@ -52,9 +52,9 @@ export default async function AboutPage() {
                 Equipe Técnica
               </h2>
               <p className="text-muted mt-3 leading-relaxed">
-                Uma equipe médica especializada em diagnóstico por imagem,
-                unindo experiência, precisão e tecnologia para oferecer
-                segurança em cada diagnóstico.
+                Conheça os médicos especialistas que unem experiência,
+                conhecimento e tecnologia para conduzir a análise dos exames e a
+                elaboração dos laudos da INNEURO.
               </p>
               <span className="text-brand mt-5 inline-flex min-h-11 items-center gap-2 text-sm font-bold">
                 Conheça nossa equipe
