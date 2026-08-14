@@ -12,7 +12,7 @@ export const modalities: Modality[] = [
   {
     slug: "neurofisiologia-exames-funcionais",
     name: "Neurofisiologia / exames funcionais",
-    shortDescription: "Eletroneuromiografia e eletroencefalograma.",
+    shortDescription: "Teste Ergométrico e eletroencefalograma.",
     icon: "functional-exam",
     active: true,
     featured: true,

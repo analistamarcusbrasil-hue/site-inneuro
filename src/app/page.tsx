@@ -6,11 +6,11 @@ import { Insurance } from "@/components/sections/insurance";
 import { Location } from "@/components/sections/location";
 import { Modalities } from "@/components/sections/modalities";
 import { QuickActions } from "@/components/sections/quick-actions";
+import { convenios } from "@/data/convenios";
 import {
   getPublicCarousel,
   getPublicExams,
   getPublicInstitutionalContent,
-  getPublicPartners,
   getPublicSchedulingSettings,
 } from "@/lib/cms/public-content";
 import { createPageMetadata } from "@/lib/metadata";
@@ -23,10 +23,9 @@ export const metadata = createPageMetadata({
 });
 
 export default async function Home() {
-  const [highlights, partners, examContent, scheduling, institutional] =
+  const [highlights, examContent, scheduling, institutional] =
     await Promise.all([
       getPublicCarousel(),
-      getPublicPartners(),
       getPublicExams(),
       getPublicSchedulingSettings(),
       getPublicInstitutionalContent(),
@@ -40,7 +39,7 @@ export default async function Home() {
       <QuickActions />
       <Modalities items={examContent.modalities} showAllLink />
       <Insurance
-        partners={partners}
+        partners={convenios}
         whatsappNumber={institutional.config.whatsapp.primary.number}
       />
       <Differentials />

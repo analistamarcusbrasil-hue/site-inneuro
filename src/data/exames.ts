@@ -32,8 +32,8 @@ export const exames: Exame[] = [
     active: true,
   },
   {
-    slug: "eletroneuromiografia",
-    name: "Eletroneuromiografia",
+    slug: "teste-ergometrico",
+    name: "Teste Ergométrico",
     modality: "Neurofisiologia / exames funcionais",
     modalitySlug: "neurofisiologia-exames-funcionais",
     shortDescription: "",

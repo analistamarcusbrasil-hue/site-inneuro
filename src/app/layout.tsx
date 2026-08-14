@@ -114,7 +114,7 @@ export default async function RootLayout({
                 "Consultas",
                 "Ressonância Magnética",
                 "Tomografia",
-                "Eletroneuromiografia",
+                "Teste Ergométrico",
                 "Eletroencefalograma",
                 "MAPA",
                 "Raio-X",

@@ -31,7 +31,7 @@ export const schedulingModalities = [
   { id: "CONSULTATION", label: "Consultas" },
   { id: "CT", label: "Tomografia" },
   { id: "MRI", label: "Ressonância Magnética" },
-  { id: "ENMG", label: "Eletroneuromiografia" },
+  { id: "ERGOMETRIC_TEST", label: "Teste Ergométrico" },
   { id: "EEG", label: "Eletroencefalograma" },
   { id: "MAPA", label: "MAPA" },
   { id: "XRAY", label: "Raio-X" },
@@ -60,7 +60,7 @@ export function inferSchedulingModality(
   if (normalized.includes("consulta")) return "CONSULTATION";
   if (normalized.includes("tomografia")) return "CT";
   if (normalized.includes("ressonancia")) return "MRI";
-  if (normalized.includes("eletroneuromiografia")) return "ENMG";
+  if (normalized.includes("teste ergometrico")) return "ERGOMETRIC_TEST";
   if (normalized.includes("eletroencefalograma")) return "EEG";
   if (/\bmapa\b/.test(normalized)) return "MAPA";
   if (normalized.includes("raio") || normalized.includes("raios"))
