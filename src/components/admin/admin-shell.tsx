@@ -81,6 +81,10 @@ export function AdminShell({
     ...hrLinks,
     ...managementLinks,
   ];
+  const isLinkActive = (href: string) =>
+    href === "/admin"
+      ? pathname === href
+      : pathname === href || pathname.startsWith(`${href}/`);
 
   return (
     <div className="bg-surface min-h-screen lg:grid lg:grid-cols-[17rem_1fr]">
@@ -142,8 +146,8 @@ export function AdminShell({
                 <Link
                   href={href}
                   onClick={() => setOpen(false)}
-                  aria-current={pathname === href ? "page" : undefined}
-                  className={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold ${pathname === href ? "bg-tech text-brand-dark" : "text-white/80 hover:bg-white/10 hover:text-white"}`}
+                  aria-current={isLinkActive(href) ? "page" : undefined}
+                  className={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold ${isLinkActive(href) ? "bg-tech text-brand-dark" : "text-white/80 hover:bg-white/10 hover:text-white"}`}
                 >
                   <Icon size={18} aria-hidden="true" />
                   {label}
@@ -160,8 +164,8 @@ export function AdminShell({
                 <Link
                   href={href}
                   onClick={() => setOpen(false)}
-                  aria-current={pathname === href ? "page" : undefined}
-                  className={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold ${pathname === href ? "bg-tech text-brand-dark" : "text-white/80 hover:bg-white/10 hover:text-white"}`}
+                  aria-current={isLinkActive(href) ? "page" : undefined}
+                  className={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold ${isLinkActive(href) ? "bg-tech text-brand-dark" : "text-white/80 hover:bg-white/10 hover:text-white"}`}
                 >
                   <Icon size={18} aria-hidden="true" />
                   {label}
@@ -180,8 +184,8 @@ export function AdminShell({
                 <Link
                   href={href}
                   onClick={() => setOpen(false)}
-                  aria-current={pathname === href ? "page" : undefined}
-                  className={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold ${pathname === href ? "bg-tech text-brand-dark" : "text-white/80 hover:bg-white/10 hover:text-white"}`}
+                  aria-current={isLinkActive(href) ? "page" : undefined}
+                  className={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold ${isLinkActive(href) ? "bg-tech text-brand-dark" : "text-white/80 hover:bg-white/10 hover:text-white"}`}
                 >
                   <Icon size={18} aria-hidden="true" />
                   {label}
@@ -198,8 +202,8 @@ export function AdminShell({
                 <Link
                   href={href}
                   onClick={() => setOpen(false)}
-                  aria-current={pathname === href ? "page" : undefined}
-                  className={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold ${pathname === href ? "bg-tech text-brand-dark" : "text-white/80 hover:bg-white/10 hover:text-white"}`}
+                  aria-current={isLinkActive(href) ? "page" : undefined}
+                  className={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold ${isLinkActive(href) ? "bg-tech text-brand-dark" : "text-white/80 hover:bg-white/10 hover:text-white"}`}
                 >
                   <Icon size={18} aria-hidden="true" />
                   {label}
@@ -220,7 +224,7 @@ export function AdminShell({
           <p className="text-muted text-sm">
             Administração /{" "}
             <strong className="text-ink">
-              {links.find((item) => item.href === pathname)?.label ??
+              {links.find((item) => isLinkActive(item.href))?.label ??
                 "Conteúdo"}
             </strong>
           </p>

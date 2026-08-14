@@ -1,35 +1,14 @@
-import type { LucideIcon } from "lucide-react";
 import {
-  BarChart3,
   BriefcaseBusiness,
   CalendarClock,
   ClipboardList,
   Database,
   Inbox,
-  LayoutDashboard,
-  Settings,
-  Star,
   Users,
 } from "lucide-react";
+import { HrNavigation } from "@/components/admin/hr-navigation";
 import { AdminPageHeading } from "@/components/admin/admin-page-heading";
 import { requireHrAccess } from "@/lib/careers/hr-auth";
-
-type HrMenuItem = {
-  label: string;
-  icon: LucideIcon;
-  active?: boolean;
-};
-
-const hrMenu: HrMenuItem[] = [
-  { label: "Dashboard", icon: LayoutDashboard, active: true },
-  { label: "Vagas", icon: BriefcaseBusiness },
-  { label: "Processos Seletivos", icon: ClipboardList },
-  { label: "Candidatos", icon: Users },
-  { label: "Banco de Talentos", icon: Database },
-  { label: "Avaliações", icon: Star },
-  { label: "Relatórios", icon: BarChart3 },
-  { label: "Configurações", icon: Settings },
-];
 
 const futureCards = [
   { label: "Vagas abertas", icon: BriefcaseBusiness },
@@ -65,29 +44,10 @@ export default async function HrDashboardPage() {
         description="Ambiente interno para desenvolver e administrar o projeto Carreiras INNEURO com segurança, antes da liberação ao público."
       />
 
-      <nav aria-label="Módulos de RH" className="mb-8">
-        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {hrMenu.map(({ label, icon: Icon, active }) => (
-            <li key={label}>
-              <div
-                aria-current={active ? "page" : undefined}
-                aria-disabled={active ? undefined : true}
-                className={`flex min-h-16 items-center gap-3 rounded-2xl border px-4 ${active ? "border-brand bg-brand text-white" : "border-border-light text-muted bg-white"}`}
-              >
-                <Icon size={19} aria-hidden="true" />
-                <span className="min-w-0 flex-1 text-sm font-bold">
-                  {label}
-                </span>
-                {!active ? (
-                  <span className="text-[0.6rem] font-bold tracking-wide uppercase">
-                    Em desenvolvimento
-                  </span>
-                ) : null}
-              </div>
-            </li>
-          ))}
-        </ul>
-      </nav>
+      <HrNavigation
+        current="dashboard"
+        canManageCandidates={canSeeCandidateTotal}
+      />
 
       <section aria-labelledby="rh-overview-title">
         <div className="flex flex-wrap items-end justify-between gap-3">
