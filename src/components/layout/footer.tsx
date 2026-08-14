@@ -1,8 +1,15 @@
-import { AtSign, ExternalLink, MapPin, MessageCircle } from "lucide-react";
+import {
+  AtSign,
+  ExternalLink,
+  Mail,
+  MapPin,
+  MessageCircle,
+} from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { Logo } from "@/components/brand/logo";
 import { Container } from "@/components/layout/container";
+import { CONTACT_EMAIL } from "@/config/contact";
 import type { SiteConfig } from "@/config/site";
 import { createWhatsAppUrl } from "@/lib/whatsapp";
 import type { SchedulingSettings } from "@/lib/scheduling/settings";
@@ -14,6 +21,7 @@ const footerLinks = [
   { label: "Notícias", href: "/noticias" },
   { label: "Sobre", href: "/sobre" },
   { label: "Contato", href: "/contato" },
+  { label: "Fale Conosco", href: "/fale-conosco" },
 ] as const;
 const generalMessage =
   "Olá! Acessei o site da INNEURO e gostaria de informações sobre exames.";
@@ -97,6 +105,13 @@ export function Footer({
               <AtSign aria-hidden="true" size={16} />
               {config.instagram.handle}
               <ExternalLink aria-hidden="true" size={13} />
+            </a>
+            <a
+              href={`mailto:${CONTACT_EMAIL}`}
+              className="inline-flex min-h-11 items-center gap-2 text-sm text-white/72 hover:text-white"
+            >
+              <Mail aria-hidden="true" size={16} />
+              {CONTACT_EMAIL}
             </a>
             <a
               href={config.mapsUrl}
