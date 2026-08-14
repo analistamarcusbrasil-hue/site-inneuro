@@ -13,7 +13,7 @@ export async function getAdminSession() {
 
   const { data } = await supabase
     .from("profiles")
-    .select("id, full_name, role")
+    .select("id, full_name, role, hr_role")
     .eq("id", user.id)
     .single();
 

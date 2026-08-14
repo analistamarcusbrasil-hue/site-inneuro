@@ -1,11 +1,15 @@
 # Carreiras INNEURO — roadmap interno
 
-## Estado atual: Fase 2 — infraestrutura de autenticação
+## Estado atual: Fase 3 — administração de RH
 
 A rota institucional pública `/carreiras` apresenta o projeto e informa que o
 portal está em desenvolvimento. A infraestrutura de conta do candidato utiliza
 Supabase Auth e permanece bloqueada pela feature flag. Currículos, vagas,
 candidaturas e Banco de Talentos não estão disponíveis.
+
+O módulo estrutural `/admin/rh` está disponível somente para usuários
+administrativos autorizados. Ele reutiliza a autenticação e o padrão visual do
+CMS existente e não depende da feature flag do portal público.
 
 ## Controle de liberação
 
@@ -19,16 +23,14 @@ estiver explicitamente definida como `true`. A liberação deve falhar de forma
 segura: valores ausentes, vazios ou diferentes de `true` mantêm o portal
 bloqueado.
 
-Rotas previstas para avaliação nas próximas fases:
+Rotas públicas previstas para avaliação nas próximas fases:
 
 - `/carreiras/vagas`
 - `/carreiras/vagas/[slug]`
-- `/carreiras/entrar`
-- `/carreiras/cadastro`
-- `/carreiras/perfil`
 - `/carreiras/candidaturas`
 
-Essas rotas não existem na Fase 1 e não devem ser criadas como telas vazias.
+As rotas de autenticação já existem, mas respondem como não encontradas
+enquanto a feature flag permanece desligada.
 
 ## Próximas fases
 
@@ -38,36 +40,42 @@ Foi preparada autenticação por e-mail/senha e Google, recuperação de senha,
 sessão server-side, logout, proteção de rotas e a tabela mínima
 `candidate_accounts` com RLS. O portal continua bloqueado em produção.
 
-### Fase 3 — Perfil profissional e currículo
+### Fase 3 — Administração de RH (estrutura concluída)
+
+Foi integrado ao CMS existente o dashboard `/admin/rh`, com autorização
+server-side e papéis preparados para administrador, gestor de RH e avaliador.
+Os módulos futuros aparecem somente como “Em desenvolvimento”.
+
+### Fase 4 — Perfil profissional e currículo
 
 Criar perfil profissional e upload seguro de currículo em PDF, com regras de
 retenção e privacidade aprovadas.
 
-### Fase 4 — Leitura assistida de currículo
+### Fase 5 — Leitura assistida de currículo
 
 Avaliar leitura inteligente do currículo e preenchimento automático, sempre com
 revisão e confirmação do candidato.
 
-### Fase 5 — Gestão de vagas
+### Fase 6 — Gestão de vagas
 
 Permitir cadastro e publicação de vagas pela área administrativa, com controle
 de acesso e auditoria.
 
-### Fase 6 — Candidaturas e processos seletivos
+### Fase 7 — Candidaturas e processos seletivos
 
 Implementar candidatura digital, acompanhamento e fluxo de seleção.
 
-### Fase 7 — Banco de Talentos
+### Fase 8 — Banco de Talentos
 
 Permitir participação consentida no Banco de Talentos e gestão de retenção dos
 dados.
 
-### Fase 8 — Habilidades e aderência
+### Fase 9 — Habilidades e aderência
 
 Estruturar habilidades e aderência entre candidato e vaga com critérios
 transparentes e revisáveis.
 
-### Fase 9 — Avaliações e relatórios
+### Fase 10 — Avaliações e relatórios
 
 Criar avaliações do RH, ranking assistido e relatórios sem decisões totalmente
 automatizadas sobre candidatos.

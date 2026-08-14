@@ -15,8 +15,10 @@ import {
   Building2,
   CalendarClock,
   ClipboardList,
+  BriefcaseBusiness,
 } from "lucide-react";
 import { cmsModules } from "@/lib/cms/modules";
+import { canAccessHr } from "@/lib/careers/hr-permissions";
 import type { AdminProfile } from "@/types/cms";
 import { logoutAction } from "@/app/admin/actions";
 
@@ -64,9 +66,19 @@ export function AdminShell({
   const managementLinks = extraLinks.filter(
     (item) => !item.superOnly || profile.role === "super_admin",
   );
+  const hrLinks = canAccessHr(profile)
+    ? [
+        {
+          href: "/admin/rh",
+          label: "RH / Recrutamento",
+          icon: BriefcaseBusiness,
+        },
+      ]
+    : [];
   const links = [
     { href: "/admin", label: "Visão geral", icon: LayoutDashboard },
     ...contentLinks,
+    ...hrLinks,
     ...managementLinks,
   ];
 
@@ -144,6 +156,26 @@ export function AdminShell({
               </p>
             </li>
             {contentLinks.map(({ href, label, icon: Icon }) => (
+              <li key={href}>
+                <Link
+                  href={href}
+                  onClick={() => setOpen(false)}
+                  aria-current={pathname === href ? "page" : undefined}
+                  className={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold ${pathname === href ? "bg-tech text-brand-dark" : "text-white/80 hover:bg-white/10 hover:text-white"}`}
+                >
+                  <Icon size={18} aria-hidden="true" />
+                  {label}
+                </Link>
+              </li>
+            ))}
+            {hrLinks.length ? (
+              <li>
+                <p className="px-3 pt-5 pb-1 text-[0.65rem] font-bold tracking-widest text-white/45 uppercase">
+                  Gestão de pessoas
+                </p>
+              </li>
+            ) : null}
+            {hrLinks.map(({ href, label, icon: Icon }) => (
               <li key={href}>
                 <Link
                   href={href}

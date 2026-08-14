@@ -1,10 +1,12 @@
 export type AppRole = "super_admin" | "admin" | "editor";
+export type HrAccessRole = "administrator" | "hr_manager" | "reviewer";
 export type ContentStatus = "draft" | "scheduled" | "published" | "archived";
 
 export type AdminProfile = {
   id: string;
   full_name: string | null;
   role: AppRole;
+  hr_role: HrAccessRole | null;
 };
 
 export type CmsCarouselSlide = {
