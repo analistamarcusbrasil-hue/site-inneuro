@@ -12,8 +12,6 @@ const messages: Record<string, string> = {
   invalid: "Revise o e-mail e a senha informados.",
   credentials: "E-mail ou senha inválidos.",
   config: "O acesso está temporariamente indisponível.",
-  google: "Não foi possível concluir a autenticação. Tente novamente.",
-  oauth: "Não foi possível concluir a autenticação. Tente novamente.",
   session: "Entre novamente para acessar sua área privada.",
   "not-candidate": "Esta conta não está vinculada ao portal de candidatos.",
   account: "Não foi possível preparar sua conta de candidato.",

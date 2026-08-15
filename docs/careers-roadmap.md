@@ -37,8 +37,7 @@ enquanto a feature flag permanece desligada.
 
 O cadastro por e-mail e senha cria a conta confirmada no servidor, inicia a
 sessão imediatamente e preserva recuperação de senha, logout, proteção de rotas
-e `candidate_accounts` com RLS. O Google OAuth permanece apenas como
-infraestrutura futura e não aparece no portal de candidatos.
+e `candidate_accounts` com RLS. O portal utiliza exclusivamente e-mail e senha.
 
 ### Fase 3 — Administração de RH (estrutura concluída)
 

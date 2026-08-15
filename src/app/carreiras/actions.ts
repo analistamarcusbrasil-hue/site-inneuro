@@ -82,25 +82,6 @@ export async function candidateLoginAction(formData: FormData) {
   redirect(next);
 }
 
-export async function candidateGoogleLoginAction(formData: FormData) {
-  requireCareersPortalEnabled();
-  const next = safeCareersDestination(formValue(formData, "next"));
-  const source =
-    formValue(formData, "auth_source") === "cadastro" ? "cadastro" : "entrar";
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) redirect(careersAuthUrl(source, "config", next));
-
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: {
-      redirectTo: careersCallbackUrl(next),
-      queryParams: { prompt: "select_account" },
-    },
-  });
-  if (error || !data.url) redirect(careersAuthUrl(source, "google", next));
-  redirect(data.url);
-}
-
 export async function candidateRegistrationAction(formData: FormData) {
   requireCareersPortalEnabled();
   const next = safeCareersDestination(formValue(formData, "next"));
