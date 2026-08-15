@@ -141,7 +141,7 @@ export default async function HrCandidateDetailPage({
         title={account.full_name}
         description="Perfil profissional autodeclarado pelo candidato. A completude indica somente preenchimento e não representa score."
       />
-      <HrNavigation current="candidates" canManageCandidates />
+      <HrNavigation current="candidates" canManageJobs canManageCandidates />
 
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-3xl bg-white p-5">
         <div>

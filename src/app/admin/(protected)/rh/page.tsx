@@ -6,12 +6,12 @@ import {
   Inbox,
   Users,
 } from "lucide-react";
+import Link from "next/link";
 import { HrNavigation } from "@/components/admin/hr-navigation";
 import { AdminPageHeading } from "@/components/admin/admin-page-heading";
 import { requireHrAccess } from "@/lib/careers/hr-auth";
 
 const futureCards = [
-  { label: "Vagas abertas", icon: BriefcaseBusiness },
   { label: "Processos ativos", icon: ClipboardList },
   { label: "Novas candidaturas", icon: Inbox },
   { label: "Entrevistas", icon: CalendarClock },
@@ -27,14 +27,21 @@ const roleLabels = {
 export default async function HrDashboardPage() {
   const { supabase, hrRole } = await requireHrAccess();
   const canSeeCandidateTotal = hrRole !== "reviewer";
-  const candidateResult = canSeeCandidateTotal
-    ? await supabase
-        .from("candidate_accounts")
-        .select("id", { count: "exact", head: true })
-    : null;
+  const [candidateResult, jobsResult] = canSeeCandidateTotal
+    ? await Promise.all([
+        supabase
+          .from("candidate_accounts")
+          .select("id", { count: "exact", head: true }),
+        supabase
+          .from("career_jobs")
+          .select("id", { count: "exact", head: true })
+          .eq("status", "published"),
+      ])
+    : [null, null];
   const candidateCount = candidateResult?.error
     ? null
     : (candidateResult?.count ?? 0);
+  const openJobsCount = jobsResult?.error ? null : (jobsResult?.count ?? 0);
 
   return (
     <>
@@ -46,6 +53,7 @@ export default async function HrDashboardPage() {
 
       <HrNavigation
         current="dashboard"
+        canManageJobs={canSeeCandidateTotal}
         canManageCandidates={canSeeCandidateTotal}
       />
 
@@ -92,6 +100,36 @@ export default async function HrDashboardPage() {
             ) : (
               <p className="text-muted mt-2 text-sm font-semibold">
                 Acesso restrito aos candidatos autorizados futuramente
+              </p>
+            )}
+          </li>
+
+          <li className="border-border-light rounded-3xl border bg-white p-6">
+            <span className="bg-mint text-brand grid size-11 place-items-center rounded-2xl">
+              <BriefcaseBusiness aria-hidden="true" size={21} />
+            </span>
+            <p className="text-muted mt-6 text-sm">Vagas publicadas</p>
+            {canSeeCandidateTotal ? (
+              openJobsCount === null ? (
+                <p className="text-warning mt-2 text-sm font-bold">
+                  Indicador temporariamente indisponível
+                </p>
+              ) : (
+                <>
+                  <p className="font-heading text-brand-dark mt-1 text-3xl font-semibold">
+                    {openJobsCount.toLocaleString("pt-BR")}
+                  </p>
+                  <Link
+                    className="text-brand mt-2 inline-block text-xs font-bold hover:underline"
+                    href="/admin/rh/vagas"
+                  >
+                    Administrar vagas
+                  </Link>
+                </>
+              )
+            ) : (
+              <p className="text-muted mt-2 text-sm font-semibold">
+                Acesso restrito ao RH autorizado
               </p>
             )}
           </li>

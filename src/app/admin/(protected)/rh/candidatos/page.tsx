@@ -62,7 +62,7 @@ export default async function HrCandidatesPage() {
         title="Candidatos"
         description="Consulte os perfis profissionais cadastrados. As informações são autodeclaradas e não representam avaliação ou score."
       />
-      <HrNavigation current="candidates" canManageCandidates />
+      <HrNavigation current="candidates" canManageJobs canManageCandidates />
 
       {accountsResult.error ? (
         <p

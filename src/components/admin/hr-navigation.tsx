@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
-type HrNavigationKey = "dashboard" | "candidates";
+type HrNavigationKey = "dashboard" | "jobs" | "candidates";
 
 type HrNavigationItem = {
   key: string;
@@ -27,7 +27,12 @@ const hrNavigationItems: HrNavigationItem[] = [
     icon: LayoutDashboard,
     href: "/admin/rh",
   },
-  { key: "jobs", label: "Vagas", icon: BriefcaseBusiness },
+  {
+    key: "jobs",
+    label: "Vagas",
+    icon: BriefcaseBusiness,
+    href: "/admin/rh/vagas",
+  },
   { key: "processes", label: "Processos Seletivos", icon: ClipboardList },
   {
     key: "candidates",
@@ -43,9 +48,11 @@ const hrNavigationItems: HrNavigationItem[] = [
 
 export function HrNavigation({
   current,
+  canManageJobs,
   canManageCandidates,
 }: {
   current: HrNavigationKey;
+  canManageJobs: boolean;
   canManageCandidates: boolean;
 }) {
   return (
@@ -53,7 +60,10 @@ export function HrNavigation({
       <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {hrNavigationItems.map(({ key, label, icon: Icon, href }) => {
           const allowedHref =
-            key === "candidates" && !canManageCandidates ? undefined : href;
+            (key === "candidates" && !canManageCandidates) ||
+            (key === "jobs" && !canManageJobs)
+              ? undefined
+              : href;
           const active = key === current;
           const className = `flex min-h-16 items-center gap-3 rounded-2xl border px-4 ${active ? "border-brand bg-brand text-white" : "border-border-light text-muted bg-white"}`;
           const content = (
@@ -62,7 +72,7 @@ export function HrNavigation({
               <span className="min-w-0 flex-1 text-sm font-bold">{label}</span>
               {!allowedHref ? (
                 <span className="text-[0.6rem] font-bold tracking-wide uppercase">
-                  {key === "candidates"
+                  {key === "candidates" || key === "jobs"
                     ? "Acesso restrito"
                     : "Em desenvolvimento"}
                 </span>
