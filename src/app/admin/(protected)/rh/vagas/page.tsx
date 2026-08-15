@@ -120,8 +120,8 @@ export default async function HrJobsPage() {
                       {job.area?.name ?? "Área indisponível"} · {job.location}
                     </p>
                     <p className="text-muted mt-1 text-xs">
-                      {workModeLabels[job.work_mode]} · {job.positions}{" "}
-                      posição(ões)
+                      {workModeLabels[job.work_mode]}
+                      {job.positions ? ` · ${job.positions} posição(ões)` : ""}
                     </p>
                     {job.unit ? (
                       <p className="text-muted mt-1 text-xs">

@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
   canTransitionJob,
+  currentMacapaDate,
   isJobPubliclyAvailable,
   slugifyJobValue,
 } from "../src/lib/careers/jobs";
@@ -38,6 +39,15 @@ test("vaga válida contempla todos os campos profissionais previstos", () => {
   if (!parsed.success) return;
   assert.equal(parsed.data.positions, 2);
   assert.equal(parsed.data.certifications, null);
+});
+
+test("quantidade de posições pode permanecer não informada", () => {
+  const parsed = careerJobFormSchema.safeParse({
+    ...validJob,
+    positions: "",
+  });
+  assert.equal(parsed.success, true);
+  if (parsed.success) assert.equal(parsed.data.positions, null);
 });
 
 test("datas inválidas e critérios pessoais protegidos são rejeitados", () => {
@@ -96,6 +106,13 @@ test("slug é estável e vaga pública respeita status e período", () => {
       "2026-08-15",
     ),
     false,
+  );
+});
+
+test("data operacional usa o fuso de Macapá", () => {
+  assert.equal(
+    currentMacapaDate(new Date("2026-10-01T01:30:00.000Z")),
+    "2026-09-30",
   );
 });
 

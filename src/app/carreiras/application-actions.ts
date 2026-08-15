@@ -24,7 +24,10 @@ export async function submitCareerJobApplicationAction(formData: FormData) {
   const parsed = careerApplicationLogisticsSchema.safeParse({
     jobId: field(formData, "job_id"),
     slug: field(formData, "slug"),
-    requiresCommute: job?.work_mode === "onsite" || job?.work_mode === "hybrid",
+    requiresCommute: Boolean(
+      job?.unit_id &&
+      (job.work_mode === "onsite" || job.work_mode === "hybrid"),
+    ),
     commuteFeasibility: field(formData, "commute_feasibility"),
     commuteTime: field(formData, "commute_time"),
     transportModes: formData.getAll("transport_modes").map(String),

@@ -1,3 +1,4 @@
+import "server-only";
 import { createClient } from "@supabase/supabase-js";
 import { isCmsAdminConfigured } from "@/lib/cms/config";
 

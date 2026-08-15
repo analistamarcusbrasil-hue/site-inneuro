@@ -3,9 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { candidateLoginAction } from "@/app/carreiras/actions";
 import { CareersAuthCard } from "@/components/careers/auth-card";
-import { GoogleAuthForm } from "@/components/careers/google-auth-form";
 import { getCandidateSession } from "@/lib/careers/auth";
-import { isCandidateGoogleAuthEnabled } from "@/lib/careers/auth-providers";
 import { safeCareersDestination } from "@/lib/careers/auth-validation";
 
 export const metadata: Metadata = { title: "Entrar | Carreiras INNEURO" };
@@ -14,10 +12,8 @@ const messages: Record<string, string> = {
   invalid: "Revise o e-mail e a senha informados.",
   credentials: "E-mail ou senha inválidos.",
   config: "O acesso está temporariamente indisponível.",
-  google:
-    "Não foi possível entrar com o Google. Tente novamente ou utilize seu e-mail.",
-  oauth:
-    "Não foi possível entrar com o Google. Tente novamente ou utilize seu e-mail.",
+  google: "Não foi possível concluir a autenticação. Tente novamente.",
+  oauth: "Não foi possível concluir a autenticação. Tente novamente.",
   session: "Entre novamente para acessar sua área privada.",
   "not-candidate": "Esta conta não está vinculada ao portal de candidatos.",
   account: "Não foi possível preparar sua conta de candidato.",
@@ -33,10 +29,7 @@ export default async function CandidateLoginPage({
 }: {
   searchParams: Promise<{ error?: string; status?: string; next?: string }>;
 }) {
-  const [query, googleEnabled] = await Promise.all([
-    searchParams,
-    isCandidateGoogleAuthEnabled(),
-  ]);
+  const query = await searchParams;
   const next = safeCareersDestination(query.next ?? null);
   const session = await getCandidateSession();
   if (session.user && session.account) redirect(next);
@@ -63,8 +56,6 @@ export default async function CandidateLoginPage({
           {statuses[query.status]}
         </p>
       ) : null}
-
-      {googleEnabled ? <GoogleAuthForm next={next} source="entrar" /> : null}
 
       <form action={candidateLoginAction} className="space-y-5">
         <input type="hidden" name="next" value={next} />

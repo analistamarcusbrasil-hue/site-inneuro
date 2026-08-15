@@ -62,7 +62,7 @@ export function safeCareersDestination(value: string | null) {
     (allowedCareersDestinations.has(value) ||
       careerApplicationDestination.test(value))
     ? value
-    : "/carreiras/perfil";
+    : "/carreiras/vagas";
 }
 
 export function normalizeCandidateName(value: unknown) {

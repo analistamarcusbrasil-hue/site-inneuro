@@ -3,10 +3,6 @@ import type { EmailOtpType } from "@supabase/supabase-js";
 import { safeCareersDestination } from "@/lib/careers/auth-validation";
 import { ensureCandidateOnboarding } from "@/lib/careers/candidate-onboarding";
 import { isCareersPortalEnabled } from "@/lib/careers/feature-flag";
-import {
-  CANDIDATE_RESEND_COOLDOWN_COOKIE,
-  PENDING_CANDIDATE_EMAIL_COOKIE,
-} from "@/lib/careers/auth-pending";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 function redirectToLogin(request: NextRequest, error: string) {
@@ -28,7 +24,8 @@ export async function GET(request: NextRequest) {
   const tokenHash = request.nextUrl.searchParams.get("token_hash");
   const type = request.nextUrl.searchParams.get("type") as EmailOtpType | null;
   const authError = request.nextUrl.searchParams.get("error");
-  if (authError || (!code && (!tokenHash || !type))) {
+  const isRecovery = Boolean(tokenHash && type === "recovery");
+  if (authError || (!code && !isRecovery)) {
     return redirectToLogin(request, "oauth");
   }
 
@@ -36,13 +33,23 @@ export async function GET(request: NextRequest) {
   if (!supabase) return redirectToLogin(request, "config");
   const { error } = code
     ? await supabase.auth.exchangeCodeForSession(code)
-    : await supabase.auth.verifyOtp({ token_hash: tokenHash!, type: type! });
+    : await supabase.auth.verifyOtp({
+        token_hash: tokenHash!,
+        type: "recovery",
+      });
   if (error) return redirectToLogin(request, "oauth");
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return redirectToLogin(request, "session");
+
+  const requestedDestination = safeCareersDestination(
+    request.nextUrl.searchParams.get("next"),
+  );
+  if (isRecovery) {
+    return NextResponse.redirect(new URL(requestedDestination, request.url));
+  }
 
   let profileSufficient = false;
   try {
@@ -52,20 +59,8 @@ export async function GET(request: NextRequest) {
     return redirectToLogin(request, "account");
   }
 
-  const requestedDestination = safeCareersDestination(
-    request.nextUrl.searchParams.get("next"),
-  );
   const destination = profileSufficient
     ? requestedDestination
     : "/carreiras/perfil";
-  const response = NextResponse.redirect(new URL(destination, request.url));
-  response.cookies.set(PENDING_CANDIDATE_EMAIL_COOKIE, "", {
-    path: "/carreiras",
-    maxAge: 0,
-  });
-  response.cookies.set(CANDIDATE_RESEND_COOLDOWN_COOKIE, "", {
-    path: "/carreiras",
-    maxAge: 0,
-  });
-  return response;
+  return NextResponse.redirect(new URL(destination, request.url));
 }

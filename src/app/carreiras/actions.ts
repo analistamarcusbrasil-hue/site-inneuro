@@ -3,12 +3,6 @@
 import { redirect } from "next/navigation";
 import { siteConfig } from "@/config/site";
 import {
-  getCandidateResendAvailableAt,
-  getPendingCandidateEmail,
-  rememberPendingCandidateEmail,
-  setCandidateResendCooldown,
-} from "@/lib/careers/auth-pending";
-import {
   candidateLoginSchema,
   candidatePasswordUpdateSchema,
   candidateRecoverySchema,
@@ -16,6 +10,9 @@ import {
   safeCareersDestination,
 } from "@/lib/careers/auth-validation";
 import { requireCareersPortalEnabled } from "@/lib/careers/guards";
+import { ensureCandidateOnboarding } from "@/lib/careers/candidate-onboarding";
+import { consumeCandidateRegistrationRateLimit } from "@/lib/careers/registration-rate-limit";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 function formValue(formData: FormData, name: string) {
@@ -37,6 +34,20 @@ function careersAuthUrl(
 ) {
   const params = new URLSearchParams({ error: reason, next });
   return `/carreiras/${path}?${params.toString()}`;
+}
+
+function isExistingCandidateError(error: { code?: string; message: string }) {
+  return (
+    ["email_exists", "user_already_exists"].includes(error.code ?? "") ||
+    /already|registered|exists/i.test(error.message)
+  );
+}
+
+async function rollbackCandidateRegistration(
+  admin: NonNullable<ReturnType<typeof createSupabaseAdminClient>>,
+  userId: string,
+) {
+  await admin.auth.admin.deleteUser(userId).catch(() => undefined);
 }
 
 export async function candidateLoginAction(formData: FormData) {
@@ -102,64 +113,57 @@ export async function candidateRegistrationAction(formData: FormData) {
   });
   if (!parsed.success) redirect(careersAuthUrl("cadastro", "invalid", next));
 
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) redirect(careersAuthUrl("cadastro", "config", next));
-  const { data, error } = await supabase.auth.signUp({
-    email: parsed.data.email,
-    password: parsed.data.password,
-    options: {
-      emailRedirectTo: careersCallbackUrl(next),
-      data: {
-        full_name: parsed.data.fullName,
-        account_type: "candidate",
-        terms_accepted_at: new Date().toISOString(),
-      },
-    },
-  });
-  if (error) redirect(careersAuthUrl("cadastro", "signup", next));
-  if (data.session) redirect(next);
-  await rememberPendingCandidateEmail(parsed.data.email);
-  await setCandidateResendCooldown();
-  const checkEmail = new URLSearchParams({ status: "check-email", next });
-  redirect(`/carreiras/cadastro?${checkEmail.toString()}`);
-}
+  const admin = createSupabaseAdminClient();
+  if (!admin) redirect(careersAuthUrl("cadastro", "config", next));
 
-export async function candidateResendConfirmationAction(formData: FormData) {
-  requireCareersPortalEnabled();
-  const next = safeCareersDestination(formValue(formData, "next"));
-  const params = new URLSearchParams({ status: "check-email", next });
-  const email = await getPendingCandidateEmail();
-  if (!email) {
-    params.set("resend", "expired");
-    redirect(`/carreiras/cadastro?${params.toString()}`);
+  let registrationAllowed = false;
+  try {
+    registrationAllowed = await consumeCandidateRegistrationRateLimit(admin);
+  } catch {
+    redirect(careersAuthUrl("cadastro", "config", next));
+  }
+  if (!registrationAllowed) {
+    redirect(careersAuthUrl("cadastro", "rate-limit", next));
   }
 
-  if ((await getCandidateResendAvailableAt()) > Date.now()) {
-    params.set("resend", "wait");
-    redirect(`/carreiras/cadastro?${params.toString()}`);
+  const termsAcceptedAt = new Date().toISOString();
+  const { data, error } = await admin.auth.admin.createUser({
+    email: parsed.data.email,
+    password: parsed.data.password,
+    email_confirm: true,
+    user_metadata: {
+      full_name: parsed.data.fullName,
+      account_type: "candidate",
+      terms_accepted_at: termsAcceptedAt,
+    },
+  });
+  if (error || !data.user) {
+    const reason =
+      error && isExistingCandidateError(error) ? "email-exists" : "signup";
+    redirect(careersAuthUrl("cadastro", reason, next));
+  }
+
+  try {
+    await ensureCandidateOnboarding(admin, data.user);
+  } catch {
+    await rollbackCandidateRegistration(admin, data.user.id);
+    redirect(careersAuthUrl("cadastro", "account", next));
   }
 
   const supabase = await createSupabaseServerClient();
   if (!supabase) {
-    params.set("resend", "error");
-    redirect(`/carreiras/cadastro?${params.toString()}`);
+    await rollbackCandidateRegistration(admin, data.user.id);
+    redirect(careersAuthUrl("cadastro", "config", next));
   }
-  const { error } = await supabase.auth.resend({
-    type: "signup",
-    email,
-    options: { emailRedirectTo: careersCallbackUrl(next) },
+  const { error: signInError } = await supabase.auth.signInWithPassword({
+    email: parsed.data.email,
+    password: parsed.data.password,
   });
-  if (error) {
-    params.set(
-      "resend",
-      error.status === 429 || /rate/i.test(error.message) ? "wait" : "error",
-    );
-    redirect(`/carreiras/cadastro?${params.toString()}`);
+  if (signInError) {
+    await rollbackCandidateRegistration(admin, data.user.id);
+    redirect(careersAuthUrl("cadastro", "session", next));
   }
-
-  await setCandidateResendCooldown();
-  params.set("resend", "sent");
-  redirect(`/carreiras/cadastro?${params.toString()}`);
+  redirect(next);
 }
 
 export async function candidateRequestPasswordAction(formData: FormData) {

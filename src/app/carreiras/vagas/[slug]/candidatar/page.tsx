@@ -5,7 +5,7 @@ import { submitCareerJobApplicationAction } from "@/app/carreiras/application-ac
 import { Container } from "@/components/layout/container";
 import { getCandidateSession } from "@/lib/careers/auth";
 import { requireCareersPortalEnabled } from "@/lib/careers/guards";
-import type { CareerJob } from "@/lib/careers/jobs";
+import { currentMacapaDate, type CareerJob } from "@/lib/careers/jobs";
 import {
   applicationSourceLabels,
   applicationSources,
@@ -65,7 +65,7 @@ export default async function ReviewCareerApplicationPage({
     redirect(`/carreiras/entrar?next=${encodeURIComponent(destination)}`);
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = currentMacapaDate();
   const [
     jobResult,
     profileResult,
@@ -123,8 +123,9 @@ export default async function ReviewCareerApplicationPage({
     .not("status", "in", "(finalized,withdrawn)")
     .maybeSingle();
   const query = await searchParams;
-  const requiresCommute =
-    job.work_mode === "onsite" || job.work_mode === "hybrid";
+  const requiresCommute = Boolean(
+    job.unit && (job.work_mode === "onsite" || job.work_mode === "hybrid"),
+  );
 
   return (
     <main

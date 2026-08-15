@@ -4,6 +4,7 @@ import { Container } from "@/components/layout/container";
 import { InternalHero } from "@/components/layout/internal-hero";
 import { requireCareersJobsAccess } from "@/lib/careers/jobs-access";
 import {
+  currentMacapaDate,
   formatJobDate,
   workModeLabels,
   type CareerJob,
@@ -21,7 +22,7 @@ export const metadata = createPageMetadata({
 export default async function PublicCareerJobsPage() {
   const { isInternalPreview } = await requireCareersJobsAccess();
   const supabase = createSupabasePublicClient();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = currentMacapaDate();
   const result = supabase
     ? await supabase
         .from("career_jobs")

@@ -3,8 +3,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Container } from "@/components/layout/container";
 import { InternalHero } from "@/components/layout/internal-hero";
+import { siteConfig } from "@/config/site";
 import { requireCareersJobsAccess } from "@/lib/careers/jobs-access";
 import {
+  currentMacapaDate,
   formatJobDate,
   workModeLabels,
   type CareerJob,
@@ -50,7 +52,7 @@ export default async function PublicCareerJobDetailPage({
   const { isInternalPreview } = await requireCareersJobsAccess();
   const supabase = createSupabasePublicClient();
   if (!supabase) notFound();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = currentMacapaDate();
   const { data, error } = await supabase
     .from("career_jobs")
     .select(
@@ -97,6 +99,10 @@ export default async function PublicCareerJobDetailPage({
             </div>
             <dl className="mt-6 grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
               <div>
+                <dt className="text-muted">Empresa</dt>
+                <dd className="text-ink mt-1 font-bold">{siteConfig.name}</dd>
+              </div>
+              <div>
                 <dt className="text-muted">Local</dt>
                 <dd className="text-ink mt-1 flex items-center gap-2 font-bold">
                   <MapPin size={15} aria-hidden="true" />
@@ -109,10 +115,12 @@ export default async function PublicCareerJobDetailPage({
                   {workModeLabels[job.work_mode]}
                 </dd>
               </div>
-              <div>
-                <dt className="text-muted">Posições</dt>
-                <dd className="text-ink mt-1 font-bold">{job.positions}</dd>
-              </div>
+              {job.positions ? (
+                <div>
+                  <dt className="text-muted">Posições</dt>
+                  <dd className="text-ink mt-1 font-bold">{job.positions}</dd>
+                </div>
+              ) : null}
               <div>
                 <dt className="text-muted">Abertura</dt>
                 <dd className="text-ink mt-1 flex items-center gap-2 font-bold">

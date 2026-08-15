@@ -121,8 +121,8 @@ export default async function CareerJobDetailPage({
               {workModeLabels[job.work_mode]}
             </p>
             <p className="text-muted mt-2 text-xs">
-              {job.positions} posição(ões) · Abertura em{" "}
-              {formatJobDate(job.opens_on)}
+              {job.positions ? `${job.positions} posição(ões) · ` : ""}
+              Abertura em {formatJobDate(job.opens_on)}
               {job.closes_on
                 ? ` · Encerramento em ${formatJobDate(job.closes_on)}`
                 : ""}
