@@ -33,7 +33,7 @@ export type CareerJob = {
   title: string;
   area_id: string;
   unit_id?: string | null;
-  positions: number;
+  positions: number | null;
   location: string;
   work_mode: WorkMode;
   work_schedule: string | null;
@@ -67,6 +67,19 @@ export type CareerJob = {
   } | null;
 };
 
+export function currentMacapaDate(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Belem",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const value = Object.fromEntries(
+    parts.map((part) => [part.type, part.value]),
+  );
+  return `${value.year}-${value.month}-${value.day}`;
+}
+
 export function slugifyJobValue(value: string) {
   return value
     .normalize("NFD")
@@ -95,7 +108,7 @@ export function formatJobDate(date: string | null | undefined) {
 
 export function isJobPubliclyAvailable(
   job: Pick<CareerJob, "status" | "opens_on" | "closes_on">,
-  today = new Date().toISOString().slice(0, 10),
+  today = currentMacapaDate(),
 ) {
   return (
     job.status === "published" &&

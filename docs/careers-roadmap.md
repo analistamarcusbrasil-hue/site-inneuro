@@ -1,11 +1,10 @@
 # Carreiras INNEURO — roadmap interno
 
-## Estado atual: Fase 4 — perfil profissional
+## Estado atual: módulo completo sob controle de liberação
 
-A rota institucional pública `/carreiras` apresenta o projeto e informa que o
-portal está em desenvolvimento. A infraestrutura de conta do candidato utiliza
-Supabase Auth e permanece bloqueada pela feature flag. Vagas, candidaturas e
-Banco de Talentos público não estão disponíveis.
+A rota institucional pública `/carreiras` e os módulos de conta, perfil, vagas,
+candidaturas e Banco de Talentos estão implementados. A disponibilidade pública
+continua controlada pela feature flag e pelas migrations aplicadas no Supabase.
 
 O módulo estrutural `/admin/rh` está disponível somente para usuários
 administrativos autorizados. Ele reutiliza a autenticação e o padrão visual do
@@ -34,11 +33,11 @@ enquanto a feature flag permanece desligada.
 
 ## Próximas fases
 
-### Fase 2 — Autenticação e conta do candidato (infraestrutura concluída)
+### Fase 2 — Autenticação e conta do candidato (concluída)
 
-Foi preparada autenticação por e-mail/senha e Google, recuperação de senha,
-sessão server-side, logout, proteção de rotas e a tabela mínima
-`candidate_accounts` com RLS. O portal continua bloqueado em produção.
+O cadastro por e-mail e senha cria a conta confirmada no servidor, inicia a
+sessão imediatamente e preserva recuperação de senha, logout, proteção de rotas
+e `candidate_accounts` com RLS. O portal utiliza exclusivamente e-mail e senha.
 
 ### Fase 3 — Administração de RH (estrutura concluída)
 

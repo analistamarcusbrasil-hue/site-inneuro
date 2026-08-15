@@ -73,15 +73,14 @@ export function HrJobForm({
             </FieldHelp>
           </label>
           <label className={labelClass}>
-            Quantidade de posições
+            Quantidade de posições (opcional)
             <input
               className={inputClass}
               name="positions"
               type="number"
               min={1}
               max={100}
-              required
-              defaultValue={job?.positions ?? 1}
+              defaultValue={job?.positions ?? ""}
             />
           </label>
           <label className={labelClass}>

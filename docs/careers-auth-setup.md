@@ -16,24 +16,22 @@ No painel do Supabase, em **Authentication → URL Configuration**:
 ## E-mail e senha
 
 - manter o provedor Email habilitado;
-- exigir confirmação de e-mail antes do primeiro acesso;
-- revisar os templates de confirmação e recuperação em português;
+- criar candidatos no servidor com o cliente Admin e `email_confirm: true`;
+- autenticar o candidato imediatamente com o cliente SSR normal;
+- manter somente o template de recuperação de senha em português;
 - não incluir senha, token ou dado pessoal em logs.
 
-## Google OAuth
+## Provedores de autenticação
 
-1. Criar credenciais OAuth 2.0 do tipo aplicação Web no Google Cloud.
-2. Usar a URL de callback exibida pelo Supabase como URI autorizada no Google.
-3. Habilitar Google em **Authentication → Providers → Google**.
-4. Informar Client ID e Client Secret somente no painel do Supabase.
-5. Nunca colocar o Client Secret em variáveis `NEXT_PUBLIC_*` ou no GitHub.
+O portal de candidatos utiliza exclusivamente e-mail e senha. Provedores
+sociais não integram o fluxo de cadastro ou login.
 
 ## Liberação futura
 
 Antes de alterar `CAREERS_PORTAL_ENABLED` para `true`:
 
 - confirmar a migração `candidate_accounts` aplicada;
-- testar cadastro, confirmação de e-mail, Google, login, recuperação e logout;
+- testar cadastro imediato, login, recuperação e logout;
 - confirmar RLS com dois usuários distintos;
 - revisar Termos de Uso e Política de Privacidade para recrutamento;
 - executar uma revisão de segurança e privacidade;

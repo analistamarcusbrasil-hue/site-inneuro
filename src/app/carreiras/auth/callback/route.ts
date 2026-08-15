@@ -1,21 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
-import type { EmailOtpType } from "@supabase/supabase-js";
-import { safeCareersDestination } from "@/lib/careers/auth-validation";
-import { ensureCandidateOnboarding } from "@/lib/careers/candidate-onboarding";
 import { isCareersPortalEnabled } from "@/lib/careers/feature-flag";
-import {
-  CANDIDATE_RESEND_COOLDOWN_COOKIE,
-  PENDING_CANDIDATE_EMAIL_COOKIE,
-} from "@/lib/careers/auth-pending";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-function redirectToLogin(request: NextRequest, error: string) {
-  const url = new URL("/carreiras/entrar", request.url);
+function redirectToRecovery(request: NextRequest, error: string) {
+  const url = new URL("/carreiras/recuperar-senha", request.url);
   url.searchParams.set("error", error);
-  url.searchParams.set(
-    "next",
-    safeCareersDestination(request.nextUrl.searchParams.get("next")),
-  );
   return NextResponse.redirect(url);
 }
 
@@ -24,48 +13,27 @@ export async function GET(request: NextRequest) {
     return new NextResponse("Não encontrado", { status: 404 });
   }
 
-  const code = request.nextUrl.searchParams.get("code");
   const tokenHash = request.nextUrl.searchParams.get("token_hash");
-  const type = request.nextUrl.searchParams.get("type") as EmailOtpType | null;
+  const type = request.nextUrl.searchParams.get("type");
   const authError = request.nextUrl.searchParams.get("error");
-  if (authError || (!code && (!tokenHash || !type))) {
-    return redirectToLogin(request, "oauth");
+  if (authError || !tokenHash || type !== "recovery") {
+    return redirectToRecovery(request, "expired");
   }
 
   const supabase = await createSupabaseServerClient();
-  if (!supabase) return redirectToLogin(request, "config");
-  const { error } = code
-    ? await supabase.auth.exchangeCodeForSession(code)
-    : await supabase.auth.verifyOtp({ token_hash: tokenHash!, type: type! });
-  if (error) return redirectToLogin(request, "oauth");
+  if (!supabase) return redirectToRecovery(request, "config");
+  const { error } = await supabase.auth.verifyOtp({
+    token_hash: tokenHash,
+    type: "recovery",
+  });
+  if (error) return redirectToRecovery(request, "expired");
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return redirectToLogin(request, "session");
+  if (!user) return redirectToRecovery(request, "expired");
 
-  let profileSufficient = false;
-  try {
-    ({ profileSufficient } = await ensureCandidateOnboarding(supabase, user));
-  } catch {
-    await supabase.auth.signOut();
-    return redirectToLogin(request, "account");
-  }
-
-  const requestedDestination = safeCareersDestination(
-    request.nextUrl.searchParams.get("next"),
+  return NextResponse.redirect(
+    new URL("/carreiras/recuperar-senha?mode=update", request.url),
   );
-  const destination = profileSufficient
-    ? requestedDestination
-    : "/carreiras/perfil";
-  const response = NextResponse.redirect(new URL(destination, request.url));
-  response.cookies.set(PENDING_CANDIDATE_EMAIL_COOKIE, "", {
-    path: "/carreiras",
-    maxAge: 0,
-  });
-  response.cookies.set(CANDIDATE_RESEND_COOLDOWN_COOKIE, "", {
-    path: "/carreiras",
-    maxAge: 0,
-  });
-  return response;
 }

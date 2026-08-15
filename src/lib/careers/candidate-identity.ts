@@ -23,15 +23,8 @@ function metadataName(metadata: Record<string, unknown> | undefined) {
 export function getCandidateIdentityFromAuthUser(
   user: Pick<User, "email" | "user_metadata" | "identities">,
 ): CandidateAuthIdentity {
-  const googleIdentity = user.identities?.find(
-    (identity) => identity.provider === "google",
-  );
-  const identityData = googleIdentity?.identity_data as
-    Record<string, unknown> | undefined;
-  const fullName = normalizeCandidateName(
-    metadataName(user.user_metadata) || metadataName(identityData),
-  );
-  const email = cleanText(user.email) || cleanText(identityData?.email) || null;
+  const fullName = normalizeCandidateName(metadataName(user.user_metadata));
+  const email = cleanText(user.email) || null;
 
   return { fullName, email };
 }

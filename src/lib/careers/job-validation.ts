@@ -50,7 +50,10 @@ export const careerJobFormSchema = z
     unitId: z
       .union([z.string().uuid(), z.literal("")])
       .transform((value) => value || null),
-    positions: z.coerce.number().int().min(1).max(100),
+    positions: z.preprocess(
+      (value) => (typeof value === "string" && !value.trim() ? null : value),
+      z.coerce.number().int().min(1).max(100).nullable(),
+    ),
     location: requiredText("o local", 2, 160),
     workMode: z.enum(workModes),
     workSchedule: optionalText(500),

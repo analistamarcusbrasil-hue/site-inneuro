@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
 import {
   candidateRegistrationSchema,
@@ -47,9 +47,9 @@ test("callback aceita somente destinos internos previstos", () => {
   );
   assert.equal(
     safeCareersDestination("https://example.com"),
-    "/carreiras/perfil",
+    "/carreiras/vagas",
   );
-  assert.equal(safeCareersDestination("//example.com"), "/carreiras/perfil");
+  assert.equal(safeCareersDestination("//example.com"), "/carreiras/vagas");
   assert.equal(
     safeCareersDestination(
       "/carreiras/vagas/assistente-de-atendimento/candidatar",
@@ -58,8 +58,9 @@ test("callback aceita somente destinos internos previstos", () => {
   );
   assert.equal(
     safeCareersDestination("/carreiras/vagas/../admin/candidatar"),
-    "/carreiras/perfil",
+    "/carreiras/vagas",
   );
+  assert.equal(safeCareersDestination(null), "/carreiras/vagas");
 });
 
 test("normaliza nome ausente sem inventar dados profissionais", () => {
@@ -67,7 +68,7 @@ test("normaliza nome ausente sem inventar dados profissionais", () => {
   assert.equal(normalizeCandidateName(""), "Candidato");
 });
 
-test("usa somente nome e e-mail seguros fornecidos pelo Google", () => {
+test("usa somente nome e e-mail seguros da conta confirmada", () => {
   const identity = getCandidateIdentityFromAuthUser({
     email: "ana@example.com",
     user_metadata: {
@@ -83,66 +84,49 @@ test("usa somente nome e e-mail seguros fornecidos pelo Google", () => {
   });
 });
 
-test("aceita nome do identity_data sem inferir campos ausentes", () => {
-  const identity = getCandidateIdentityFromAuthUser({
-    email: undefined,
-    user_metadata: {},
-    identities: [
-      {
-        id: "google-id",
-        user_id: "candidate-id",
-        identity_id: "identity-id",
-        provider: "google",
-        identity_data: {
-          given_name: "Maria",
-          family_name: "Silva",
-          email: "maria@example.com",
-          picture: "https://example.com/foto.jpg",
-        },
-        created_at: "2026-08-15T00:00:00.000Z",
-        updated_at: "2026-08-15T00:00:00.000Z",
-        last_sign_in_at: "2026-08-15T00:00:00.000Z",
-      },
-    ],
-  });
-  assert.deepEqual(identity, {
-    fullName: "Maria Silva",
-    email: "maria@example.com",
-  });
-});
-
-test("login com Google só aparece quando o provedor estiver habilitado", () => {
-  const page = readFileSync(
+test("Google não aparece no login nem no cadastro de candidatos", () => {
+  const loginPage = readFileSync(
     new URL("../src/app/carreiras/(portal)/entrar/page.tsx", import.meta.url),
     "utf8",
   );
-  const providers = readFileSync(
-    new URL("../src/lib/careers/auth-providers.ts", import.meta.url),
-    "utf8",
-  );
-  assert.match(page, /isCandidateGoogleAuthEnabled/);
-  assert.match(page, /googleEnabled \?/);
-  assert.match(providers, /\/auth\/v1\/settings/);
-  assert.match(providers, /settings\.external\?\.google === true/);
-});
-
-test("cadastro oferece Google quando habilitado e separa o estado check-email", () => {
-  const page = readFileSync(
+  const registrationPage = readFileSync(
     new URL("../src/app/carreiras/(portal)/cadastro/page.tsx", import.meta.url),
     "utf8",
   );
-  assert.match(page, /GoogleAuthForm/);
-  assert.match(page, /source="cadastro"/);
-  assert.match(page, /checkEmail \?/);
-  assert.match(page, /Confirme seu e-mail/);
-  assert.match(page, /ResendConfirmationForm/);
+  const googleComponent = new URL(
+    "../src/components/careers/google-auth-form.tsx",
+    import.meta.url,
+  );
+  const googleProvider = new URL(
+    "../src/lib/careers/auth-providers.ts",
+    import.meta.url,
+  );
+  assert.doesNotMatch(loginPage, /GoogleAuthForm|Continuar com Google/);
+  assert.doesNotMatch(registrationPage, /GoogleAuthForm|Continuar com Google/);
+  assert.equal(existsSync(googleComponent), false);
+  assert.equal(existsSync(googleProvider), false);
 });
 
-test("botão Google informa carregamento e callback não sobrescreve perfil", () => {
-  const button = readFileSync(
-    new URL("../src/components/careers/google-auth-form.tsx", import.meta.url),
+test("cadastro administrativo confirma e autentica o candidato imediatamente", () => {
+  const actions = readFileSync(
+    new URL("../src/app/carreiras/actions.ts", import.meta.url),
     "utf8",
   );
+  assert.match(actions, /createSupabaseAdminClient/);
+  assert.match(actions, /admin\.auth\.admin\.createUser/);
+  assert.match(actions, /email_confirm: true/);
+  assert.match(actions, /account_type: "candidate"/);
+  assert.match(actions, /ensureCandidateOnboarding\(admin, data\.user\)/);
+  assert.match(actions, /supabase\.auth\.signInWithPassword/);
+  assert.match(actions, /consumeCandidateRegistrationRateLimit/);
+  assert.match(actions, /rollbackCandidateRegistration/);
+  assert.doesNotMatch(
+    actions,
+    /auth\.signUp|auth\.resend|candidateGoogleLoginAction|signInWithOAuth/,
+  );
+});
+
+test("onboarding preserva o perfil existente do candidato", () => {
   const callback = readFileSync(
     new URL("../src/app/carreiras/auth/callback/route.ts", import.meta.url),
     "utf8",
@@ -152,21 +136,19 @@ test("botão Google informa carregamento e callback não sobrescreve perfil", ()
     "utf8",
   );
   const profile = readFileSync(
-    new URL(
-      "../src/app/carreiras/(portal)/perfil/page.tsx",
-      import.meta.url,
-    ),
+    new URL("../src/app/carreiras/(portal)/perfil/page.tsx", import.meta.url),
     "utf8",
   );
-  assert.match(button, /useFormStatus/);
-  assert.match(button, /Conectando ao Google/);
-  assert.match(callback, /ensureCandidateOnboarding/);
+  assert.doesNotMatch(
+    callback,
+    /ensureCandidateOnboarding|exchangeCodeForSession/,
+  );
   assert.match(onboarding, /ignoreDuplicates: true/);
   assert.match(onboarding, /CANDIDATE_PROFILE_SUFFICIENT_PERCENT/);
   assert.match(profile, /Complete seu perfil profissional/);
 });
 
-test("reenvio usa API oficial, callback seguro e cooldown assinado", () => {
+test("callback aceita apenas recuperação de senha", () => {
   const actions = readFileSync(
     new URL("../src/app/carreiras/actions.ts", import.meta.url),
     "utf8",
@@ -175,33 +157,46 @@ test("reenvio usa API oficial, callback seguro e cooldown assinado", () => {
     new URL("../src/app/carreiras/auth/callback/route.ts", import.meta.url),
     "utf8",
   );
-  const pending = readFileSync(
-    new URL("../src/lib/careers/auth-pending.ts", import.meta.url),
-    "utf8",
-  );
-  assert.match(actions, /supabase\.auth\.resend\(\{/);
-  assert.match(actions, /type: "signup"/);
-  assert.match(actions, /setCandidateResendCooldown/);
+  assert.match(actions, /resetPasswordForEmail/);
   assert.match(callback, /verifyOtp/);
-  assert.match(callback, /safeCareersDestination/);
-  assert.match(pending, /createHmac\("sha256"/);
-  assert.match(pending, /httpOnly: true/);
-  assert.match(pending, /sameSite: "lax"/);
+  assert.match(callback, /type: "recovery"/);
+  assert.match(callback, /type !== "recovery"/);
+  assert.match(callback, /recuperar-senha\?mode=update/);
+  assert.doesNotMatch(
+    callback,
+    /exchangeCodeForSession|safeCareersDestination/,
+  );
 });
 
-test("templates Auth usam token hash e retorno SSR do Carreiras", () => {
-  const confirmation = readFileSync(
-    new URL("../supabase/templates/confirmation.html", import.meta.url),
+test("cadastro limita abuso sem expor a Service Role no cliente", () => {
+  const limiter = readFileSync(
+    new URL("../src/lib/careers/registration-rate-limit.ts", import.meta.url),
     "utf8",
   );
+  const adminClient = readFileSync(
+    new URL("../src/lib/supabase/admin.ts", import.meta.url),
+    "utf8",
+  );
+  const registrationPage = readFileSync(
+    new URL("../src/app/carreiras/(portal)/cadastro/page.tsx", import.meta.url),
+    "utf8",
+  );
+  const adminActions = readFileSync(
+    new URL("../src/app/admin/actions.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(limiter, /consume_contact_rate_limit/);
+  assert.match(limiter, /createHmac\("sha256"/);
+  assert.match(adminClient, /^import "server-only";/);
+  assert.doesNotMatch(registrationPage, /SUPABASE_SERVICE_ROLE_KEY/);
+  assert.match(adminActions, /inviteUserByEmail/);
+});
+
+test("recuperação de senha mantém template com retorno SSR do Carreiras", () => {
   const recovery = readFileSync(
     new URL("../supabase/templates/recovery.html", import.meta.url),
     "utf8",
   );
-  assert.match(confirmation, /Confirme seu cadastro/);
-  assert.match(confirmation, /\.RedirectTo/);
-  assert.match(confirmation, /\.TokenHash/);
-  assert.match(confirmation, /type=email/);
   assert.match(recovery, /Redefina sua senha/);
   assert.match(recovery, /type=recovery/);
 });
