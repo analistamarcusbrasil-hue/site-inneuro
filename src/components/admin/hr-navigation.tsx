@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
-type HrNavigationKey = "dashboard" | "jobs" | "candidates";
+type HrNavigationKey = "dashboard" | "jobs" | "processes" | "candidates";
 
 type HrNavigationItem = {
   key: string;
@@ -33,7 +33,12 @@ const hrNavigationItems: HrNavigationItem[] = [
     icon: BriefcaseBusiness,
     href: "/admin/rh/vagas",
   },
-  { key: "processes", label: "Processos Seletivos", icon: ClipboardList },
+  {
+    key: "processes",
+    label: "Processos Seletivos",
+    icon: ClipboardList,
+    href: "/admin/rh/processos",
+  },
   {
     key: "candidates",
     label: "Candidatos",
@@ -50,10 +55,12 @@ export function HrNavigation({
   current,
   canManageJobs,
   canManageCandidates,
+  canManageProcesses = canManageJobs,
 }: {
   current: HrNavigationKey;
   canManageJobs: boolean;
   canManageCandidates: boolean;
+  canManageProcesses?: boolean;
 }) {
   return (
     <nav aria-label="Módulos de RH" className="mb-8">
@@ -61,7 +68,8 @@ export function HrNavigation({
         {hrNavigationItems.map(({ key, label, icon: Icon, href }) => {
           const allowedHref =
             (key === "candidates" && !canManageCandidates) ||
-            (key === "jobs" && !canManageJobs)
+            (key === "jobs" && !canManageJobs) ||
+            (key === "processes" && !canManageProcesses)
               ? undefined
               : href;
           const active = key === current;
@@ -72,7 +80,7 @@ export function HrNavigation({
               <span className="min-w-0 flex-1 text-sm font-bold">{label}</span>
               {!allowedHref ? (
                 <span className="text-[0.6rem] font-bold tracking-wide uppercase">
-                  {key === "candidates" || key === "jobs"
+                  {key === "candidates" || key === "jobs" || key === "processes"
                     ? "Acesso restrito"
                     : "Em desenvolvimento"}
                 </span>

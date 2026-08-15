@@ -12,7 +12,6 @@ import { AdminPageHeading } from "@/components/admin/admin-page-heading";
 import { requireHrAccess } from "@/lib/careers/hr-auth";
 
 const futureCards = [
-  { label: "Processos ativos", icon: ClipboardList },
   { label: "Novas candidaturas", icon: Inbox },
   { label: "Entrevistas", icon: CalendarClock },
   { label: "Banco de talentos", icon: Database },
@@ -27,7 +26,7 @@ const roleLabels = {
 export default async function HrDashboardPage() {
   const { supabase, hrRole } = await requireHrAccess();
   const canSeeCandidateTotal = hrRole !== "reviewer";
-  const [candidateResult, jobsResult] = canSeeCandidateTotal
+  const [candidateResult, jobsResult, processesResult] = canSeeCandidateTotal
     ? await Promise.all([
         supabase
           .from("candidate_accounts")
@@ -36,12 +35,19 @@ export default async function HrDashboardPage() {
           .from("career_jobs")
           .select("id", { count: "exact", head: true })
           .eq("status", "published"),
+        supabase
+          .from("career_selection_processes")
+          .select("id", { count: "exact", head: true })
+          .in("status", ["open", "in_progress"]),
       ])
-    : [null, null];
+    : [null, null, null];
   const candidateCount = candidateResult?.error
     ? null
     : (candidateResult?.count ?? 0);
   const openJobsCount = jobsResult?.error ? null : (jobsResult?.count ?? 0);
+  const activeProcessesCount = processesResult?.error
+    ? null
+    : (processesResult?.count ?? 0);
 
   return (
     <>
@@ -124,6 +130,36 @@ export default async function HrDashboardPage() {
                     href="/admin/rh/vagas"
                   >
                     Administrar vagas
+                  </Link>
+                </>
+              )
+            ) : (
+              <p className="text-muted mt-2 text-sm font-semibold">
+                Acesso restrito ao RH autorizado
+              </p>
+            )}
+          </li>
+
+          <li className="border-border-light rounded-3xl border bg-white p-6">
+            <span className="bg-mint text-brand grid size-11 place-items-center rounded-2xl">
+              <ClipboardList aria-hidden="true" size={21} />
+            </span>
+            <p className="text-muted mt-6 text-sm">Processos ativos</p>
+            {canSeeCandidateTotal ? (
+              activeProcessesCount === null ? (
+                <p className="text-warning mt-2 text-sm font-bold">
+                  Indicador temporariamente indisponível
+                </p>
+              ) : (
+                <>
+                  <p className="font-heading text-brand-dark mt-1 text-3xl font-semibold">
+                    {activeProcessesCount.toLocaleString("pt-BR")}
+                  </p>
+                  <Link
+                    className="text-brand mt-2 inline-block text-xs font-bold hover:underline"
+                    href="/admin/rh/processos"
+                  >
+                    Administrar processos
                   </Link>
                 </>
               )
