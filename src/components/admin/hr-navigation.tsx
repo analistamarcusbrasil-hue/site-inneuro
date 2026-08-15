@@ -12,7 +12,7 @@ import {
 import Link from "next/link";
 
 type HrNavigationKey =
-  "dashboard" | "jobs" | "processes" | "candidates" | "talent";
+  "dashboard" | "jobs" | "processes" | "candidates" | "talent" | "evaluations";
 
 type HrNavigationItem = {
   key: string;
@@ -52,7 +52,12 @@ const hrNavigationItems: HrNavigationItem[] = [
     icon: Database,
     href: "/admin/rh/talentos",
   },
-  { key: "evaluations", label: "Avaliações", icon: Star },
+  {
+    key: "evaluations",
+    label: "Avaliações",
+    icon: Star,
+    href: "/admin/rh/avaliacoes",
+  },
   { key: "reports", label: "Relatórios", icon: BarChart3 },
   { key: "settings", label: "Configurações", icon: Settings },
 ];
@@ -63,12 +68,14 @@ export function HrNavigation({
   canManageCandidates,
   canManageProcesses = canManageJobs,
   canManageTalentPool = canManageCandidates,
+  canEvaluate = true,
 }: {
   current: HrNavigationKey;
   canManageJobs: boolean;
   canManageCandidates: boolean;
   canManageProcesses?: boolean;
   canManageTalentPool?: boolean;
+  canEvaluate?: boolean;
 }) {
   return (
     <nav aria-label="Módulos de RH" className="mb-8">
@@ -78,7 +85,8 @@ export function HrNavigation({
             (key === "candidates" && !canManageCandidates) ||
             (key === "jobs" && !canManageJobs) ||
             (key === "processes" && !canManageProcesses) ||
-            (key === "talent" && !canManageTalentPool)
+            (key === "talent" && !canManageTalentPool) ||
+            (key === "evaluations" && !canEvaluate)
               ? undefined
               : href;
           const active = key === current;
@@ -92,7 +100,8 @@ export function HrNavigation({
                   {key === "candidates" ||
                   key === "jobs" ||
                   key === "processes" ||
-                  key === "talent"
+                  key === "talent" ||
+                  key === "evaluations"
                     ? "Acesso restrito"
                     : "Em desenvolvimento"}
                 </span>

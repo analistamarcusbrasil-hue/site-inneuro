@@ -128,6 +128,12 @@ export default async function CareerJobDetailPage({
           <div className="flex flex-wrap gap-3">
             <a
               className="border-brand/30 text-brand-dark hover:bg-mint inline-flex min-h-11 items-center rounded-full border px-5 text-sm font-bold"
+              href={`/admin/rh/vagas/${job.id}/avaliacoes`}
+            >
+              Modelo de avaliação
+            </a>
+            <a
+              className="border-brand/30 text-brand-dark hover:bg-mint inline-flex min-h-11 items-center rounded-full border px-5 text-sm font-bold"
               href={`/admin/rh/vagas/${job.id}/aderencia`}
             >
               Matriz de aderência

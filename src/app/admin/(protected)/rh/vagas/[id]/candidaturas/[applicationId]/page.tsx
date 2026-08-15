@@ -137,6 +137,12 @@ export default async function CareerApplicationDetailPage({
 
       <div className="mb-6 flex flex-wrap gap-3">
         <Link
+          className="bg-brand hover:bg-brand-dark inline-flex min-h-11 items-center rounded-full px-5 text-sm font-bold text-white"
+          href={`/admin/rh/avaliacoes/${applicationId}`}
+        >
+          Avaliações humanas
+        </Link>
+        <Link
           className="border-brand/30 text-brand-dark inline-flex min-h-11 items-center rounded-full border px-5 text-sm font-bold"
           href={`/admin/rh/vagas/${id}/candidaturas`}
         >
