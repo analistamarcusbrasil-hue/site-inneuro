@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { candidateRegistrationAction } from "@/app/carreiras/actions";
 import { CareersAuthCard } from "@/components/careers/auth-card";
 import { getCandidateSession } from "@/lib/careers/auth";
+import { safeCareersDestination } from "@/lib/careers/auth-validation";
 
 export const metadata: Metadata = {
   title: "Criar conta | Carreiras INNEURO",
@@ -12,11 +13,12 @@ export const metadata: Metadata = {
 export default async function CandidateRegistrationPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; status?: string }>;
+  searchParams: Promise<{ error?: string; status?: string; next?: string }>;
 }) {
-  const session = await getCandidateSession();
-  if (session.user && session.account) redirect("/carreiras/perfil");
   const query = await searchParams;
+  const next = safeCareersDestination(query.next ?? null);
+  const session = await getCandidateSession();
+  if (session.user && session.account) redirect(next);
 
   return (
     <CareersAuthCard
@@ -42,6 +44,7 @@ export default async function CandidateRegistrationPage({
       ) : null}
 
       <form action={candidateRegistrationAction} className="mt-5 space-y-5">
+        <input type="hidden" name="next" value={next} />
         <label className="text-ink block text-sm font-bold">
           Nome
           <input
@@ -123,7 +126,7 @@ export default async function CandidateRegistrationPage({
         Já tem uma conta?{" "}
         <Link
           className="text-brand font-bold hover:underline"
-          href="/carreiras/entrar"
+          href={`/carreiras/entrar?next=${encodeURIComponent(next)}`}
         >
           Entrar
         </Link>

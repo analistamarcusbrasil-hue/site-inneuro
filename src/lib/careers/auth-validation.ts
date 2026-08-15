@@ -49,11 +49,17 @@ export const candidatePasswordUpdateSchema = z
 
 const allowedCareersDestinations = new Set([
   "/carreiras/perfil",
+  "/carreiras/candidaturas",
   "/carreiras/recuperar-senha?mode=update",
 ]);
 
+const careerApplicationDestination =
+  /^\/carreiras\/vagas\/[a-z0-9]+(?:-[a-z0-9]+)*\/candidatar$/;
+
 export function safeCareersDestination(value: string | null) {
-  return value && allowedCareersDestinations.has(value)
+  return value &&
+    (allowedCareersDestinations.has(value) ||
+      careerApplicationDestination.test(value))
     ? value
     : "/carreiras/perfil";
 }

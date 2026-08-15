@@ -9,6 +9,10 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 function redirectToLogin(request: NextRequest, error: string) {
   const url = new URL("/carreiras/entrar", request.url);
   url.searchParams.set("error", error);
+  url.searchParams.set(
+    "next",
+    safeCareersDestination(request.nextUrl.searchParams.get("next")),
+  );
   return NextResponse.redirect(url);
 }
 

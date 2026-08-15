@@ -7,6 +7,7 @@ import {
   candidatePasswordUpdateSchema,
   candidateRecoverySchema,
   candidateRegistrationSchema,
+  safeCareersDestination,
 } from "@/lib/careers/auth-validation";
 import { requireCareersPortalEnabled } from "@/lib/careers/guards";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -23,18 +24,28 @@ function careersCallbackUrl(next: string) {
   return callback.toString();
 }
 
+function careersAuthUrl(
+  path: "entrar" | "cadastro",
+  reason: string,
+  next: string,
+) {
+  const params = new URLSearchParams({ error: reason, next });
+  return `/carreiras/${path}?${params.toString()}`;
+}
+
 export async function candidateLoginAction(formData: FormData) {
   requireCareersPortalEnabled();
+  const next = safeCareersDestination(formValue(formData, "next"));
   const parsed = candidateLoginSchema.safeParse({
     email: formValue(formData, "email"),
     password: formValue(formData, "password"),
   });
-  if (!parsed.success) redirect("/carreiras/entrar?error=invalid");
+  if (!parsed.success) redirect(careersAuthUrl("entrar", "invalid", next));
 
   const supabase = await createSupabaseServerClient();
-  if (!supabase) redirect("/carreiras/entrar?error=config");
+  if (!supabase) redirect(careersAuthUrl("entrar", "config", next));
   const { error } = await supabase.auth.signInWithPassword(parsed.data);
-  if (error) redirect("/carreiras/entrar?error=credentials");
+  if (error) redirect(careersAuthUrl("entrar", "credentials", next));
 
   const {
     data: { user },
@@ -49,29 +60,31 @@ export async function candidateLoginAction(formData: FormData) {
 
   if (!account) {
     await supabase.auth.signOut();
-    redirect("/carreiras/entrar?error=not-candidate");
+    redirect(careersAuthUrl("entrar", "not-candidate", next));
   }
-  redirect("/carreiras/perfil");
+  redirect(next);
 }
 
-export async function candidateGoogleLoginAction() {
+export async function candidateGoogleLoginAction(formData: FormData) {
   requireCareersPortalEnabled();
+  const next = safeCareersDestination(formValue(formData, "next"));
   const supabase = await createSupabaseServerClient();
-  if (!supabase) redirect("/carreiras/entrar?error=config");
+  if (!supabase) redirect(careersAuthUrl("entrar", "config", next));
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: careersCallbackUrl("/carreiras/perfil"),
+      redirectTo: careersCallbackUrl(next),
       queryParams: { prompt: "select_account" },
     },
   });
-  if (error || !data.url) redirect("/carreiras/entrar?error=google");
+  if (error || !data.url) redirect(careersAuthUrl("entrar", "google", next));
   redirect(data.url);
 }
 
 export async function candidateRegistrationAction(formData: FormData) {
   requireCareersPortalEnabled();
+  const next = safeCareersDestination(formValue(formData, "next"));
   const parsed = candidateRegistrationSchema.safeParse({
     fullName: formValue(formData, "full_name"),
     email: formValue(formData, "email"),
@@ -79,15 +92,15 @@ export async function candidateRegistrationAction(formData: FormData) {
     passwordConfirmation: formValue(formData, "password_confirmation"),
     acceptedTerms: formData.get("accepted_terms") === "on",
   });
-  if (!parsed.success) redirect("/carreiras/cadastro?error=invalid");
+  if (!parsed.success) redirect(careersAuthUrl("cadastro", "invalid", next));
 
   const supabase = await createSupabaseServerClient();
-  if (!supabase) redirect("/carreiras/cadastro?error=config");
+  if (!supabase) redirect(careersAuthUrl("cadastro", "config", next));
   const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
     options: {
-      emailRedirectTo: careersCallbackUrl("/carreiras/perfil"),
+      emailRedirectTo: careersCallbackUrl(next),
       data: {
         full_name: parsed.data.fullName,
         account_type: "candidate",
@@ -95,9 +108,10 @@ export async function candidateRegistrationAction(formData: FormData) {
       },
     },
   });
-  if (error) redirect("/carreiras/cadastro?error=signup");
-  if (data.session) redirect("/carreiras/perfil");
-  redirect("/carreiras/cadastro?status=check-email");
+  if (error) redirect(careersAuthUrl("cadastro", "signup", next));
+  if (data.session) redirect(next);
+  const checkEmail = new URLSearchParams({ status: "check-email", next });
+  redirect(`/carreiras/cadastro?${checkEmail.toString()}`);
 }
 
 export async function candidateRequestPasswordAction(formData: FormData) {

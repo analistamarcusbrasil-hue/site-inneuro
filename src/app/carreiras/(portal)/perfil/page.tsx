@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { candidateLogoutAction } from "@/app/carreiras/actions";
 import {
@@ -221,11 +222,19 @@ export default async function CandidateProfilePage({
                 excluir seus dados sempre que necessário.
               </p>
             </div>
-            <form action={candidateLogoutAction}>
-              <button className="border-brand/30 text-brand-dark hover:bg-mint min-h-11 rounded-full border px-6 text-sm font-bold">
-                Sair da conta
-              </button>
-            </form>
+            <div className="flex flex-wrap gap-3">
+              <Link
+                className="bg-brand hover:bg-brand-dark inline-flex min-h-11 items-center rounded-full px-6 text-sm font-bold text-white"
+                href="/carreiras/candidaturas"
+              >
+                Minhas candidaturas
+              </Link>
+              <form action={candidateLogoutAction}>
+                <button className="border-brand/30 text-brand-dark hover:bg-mint min-h-11 rounded-full border px-6 text-sm font-bold">
+                  Sair da conta
+                </button>
+              </form>
+            </div>
           </div>
 
           <section

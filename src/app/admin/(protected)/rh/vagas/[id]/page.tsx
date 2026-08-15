@@ -63,13 +63,20 @@ export default async function CareerJobDetailPage({
   const query = await searchParams;
   if (!z.string().uuid().safeParse(id).success) notFound();
   const { supabase } = await requireHrAccess("jobs:manage");
-  const { data, error } = await supabase
-    .from("career_jobs")
-    .select("*, area:career_job_areas(id, name, slug, is_active)")
-    .eq("id", id)
-    .maybeSingle();
-  if (error || !data) notFound();
-  const job = data as CareerJob;
+  const [jobResult, applicationsResult] = await Promise.all([
+    supabase
+      .from("career_jobs")
+      .select("*, area:career_job_areas(id, name, slug, is_active)")
+      .eq("id", id)
+      .maybeSingle(),
+    supabase
+      .from("career_job_applications")
+      .select("id", { count: "exact", head: true })
+      .eq("job_id", id),
+  ]);
+  if (jobResult.error || !jobResult.data) notFound();
+  const job = jobResult.data as CareerJob;
+  const applicationCount = applicationsResult.count ?? 0;
   const publicAvailable = isJobPubliclyAvailable(job);
 
   return (
@@ -119,6 +126,12 @@ export default async function CareerJobDetailPage({
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
+            <a
+              className="bg-brand hover:bg-brand-dark inline-flex min-h-11 items-center rounded-full px-5 text-sm font-bold text-white"
+              href={`/admin/rh/vagas/${job.id}/candidaturas`}
+            >
+              Candidaturas ({applicationCount})
+            </a>
             <a
               className="border-brand/30 text-brand-dark hover:bg-mint inline-flex min-h-11 items-center rounded-full border px-5 text-sm font-bold"
               href={`/admin/rh/vagas/${job.id}/editar`}

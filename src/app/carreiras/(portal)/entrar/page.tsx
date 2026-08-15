@@ -7,6 +7,7 @@ import {
 } from "@/app/carreiras/actions";
 import { CareersAuthCard } from "@/components/careers/auth-card";
 import { getCandidateSession } from "@/lib/careers/auth";
+import { safeCareersDestination } from "@/lib/careers/auth-validation";
 
 export const metadata: Metadata = { title: "Entrar | Carreiras INNEURO" };
 
@@ -28,11 +29,12 @@ const statuses: Record<string, string> = {
 export default async function CandidateLoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; status?: string }>;
+  searchParams: Promise<{ error?: string; status?: string; next?: string }>;
 }) {
-  const session = await getCandidateSession();
-  if (session.user && session.account) redirect("/carreiras/perfil");
   const query = await searchParams;
+  const next = safeCareersDestination(query.next ?? null);
+  const session = await getCandidateSession();
+  if (session.user && session.account) redirect(next);
 
   return (
     <CareersAuthCard
@@ -58,6 +60,7 @@ export default async function CandidateLoginPage({
       ) : null}
 
       <form action={candidateGoogleLoginAction} className="mt-5">
+        <input type="hidden" name="next" value={next} />
         <button
           type="submit"
           className="border-border-light text-ink focus-visible:ring-tech hover:bg-surface flex min-h-12 w-full items-center justify-center gap-3 rounded-full border bg-white px-5 font-bold transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
@@ -76,6 +79,7 @@ export default async function CandidateLoginPage({
       </div>
 
       <form action={candidateLoginAction} className="space-y-5">
+        <input type="hidden" name="next" value={next} />
         <label className="text-ink block text-sm font-bold">
           E-mail
           <input
@@ -107,7 +111,7 @@ export default async function CandidateLoginPage({
       <div className="mt-6 flex flex-col items-center gap-3 text-sm sm:flex-row sm:justify-between">
         <Link
           className="text-brand font-bold hover:underline"
-          href="/carreiras/cadastro"
+          href={`/carreiras/cadastro?next=${encodeURIComponent(next)}`}
         >
           Criar conta
         </Link>

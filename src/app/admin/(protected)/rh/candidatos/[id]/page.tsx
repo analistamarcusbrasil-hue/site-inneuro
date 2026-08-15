@@ -1,7 +1,13 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 import { AdminPageHeading } from "@/components/admin/admin-page-heading";
 import { HrNavigation } from "@/components/admin/hr-navigation";
+import {
+  applicationStatusLabels,
+  formatApplicationDate,
+  type ApplicationStatus,
+} from "@/lib/careers/applications";
 import { requireHrAccess } from "@/lib/careers/hr-auth";
 import {
   calculateCandidateProfileCompletion,
@@ -22,6 +28,15 @@ type CandidateAccountRow = {
   full_name: string;
   created_at: string;
   updated_at: string;
+};
+
+type CandidateApplicationRow = {
+  id: string;
+  job_id: string;
+  status: ApplicationStatus;
+  process_label: string | null;
+  submitted_at: string;
+  job: { title: string } | null;
 };
 
 function DetailSection({
@@ -67,6 +82,7 @@ export default async function HrCandidateDetailPage({
     certificationsResult,
     skillsResult,
     resumesResult,
+    applicationsResult,
   ] = await Promise.all([
     supabase.from("candidate_accounts").select("*").eq("id", id).maybeSingle(),
     supabase
@@ -99,6 +115,13 @@ export default async function HrCandidateDetailPage({
       .select("*")
       .eq("candidate_id", id)
       .order("version", { ascending: false }),
+    supabase
+      .from("career_job_applications")
+      .select(
+        "id, job_id, status, process_label, submitted_at, job:career_jobs(title)",
+      )
+      .eq("candidate_id", id)
+      .order("submitted_at", { ascending: false }),
   ]);
   if (accountResult.error || !accountResult.data) notFound();
 
@@ -112,6 +135,9 @@ export default async function HrCandidateDetailPage({
     (certificationsResult.data as CandidateCertification[] | null) ?? [];
   const skills = (skillsResult.data as CandidateSkill[] | null) ?? [];
   const resumes = (resumesResult.data as CandidateResume[] | null) ?? [];
+  const applications =
+    (applicationsResult.data as unknown as CandidateApplicationRow[] | null) ??
+    [];
 
   const admin = createSupabaseAdminClient();
   const authResult = admin ? await admin.auth.admin.getUserById(id) : null;
@@ -374,6 +400,50 @@ export default async function HrCandidateDetailPage({
           <p className="text-muted mt-4 text-xs">
             Os links expiram em 5 minutos e não são URLs públicas permanentes.
           </p>
+        </DetailSection>
+
+        <DetailSection title="Candidaturas">
+          {applicationsResult.error ? (
+            <p className="text-error text-sm">
+              Não foi possível carregar as candidaturas.
+            </p>
+          ) : applications.length ? (
+            <ol className="grid gap-3">
+              {applications.map((application) => (
+                <li
+                  key={application.id}
+                  className="border-border-light rounded-2xl border p-4"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-ink font-bold">
+                        {application.job?.title ?? "Vaga indisponível"}
+                      </h3>
+                      <p className="text-muted mt-1 text-xs">
+                        {formatApplicationDate(application.submitted_at)}
+                      </p>
+                      {application.process_label ? (
+                        <p className="text-muted mt-1 text-xs">
+                          Processo: {application.process_label}
+                        </p>
+                      ) : null}
+                    </div>
+                    <span className="bg-mint text-brand-dark rounded-full px-3 py-1 text-xs font-bold">
+                      {applicationStatusLabels[application.status]}
+                    </span>
+                  </div>
+                  <Link
+                    className="text-brand mt-3 inline-flex text-sm font-bold hover:underline"
+                    href={`/admin/rh/vagas/${application.job_id}/candidaturas/${application.id}`}
+                  >
+                    Abrir candidatura
+                  </Link>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="text-muted text-sm">Nenhuma candidatura enviada.</p>
+          )}
         </DetailSection>
       </div>
     </>

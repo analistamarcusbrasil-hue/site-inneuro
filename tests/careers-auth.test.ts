@@ -48,6 +48,16 @@ test("callback aceita somente destinos internos previstos", () => {
     "/carreiras/perfil",
   );
   assert.equal(safeCareersDestination("//example.com"), "/carreiras/perfil");
+  assert.equal(
+    safeCareersDestination(
+      "/carreiras/vagas/assistente-de-atendimento/candidatar",
+    ),
+    "/carreiras/vagas/assistente-de-atendimento/candidatar",
+  );
+  assert.equal(
+    safeCareersDestination("/carreiras/vagas/../admin/candidatar"),
+    "/carreiras/perfil",
+  );
 });
 
 test("normaliza nome ausente sem inventar dados profissionais", () => {

@@ -1,4 +1,5 @@
 import { BriefcaseBusiness, CalendarDays, MapPin } from "lucide-react";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Container } from "@/components/layout/container";
 import { InternalHero } from "@/components/layout/internal-hero";
@@ -153,9 +154,27 @@ export default async function PublicCareerJobDetailPage({
             />
           </div>
 
-          <aside className="border-brand/15 bg-mint/65 text-brand-dark mt-6 rounded-3xl border p-5 text-sm font-semibold sm:p-6">
-            O envio de candidatura será disponibilizado em uma próxima etapa do
-            portal de carreiras.
+          <aside className="border-brand/15 bg-mint/65 text-brand-dark mt-6 flex flex-wrap items-center justify-between gap-4 rounded-3xl border p-5 sm:p-6">
+            <div>
+              <h2 className="font-heading text-xl font-semibold">
+                Interesse nesta oportunidade?
+              </h2>
+              <p className="mt-1 text-sm">
+                Revise seu perfil profissional antes de enviar a candidatura.
+              </p>
+            </div>
+            {isInternalPreview ? (
+              <span className="text-muted text-sm font-bold">
+                Candidatura indisponível na visualização interna
+              </span>
+            ) : (
+              <Link
+                href={`/carreiras/vagas/${job.slug}/candidatar`}
+                className="bg-brand hover:bg-brand-dark focus-visible:ring-tech inline-flex min-h-12 items-center rounded-full px-6 font-bold text-white transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+              >
+                Candidatar-se
+              </Link>
+            )}
           </aside>
         </Container>
       </section>

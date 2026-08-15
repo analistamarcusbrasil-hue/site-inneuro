@@ -32,6 +32,7 @@ export default async function HrCandidatesPage() {
     educationResult,
     skillsResult,
     resumesResult,
+    applicationsResult,
   ] = await Promise.all([
     supabase
       .from("candidate_accounts")
@@ -42,6 +43,7 @@ export default async function HrCandidatesPage() {
     supabase.from("candidate_education").select("candidate_id"),
     supabase.from("candidate_skills").select("candidate_id"),
     supabase.from("candidate_resumes").select("candidate_id"),
+    supabase.from("career_job_applications").select("candidate_id"),
   ]);
 
   const accounts = (accountsResult.data as CandidateAccountRow[] | null) ?? [];
@@ -54,6 +56,7 @@ export default async function HrCandidatesPage() {
   const educationCounts = countByCandidate(educationResult.data);
   const skillCounts = countByCandidate(skillsResult.data);
   const resumeCounts = countByCandidate(resumesResult.data);
+  const applicationCounts = countByCandidate(applicationsResult.data);
 
   return (
     <>
@@ -105,7 +108,7 @@ export default async function HrCandidatesPage() {
                       {completion}% preenchido
                     </span>
                   </div>
-                  <div className="text-muted mt-5 grid grid-cols-3 gap-3 text-xs">
+                  <div className="text-muted mt-5 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
                     <span>
                       {experienceCounts.get(account.id) ?? 0} experiência(s)
                     </span>
@@ -114,6 +117,9 @@ export default async function HrCandidatesPage() {
                     </span>
                     <span>
                       {skillCounts.get(account.id) ?? 0} habilidade(s)
+                    </span>
+                    <span>
+                      {applicationCounts.get(account.id) ?? 0} candidatura(s)
                     </span>
                   </div>
                   <p className="text-brand mt-5 text-sm font-bold group-hover:underline">
