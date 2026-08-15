@@ -26,24 +26,32 @@ const upcomingFeatures = [
     title: "Perfil profissional",
     description:
       "O candidato poderá manter seus dados profissionais atualizados.",
+    availableDescription:
+      "Mantenha seus dados profissionais atualizados em um perfil permanente.",
     icon: IdCard,
   },
   {
     title: "Banco de Talentos",
     description:
       "Profissionais poderão deixar seus perfis disponíveis para futuras oportunidades.",
+    availableDescription:
+      "Escolha suas áreas de interesse e participe do Banco de Talentos da INNEURO.",
     icon: UsersRound,
   },
   {
     title: "Vagas e processos seletivos",
     description:
       "Será possível acompanhar oportunidades abertas e participar de seleções.",
+    availableDescription:
+      "Consulte oportunidades abertas e acompanhe suas candidaturas.",
     icon: BriefcaseBusiness,
   },
   {
     title: "Candidatura digital",
     description:
       "Todo o processo inicial poderá ser realizado diretamente pelo site da INNEURO.",
+    availableDescription:
+      "Candidate-se diretamente pelo site com seu perfil profissional revisado.",
     icon: FileCheck2,
   },
 ] as const;
@@ -168,7 +176,9 @@ export default function CareersPage() {
                       {item.title}
                     </h3>
                     <p className="text-muted mt-3 text-sm leading-relaxed">
-                      {item.description}
+                      {portalEnabled
+                        ? item.availableDescription
+                        : item.description}
                     </p>
                   </article>
                 );

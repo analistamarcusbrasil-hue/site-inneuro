@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
   candidateRegistrationSchema,
@@ -63,4 +64,19 @@ test("callback aceita somente destinos internos previstos", () => {
 test("normaliza nome ausente sem inventar dados profissionais", () => {
   assert.equal(normalizeCandidateName("  Ana Souza  "), "Ana Souza");
   assert.equal(normalizeCandidateName(""), "Candidato");
+});
+
+test("login com Google só aparece quando o provedor estiver habilitado", () => {
+  const page = readFileSync(
+    new URL("../src/app/carreiras/(portal)/entrar/page.tsx", import.meta.url),
+    "utf8",
+  );
+  const providers = readFileSync(
+    new URL("../src/lib/careers/auth-providers.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(page, /isCandidateGoogleAuthEnabled/);
+  assert.match(page, /googleEnabled \?/);
+  assert.match(providers, /\/auth\/v1\/settings/);
+  assert.match(providers, /settings\.external\?\.google === true/);
 });

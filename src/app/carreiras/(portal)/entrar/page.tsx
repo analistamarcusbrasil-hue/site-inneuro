@@ -7,6 +7,7 @@ import {
 } from "@/app/carreiras/actions";
 import { CareersAuthCard } from "@/components/careers/auth-card";
 import { getCandidateSession } from "@/lib/careers/auth";
+import { isCandidateGoogleAuthEnabled } from "@/lib/careers/auth-providers";
 import { safeCareersDestination } from "@/lib/careers/auth-validation";
 
 export const metadata: Metadata = { title: "Entrar | Carreiras INNEURO" };
@@ -31,7 +32,10 @@ export default async function CandidateLoginPage({
 }: {
   searchParams: Promise<{ error?: string; status?: string; next?: string }>;
 }) {
-  const query = await searchParams;
+  const [query, googleEnabled] = await Promise.all([
+    searchParams,
+    isCandidateGoogleAuthEnabled(),
+  ]);
   const next = safeCareersDestination(query.next ?? null);
   const session = await getCandidateSession();
   if (session.user && session.account) redirect(next);
@@ -59,24 +63,28 @@ export default async function CandidateLoginPage({
         </p>
       ) : null}
 
-      <form action={candidateGoogleLoginAction} className="mt-5">
-        <input type="hidden" name="next" value={next} />
-        <button
-          type="submit"
-          className="border-border-light text-ink focus-visible:ring-tech hover:bg-surface flex min-h-12 w-full items-center justify-center gap-3 rounded-full border bg-white px-5 font-bold transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
-        >
-          <span aria-hidden="true" className="text-brand text-lg font-bold">
-            G
-          </span>
-          Continuar com Google
-        </button>
-      </form>
+      {googleEnabled ? (
+        <>
+          <form action={candidateGoogleLoginAction} className="mt-5">
+            <input type="hidden" name="next" value={next} />
+            <button
+              type="submit"
+              className="border-border-light text-ink focus-visible:ring-tech hover:bg-surface flex min-h-12 w-full items-center justify-center gap-3 rounded-full border bg-white px-5 font-bold transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+            >
+              <span aria-hidden="true" className="text-brand text-lg font-bold">
+                G
+              </span>
+              Continuar com Google
+            </button>
+          </form>
 
-      <div className="text-muted my-6 flex items-center gap-3 text-xs">
-        <span className="bg-border-light h-px flex-1" />
-        <span>ou</span>
-        <span className="bg-border-light h-px flex-1" />
-      </div>
+          <div className="text-muted my-6 flex items-center gap-3 text-xs">
+            <span className="bg-border-light h-px flex-1" />
+            <span>ou</span>
+            <span className="bg-border-light h-px flex-1" />
+          </div>
+        </>
+      ) : null}
 
       <form action={candidateLoginAction} className="space-y-5">
         <input type="hidden" name="next" value={next} />
