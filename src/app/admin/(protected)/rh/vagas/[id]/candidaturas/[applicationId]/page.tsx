@@ -13,7 +13,13 @@ import {
   type CareerJobApplication,
 } from "@/lib/careers/applications";
 import { requireHrAccess } from "@/lib/careers/hr-auth";
+import {
+  matchResultSchema,
+  matchStatusLabels,
+  type ExplainableMatchResult,
+} from "@/lib/careers/matching";
 import { formatCandidateMonth, formatFileSize } from "@/lib/careers/profile";
+import { recalculateApplicationMatchAction } from "../../aderencia/actions";
 import { updateCareerApplicationStatusAction } from "../actions";
 
 type HistoryRow = {
@@ -22,6 +28,15 @@ type HistoryRow = {
   to_status: ApplicationStatus;
   actor_kind: "candidate" | "admin" | "system";
   changed_at: string;
+};
+
+type MatchRunRow = {
+  id: string;
+  matrix_version: number;
+  overall_score: number;
+  hard_skills_score: number;
+  result: unknown;
+  calculated_at: string;
 };
 
 function SnapshotSection({
@@ -55,7 +70,13 @@ export default async function CareerApplicationDetailPage({
   )
     notFound();
   const { supabase } = await requireHrAccess("jobs:manage");
-  const [jobResult, applicationResult, historyResult] = await Promise.all([
+  const [
+    jobResult,
+    applicationResult,
+    historyResult,
+    matchRunsResult,
+    matrixResult,
+  ] = await Promise.all([
     supabase.from("career_jobs").select("id, title").eq("id", id).maybeSingle(),
     supabase
       .from("career_job_applications")
@@ -68,6 +89,20 @@ export default async function CareerApplicationDetailPage({
       .select("id, from_status, to_status, actor_kind, changed_at")
       .eq("application_id", applicationId)
       .order("changed_at", { ascending: false }),
+    supabase
+      .from("career_application_match_runs")
+      .select(
+        "id, matrix_version, overall_score, hard_skills_score, result, calculated_at",
+      )
+      .eq("application_id", applicationId)
+      .order("calculated_at", { ascending: false }),
+    supabase
+      .from("career_job_match_matrices")
+      .select("id, version")
+      .eq("job_id", id)
+      .order("version", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
   if (
     jobResult.error ||
@@ -82,6 +117,12 @@ export default async function CareerApplicationDetailPage({
   );
   const snapshot = snapshotResult.success ? snapshotResult.data : null;
   const history = (historyResult.data as HistoryRow[] | null) ?? [];
+  const matchRuns = (matchRunsResult.data as MatchRunRow[] | null) ?? [];
+  const latestMatch = matchRuns[0] ?? null;
+  const parsedMatch = matchResultSchema.safeParse(latestMatch?.result);
+  const match: ExplainableMatchResult | null = parsedMatch.success
+    ? parsedMatch.data
+    : null;
   const transitions = adminApplicationTransitions[application.status];
   const query = await searchParams;
 
@@ -117,6 +158,14 @@ export default async function CareerApplicationDetailPage({
           Status atualizado e registrado no histórico.
         </p>
       ) : null}
+      {query.status === "match-calculated" ? (
+        <p
+          role="status"
+          className="bg-mint text-brand-dark mb-6 rounded-2xl p-4 text-sm font-bold"
+        >
+          Indicador recalculado e nova entrada adicionada ao histórico.
+        </p>
+      ) : null}
       {query.error ? (
         <p
           role="alert"
@@ -124,7 +173,9 @@ export default async function CareerApplicationDetailPage({
         >
           {query.error === "transition"
             ? "Esta mudança de status não é permitida."
-            : "Não foi possível atualizar a candidatura."}
+            : query.error === "calculation"
+              ? "Não foi possível calcular a aderência desta candidatura."
+              : "Não foi possível atualizar a candidatura."}
         </p>
       ) : null}
 
@@ -188,6 +239,140 @@ export default async function CareerApplicationDetailPage({
               </button>
             </div>
           </ConfirmCommandForm>
+        ) : null}
+      </section>
+
+      <section className="border-border-light mt-6 rounded-3xl border bg-white p-5 sm:p-7">
+        <div className="flex flex-wrap items-start justify-between gap-5">
+          <div>
+            <p className="text-muted text-xs font-bold tracking-wide uppercase">
+              Apoio à triagem
+            </p>
+            <h2 className="font-heading text-brand-dark mt-1 text-2xl font-semibold">
+              {match
+                ? `Aderência à vaga: ${match.overallScore}%`
+                : "Aderência ainda não calculada"}
+            </h2>
+            {match ? (
+              <p className="text-muted mt-2 text-sm">
+                Hard skills vinculadas à vaga: {match.hardSkillsScore}% · Matriz
+                v{latestMatch?.matrix_version}
+              </p>
+            ) : null}
+          </div>
+          {matrixResult.data ? (
+            <ConfirmCommandForm
+              action={recalculateApplicationMatchAction}
+              message="Recalcular com a versão atual da matriz? O cálculo anterior permanecerá no histórico."
+            >
+              <input type="hidden" name="job_id" value={id} />
+              <input
+                type="hidden"
+                name="application_id"
+                value={applicationId}
+              />
+              <button className="border-brand/30 text-brand-dark min-h-11 rounded-full border px-5 text-sm font-bold">
+                {match ? "Recalcular" : "Calcular aderência"}
+              </button>
+            </ConfirmCommandForm>
+          ) : (
+            <Link
+              className="border-brand/30 text-brand-dark inline-flex min-h-11 items-center rounded-full border px-5 text-sm font-bold"
+              href={`/admin/rh/vagas/${id}/aderencia`}
+            >
+              Configurar matriz
+            </Link>
+          )}
+        </div>
+
+        <p className="border-brand/20 bg-mint/60 text-brand-dark mt-5 rounded-2xl border p-4 text-sm font-bold">
+          Indicador de apoio à triagem. A decisão final é responsabilidade do
+          RH. Nenhuma ação é tomada automaticamente.
+        </p>
+
+        {match ? (
+          <div className="mt-6 grid gap-4">
+            {match.items.map((item) => (
+              <article
+                key={item.key}
+                className="border-border-light rounded-2xl border p-4"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-ink font-bold">{item.label}</h3>
+                    <p className="text-muted mt-1 text-xs">
+                      Peso {item.weight}% · Correspondência {item.score}%
+                    </p>
+                  </div>
+                  <span className="bg-surface text-brand-dark rounded-full px-3 py-1 text-xs font-bold">
+                    {matchStatusLabels[item.status]}
+                  </span>
+                </div>
+                {item.evidence.length ? (
+                  <div className="mt-4">
+                    <h4 className="text-success text-xs font-bold tracking-wide uppercase">
+                      Evidências de aderência
+                    </h4>
+                    <ul className="mt-2 grid gap-2 text-sm">
+                      {item.evidence.map((evidence, index) => (
+                        <li key={`${evidence.source}-${index}`}>
+                          <span className="text-success" aria-hidden="true">
+                            ✓
+                          </span>{" "}
+                          {evidence.text}
+                          <span className="text-muted block text-xs">
+                            Fonte: {evidence.source}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {item.pointsToVerify.length ? (
+                  <div className="mt-4">
+                    <h4 className="text-warning text-xs font-bold tracking-wide uppercase">
+                      Pontos a verificar
+                    </h4>
+                    <ul className="mt-2 grid gap-2 text-sm">
+                      {item.pointsToVerify.map((point) => (
+                        <li key={point}>• {point}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="text-muted mt-5 text-sm">
+            O cálculo usa somente o snapshot profissional confirmado enviado
+            nesta candidatura.
+          </p>
+        )}
+
+        {matchRuns.length ? (
+          <details className="border-border-light mt-6 border-t pt-5">
+            <summary className="text-brand cursor-pointer text-sm font-bold">
+              Histórico de cálculos ({matchRuns.length})
+            </summary>
+            <ol className="mt-4 grid gap-2 text-sm">
+              {matchRuns.map((run) => (
+                <li
+                  key={run.id}
+                  className="border-border-light flex flex-wrap justify-between gap-3 rounded-xl border p-3"
+                >
+                  <span>
+                    Matriz v{run.matrix_version}:{" "}
+                    <strong>{run.overall_score}%</strong>
+                    {" · "}Hard skills {run.hard_skills_score}%
+                  </span>
+                  <span className="text-muted text-xs">
+                    {formatApplicationDate(run.calculated_at)}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </details>
         ) : null}
       </section>
 

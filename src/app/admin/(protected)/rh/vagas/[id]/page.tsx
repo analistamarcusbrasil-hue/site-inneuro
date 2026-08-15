@@ -127,6 +127,12 @@ export default async function CareerJobDetailPage({
           </div>
           <div className="flex flex-wrap gap-3">
             <a
+              className="border-brand/30 text-brand-dark hover:bg-mint inline-flex min-h-11 items-center rounded-full border px-5 text-sm font-bold"
+              href={`/admin/rh/vagas/${job.id}/aderencia`}
+            >
+              Matriz de aderência
+            </a>
+            <a
               className="bg-brand hover:bg-brand-dark inline-flex min-h-11 items-center rounded-full px-5 text-sm font-bold text-white"
               href={`/admin/rh/vagas/${job.id}/candidaturas`}
             >
