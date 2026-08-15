@@ -145,14 +145,14 @@ test("Nodemailer serializa destinatário fixo e Reply-To", async () => {
   });
   const info = await transport.sendMail({
     from: "INNEURO <site@inneuroap.com.br>",
-    to: "faleconosco@inneuroap.com.br",
+    to: "adm@inneuroap.com.br",
     replyTo: email.replyTo,
     subject: email.subject,
     text: email.text,
     html: email.html,
   });
   const raw = String(info.message);
-  assert.match(raw, /To: faleconosco@inneuroap.com.br/);
+  assert.match(raw, /To: adm@inneuroap.com.br/);
   assert.match(raw, /Reply-To: maria@example.com/);
 });
 

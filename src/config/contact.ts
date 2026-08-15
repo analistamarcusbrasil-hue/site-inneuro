@@ -1,1 +1,1 @@
-export const CONTACT_EMAIL = "faleconosco@inneuroap.com.br";
+export const CONTACT_EMAIL = "adm@inneuroap.com.br";

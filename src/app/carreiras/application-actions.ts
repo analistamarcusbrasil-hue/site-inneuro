@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { careerApplicationIdSchema } from "@/lib/careers/application-validation";
+import { notifyNewCareerApplication } from "@/lib/careers/application-notification";
 import { requireCandidateSession } from "@/lib/careers/auth";
 import { requireCareersPortalEnabled } from "@/lib/careers/guards";
 import { careerApplicationLogisticsSchema } from "@/lib/careers/logistics-validation";
@@ -13,11 +14,11 @@ function field(formData: FormData, name: string) {
 
 export async function submitCareerJobApplicationAction(formData: FormData) {
   requireCareersPortalEnabled();
-  const { supabase } = await requireCandidateSession();
+  const { supabase, account, user } = await requireCandidateSession();
   const jobId = field(formData, "job_id");
   const { data: job } = await supabase
     .from("career_jobs")
-    .select("id, work_mode, unit_id")
+    .select("id, title, work_mode, unit_id")
     .eq("id", jobId)
     .maybeSingle();
   const parsed = careerApplicationLogisticsSchema.safeParse({
@@ -34,7 +35,7 @@ export async function submitCareerJobApplicationAction(formData: FormData) {
   });
   if (!parsed.success) redirect("/carreiras/vagas?error=application");
 
-  const { error } = await supabase.rpc(
+  const { data: applicationId, error } = await supabase.rpc(
     "submit_career_job_application_with_logistics",
     {
       p_job_id: parsed.data.jobId,
@@ -56,6 +57,21 @@ export async function submitCareerJobApplicationAction(formData: FormData) {
           : "save";
     redirect(`/carreiras/vagas/${parsed.data.slug}/candidatar?error=${reason}`);
   }
+
+  const parsedApplicationId =
+    careerApplicationIdSchema.safeParse(applicationId);
+  if (!parsedApplicationId.success) {
+    redirect(`/carreiras/vagas/${parsed.data.slug}/candidatar?error=save`);
+  }
+
+  await notifyNewCareerApplication({
+    applicationId: parsedApplicationId.data,
+    jobId: parsed.data.jobId,
+    jobTitle: job?.title ?? "Vaga INNEURO",
+    candidateName: account.full_name,
+    candidateEmail: user.email ?? "",
+    submittedAt: new Date(),
+  });
 
   revalidatePath("/carreiras/candidaturas");
   redirect("/carreiras/candidaturas?status=submitted");

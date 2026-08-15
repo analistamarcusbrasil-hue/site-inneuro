@@ -1,0 +1,228 @@
+PASSO A PASSO — CONFIGURAR O ENVIO DE E-MAIL DO FALE CONOSCO DA INNEURO
+
+Endereço do formulário:
+https://inneuroap.com.br/fale-conosco
+
+E-mail oficial configurado no site:
+adm@inneuroap.com.br
+
+IMPORTANTE
+
+- O Registro.br administra o domínio, mas não cria uma caixa de e-mail.
+- É necessário ter um serviço de e-mail contratado e a caixa
+  adm@inneuroap.com.br criada nesse serviço.
+- Não envie a senha por WhatsApp, chat ou e-mail.
+- Não coloque a senha em arquivos do projeto ou no GitHub.
+- A senha deverá ser cadastrada somente como variável secreta na Vercel.
+
+
+1. CONFIRMAR QUE A CAIXA DE E-MAIL EXISTE
+
+1. Acesse o painel da empresa que fornece o e-mail da INNEURO.
+2. Confirme que a caixa adm@inneuroap.com.br está criada e ativa.
+3. Entre no webmail com esse endereço.
+4. Envie um e-mail de teste para outro endereço e responda para a caixa da
+   INNEURO.
+5. Continue somente depois de confirmar que a caixa envia e recebe mensagens.
+
+Se a caixa ainda não existir, será necessário contratar ou configurar um
+provedor de e-mail antes de continuar. Exemplos de provedores são Google
+Workspace, Microsoft 365, Zoho Mail, Titan ou o serviço oferecido pela empresa
+de hospedagem. Escolha somente um provedor para o domínio.
+
+
+2. OBTER OS DADOS SMTP NO PROVEDOR DE E-MAIL
+
+No painel ou suporte do provedor, procure por “Configuração SMTP” ou “Enviar
+e-mail por aplicativos” e anote:
+
+- servidor SMTP (host);
+- porta SMTP;
+- tipo de segurança;
+- usuário SMTP;
+- senha SMTP ou senha de aplicativo.
+
+Normalmente existem duas configurações possíveis:
+
+Opção A — SSL direto
+- Porta: 465
+- SMTP_SECURE: true
+
+Opção B — STARTTLS
+- Porta: 587
+- SMTP_SECURE: false
+
+Use exatamente a porta e a segurança informadas pelo provedor. Não tente
+misturar a porta 465 com false nem a porta 587 com true.
+
+O usuário geralmente será o endereço completo:
+adm@inneuroap.com.br
+
+Se a conta utiliza verificação em duas etapas, o provedor poderá exigir uma
+“senha de aplicativo” em vez da senha normal do webmail.
+
+
+3. CADASTRAR AS VARIÁVEIS NA VERCEL
+
+1. Acesse https://vercel.com e entre na conta responsável pelo site.
+2. Abra o projeto site-inneuro-91b3.
+3. Entre em Settings.
+4. Entre em Environment Variables.
+5. Cadastre uma variável por vez.
+6. Marque o ambiente Production em todas elas.
+7. Não use aspas e não deixe espaços antes ou depois dos valores.
+
+Variáveis obrigatórias:
+
+SMTP_HOST
+Valor: servidor SMTP fornecido pela empresa de e-mail.
+Exemplo de formato: smtp.provedor.com
+
+SMTP_PORT
+Valor: porta fornecida pelo provedor.
+Normalmente: 465 ou 587
+
+SMTP_SECURE
+Valor: true para a porta 465 ou false para a porta 587.
+
+SMTP_USER
+Valor recomendado: adm@inneuroap.com.br
+
+SMTP_PASSWORD
+Valor: senha SMTP ou senha de aplicativo fornecida pelo provedor.
+Esta variável deve permanecer secreta.
+
+CONTACT_FROM_EMAIL
+Valor recomendado: adm@inneuroap.com.br
+
+CONTACT_RECIPIENT_EMAIL
+Valor recomendado: adm@inneuroap.com.br
+
+Resumo para conferência:
+
+SMTP_HOST=SERVIDOR_FORNECIDO_PELO_PROVEDOR
+SMTP_PORT=465_OU_587
+SMTP_SECURE=true_OU_false
+SMTP_USER=adm@inneuroap.com.br
+SMTP_PASSWORD=SENHA_SMTP_OU_SENHA_DE_APLICATIVO
+CONTACT_FROM_EMAIL=adm@inneuroap.com.br
+CONTACT_RECIPIENT_EMAIL=adm@inneuroap.com.br
+
+Não cadastre SMTP_PASSWORD com o prefixo NEXT_PUBLIC_. Variáveis com esse
+prefixo podem ser expostas ao navegador.
+
+
+4. PUBLICAR NOVAMENTE DEPOIS DE CADASTRAR AS VARIÁVEIS
+
+As variáveis novas não alteram automaticamente um deploy que já foi criado.
+
+1. Na Vercel, abra Deployments.
+2. Localize o deploy mais recente da branch main.
+3. Abra o menu de opções desse deploy.
+4. Clique em Redeploy.
+5. Confirme que o destino é Production.
+6. Aguarde o status Ready.
+
+
+5. CONFIGURAR SPF, DKIM E DMARC NO DNS
+
+Esses registros ajudam a impedir que os e-mails enviados pelo site sejam
+rejeitados ou classificados como spam.
+
+1. No provedor de e-mail, abra a área de configuração do domínio.
+2. Copie os registros SPF, DKIM e DMARC mostrados pelo provedor.
+3. Cadastre esses registros no painel DNS que atualmente administra
+   inneuroap.com.br.
+4. Se o DNS estiver no Registro.br, faça a inclusão na Zona DNS do domínio.
+5. Aguarde a validação indicada pelo provedor.
+
+Não copie registros genéricos da internet. Cada provedor fornece nomes e valores
+próprios, principalmente para o DKIM. Não crie dois registros SPF separados;
+se já existir SPF, ele precisa ser ajustado conforme a orientação do provedor.
+
+
+6. REALIZAR O TESTE COMPLETO
+
+1. Abra uma janela anônima do navegador.
+2. Acesse https://inneuroap.com.br/fale-conosco.
+3. Preencha o formulário usando um endereço de e-mail diferente do endereço da
+   INNEURO.
+4. Marque a autorização necessária e envie a mensagem.
+5. Anote o protocolo exibido.
+6. Abra a caixa adm@inneuroap.com.br.
+7. Verifique a Caixa de entrada e a pasta Spam.
+8. Abra a mensagem e clique em Responder.
+9. Confirme que a resposta será enviada ao endereço informado no formulário.
+
+ATENÇÃO: a tela do site pode gerar um protocolo mesmo se o servidor de e-mail
+falhar, pois a solicitação é salva antes da tentativa de envio. Portanto, o
+recebimento da mensagem e o status no banco precisam ser confirmados.
+
+
+7. CONFIRMAR O STATUS REAL NO SUPABASE
+
+1. Acesse o projeto da INNEURO no Supabase.
+2. Abra Table Editor.
+3. Abra a tabela contact_messages.
+4. Localize a linha pelo protocolo do teste.
+5. Confirme os campos:
+
+- email_delivery_status deve estar como SENT;
+- email_sent_at deve conter a data e a hora do envio.
+
+Se email_delivery_status estiver como FAILED, o formulário foi salvo, mas o
+SMTP não conseguiu enviar a mensagem.
+
+
+8. COMO CORRIGIR OS ERROS MAIS COMUNS
+
+Erro de autenticação ou código 535:
+- confira SMTP_USER e SMTP_PASSWORD;
+- gere uma senha de aplicativo se a conta usar autenticação em duas etapas;
+- confirme se o provedor permite SMTP para essa conta.
+
+Erro de conexão ou timeout:
+- confira SMTP_HOST;
+- confira a porta;
+- confirme a combinação da porta com SMTP_SECURE;
+- pergunte ao provedor se há bloqueio para conexões externas.
+
+Erro “sender rejected”, “from not allowed” ou remetente recusado:
+- mantenha CONTACT_FROM_EMAIL igual ao endereço autenticado em SMTP_USER;
+- confirme no provedor se o endereço pode enviar mensagens.
+
+Mensagem enviada, mas recebida no Spam:
+- valide SPF e DKIM;
+- configure DMARC conforme a orientação do provedor;
+- confirme que o domínio está verificado no serviço de e-mail.
+
+O formulário gera protocolo, mas nenhum e-mail chega:
+- consulte contact_messages no Supabase;
+- se o status for FAILED, revise as sete variáveis SMTP na Vercel;
+- abra o deploy na Vercel e consulte os logs da rota /api/fale-conosco;
+- nunca copie senhas ou chaves completas para os logs ou para atendimento.
+
+
+9. CHECKLIST FINAL
+
+[ ] A caixa adm@inneuroap.com.br existe e acessa o webmail.
+[ ] A caixa envia e recebe mensagens manualmente.
+[ ] O provedor forneceu host, porta, segurança, usuário e senha SMTP.
+[ ] As sete variáveis foram cadastradas para Production na Vercel.
+[ ] Foi feito um novo deploy de produção após cadastrar as variáveis.
+[ ] SPF, DKIM e DMARC foram configurados conforme o provedor.
+[ ] O formulário exibiu um protocolo.
+[ ] A mensagem chegou ao e-mail da INNEURO.
+[ ] O botão Responder aponta para o remetente do formulário.
+[ ] O registro no Supabase mostra email_delivery_status como SENT.
+
+
+OBSERVAÇÃO SOBRE O PROJETO ATUAL
+
+Na cópia local do projeto, as variáveis SMTP não possuem valores. Isso é
+correto para segurança: os valores reais devem ficar somente na Vercel e nunca
+devem ser enviados ao GitHub.
+
+O formulário também depende das variáveis do Supabase e da tabela
+contact_messages. Se o formulário já gera protocolo, essa parte provavelmente
+já está funcionando; ainda assim, o teste da seção 7 é a confirmação definitiva.
