@@ -15,7 +15,7 @@ export async function isCandidateGoogleAuthEnabled() {
       `${supabaseUrl.replace(/\/$/, "")}/auth/v1/settings`,
       {
         headers: { apikey: publishableKey },
-        next: { revalidate: 300 },
+        cache: "no-store",
       },
     );
     if (!response.ok) return false;
