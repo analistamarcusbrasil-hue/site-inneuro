@@ -50,6 +50,7 @@ export const candidatePasswordUpdateSchema = z
 const allowedCareersDestinations = new Set([
   "/carreiras/perfil",
   "/carreiras/candidaturas",
+  "/carreiras/vagas",
   "/carreiras/recuperar-senha?mode=update",
 ]);
 

@@ -1,9 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
-import {
-  normalizeCandidateName,
-  safeCareersDestination,
-} from "@/lib/careers/auth-validation";
+import type { EmailOtpType } from "@supabase/supabase-js";
+import { safeCareersDestination } from "@/lib/careers/auth-validation";
+import { ensureCandidateOnboarding } from "@/lib/careers/candidate-onboarding";
 import { isCareersPortalEnabled } from "@/lib/careers/feature-flag";
+import {
+  CANDIDATE_RESEND_COOLDOWN_COOKIE,
+  PENDING_CANDIDATE_EMAIL_COOKIE,
+} from "@/lib/careers/auth-pending";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 function redirectToLogin(request: NextRequest, error: string) {
@@ -22,12 +25,18 @@ export async function GET(request: NextRequest) {
   }
 
   const code = request.nextUrl.searchParams.get("code");
+  const tokenHash = request.nextUrl.searchParams.get("token_hash");
+  const type = request.nextUrl.searchParams.get("type") as EmailOtpType | null;
   const authError = request.nextUrl.searchParams.get("error");
-  if (!code || authError) return redirectToLogin(request, "oauth");
+  if (authError || (!code && (!tokenHash || !type))) {
+    return redirectToLogin(request, "oauth");
+  }
 
   const supabase = await createSupabaseServerClient();
   if (!supabase) return redirectToLogin(request, "config");
-  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  const { error } = code
+    ? await supabase.auth.exchangeCodeForSession(code)
+    : await supabase.auth.verifyOtp({ token_hash: tokenHash!, type: type! });
   if (error) return redirectToLogin(request, "oauth");
 
   const {
@@ -35,22 +44,28 @@ export async function GET(request: NextRequest) {
   } = await supabase.auth.getUser();
   if (!user) return redirectToLogin(request, "session");
 
-  const fullName = normalizeCandidateName(
-    user.user_metadata.full_name ?? user.user_metadata.name,
-  );
-  const { error: accountError } = await supabase
-    .from("candidate_accounts")
-    .upsert(
-      { id: user.id, full_name: fullName },
-      { onConflict: "id", ignoreDuplicates: true },
-    );
-  if (accountError) {
+  let profileSufficient = false;
+  try {
+    ({ profileSufficient } = await ensureCandidateOnboarding(supabase, user));
+  } catch {
     await supabase.auth.signOut();
     return redirectToLogin(request, "account");
   }
 
-  const destination = safeCareersDestination(
+  const requestedDestination = safeCareersDestination(
     request.nextUrl.searchParams.get("next"),
   );
-  return NextResponse.redirect(new URL(destination, request.url));
+  const destination = profileSufficient
+    ? requestedDestination
+    : "/carreiras/perfil";
+  const response = NextResponse.redirect(new URL(destination, request.url));
+  response.cookies.set(PENDING_CANDIDATE_EMAIL_COOKIE, "", {
+    path: "/carreiras",
+    maxAge: 0,
+  });
+  response.cookies.set(CANDIDATE_RESEND_COOLDOWN_COOKIE, "", {
+    path: "/carreiras",
+    maxAge: 0,
+  });
+  return response;
 }

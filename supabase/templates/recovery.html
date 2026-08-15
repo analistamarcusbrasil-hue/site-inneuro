@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="pt-BR">
+  <body
+    style="
+      margin: 0;
+      background: #f7faf8;
+      font-family: Arial, sans-serif;
+      color: #10231b;
+    "
+  >
+    <div style="max-width: 620px; margin: 0 auto; padding: 32px 16px">
+      <div
+        style="
+          background: #03251b;
+          color: #fff;
+          padding: 24px;
+          border-radius: 18px 18px 0 0;
+        "
+      >
+        <p
+          style="
+            margin: 0;
+            color: #dff8ec;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+          "
+        >
+          INNEURO CARREIRAS
+        </p>
+      </div>
+      <div
+        style="
+          background: #fff;
+          padding: 28px 24px;
+          border: 1px solid #dde9e2;
+          border-top: 0;
+          border-radius: 0 0 18px 18px;
+        "
+      >
+        <h1 style="margin: 0; font-size: 24px; line-height: 1.3">
+          Redefina sua senha
+        </h1>
+        <p style="margin: 18px 0 0; line-height: 1.65">
+          Recebemos uma solicitação para redefinir a senha da sua conta no
+          Carreiras INNEURO.
+        </p>
+        <p style="margin: 24px 0">
+          <a
+            href="{{ .RedirectTo }}&amp;token_hash={{ .TokenHash }}&amp;type=recovery"
+            style="
+              display: inline-block;
+              padding: 13px 20px;
+              border-radius: 12px;
+              background: #087a4d;
+              color: #fff;
+              text-decoration: none;
+              font-weight: 700;
+            "
+            >Criar nova senha</a
+          >
+        </p>
+        <p
+          style="margin: 0; color: #65736d; font-size: 12px; line-height: 1.55"
+        >
+          Se você não solicitou a alteração, ignore esta mensagem.
+        </p>
+      </div>
+    </div>
+  </body>
+</html>

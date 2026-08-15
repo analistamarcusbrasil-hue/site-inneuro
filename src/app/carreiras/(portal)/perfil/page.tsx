@@ -275,7 +275,9 @@ export default async function CandidateProfilePage({
                 Área privada do candidato
               </p>
               <h1 className="font-heading text-brand-dark mt-3 text-3xl font-semibold tracking-[-0.035em] sm:text-4xl">
-                Seu perfil profissional
+                {completion < 70
+                  ? "Complete seu perfil profissional"
+                  : "Seu perfil profissional"}
               </h1>
               <p className="text-muted mt-3 max-w-2xl leading-relaxed">
                 Mantenha suas informações atualizadas. Você poderá editar ou

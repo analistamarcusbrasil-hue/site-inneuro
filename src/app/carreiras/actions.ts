@@ -3,6 +3,12 @@
 import { redirect } from "next/navigation";
 import { siteConfig } from "@/config/site";
 import {
+  getCandidateResendAvailableAt,
+  getPendingCandidateEmail,
+  rememberPendingCandidateEmail,
+  setCandidateResendCooldown,
+} from "@/lib/careers/auth-pending";
+import {
   candidateLoginSchema,
   candidatePasswordUpdateSchema,
   candidateRecoverySchema,
@@ -68,8 +74,10 @@ export async function candidateLoginAction(formData: FormData) {
 export async function candidateGoogleLoginAction(formData: FormData) {
   requireCareersPortalEnabled();
   const next = safeCareersDestination(formValue(formData, "next"));
+  const source =
+    formValue(formData, "auth_source") === "cadastro" ? "cadastro" : "entrar";
   const supabase = await createSupabaseServerClient();
-  if (!supabase) redirect(careersAuthUrl("entrar", "config", next));
+  if (!supabase) redirect(careersAuthUrl(source, "config", next));
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
@@ -78,7 +86,7 @@ export async function candidateGoogleLoginAction(formData: FormData) {
       queryParams: { prompt: "select_account" },
     },
   });
-  if (error || !data.url) redirect(careersAuthUrl("entrar", "google", next));
+  if (error || !data.url) redirect(careersAuthUrl(source, "google", next));
   redirect(data.url);
 }
 
@@ -110,8 +118,48 @@ export async function candidateRegistrationAction(formData: FormData) {
   });
   if (error) redirect(careersAuthUrl("cadastro", "signup", next));
   if (data.session) redirect(next);
+  await rememberPendingCandidateEmail(parsed.data.email);
+  await setCandidateResendCooldown();
   const checkEmail = new URLSearchParams({ status: "check-email", next });
   redirect(`/carreiras/cadastro?${checkEmail.toString()}`);
+}
+
+export async function candidateResendConfirmationAction(formData: FormData) {
+  requireCareersPortalEnabled();
+  const next = safeCareersDestination(formValue(formData, "next"));
+  const params = new URLSearchParams({ status: "check-email", next });
+  const email = await getPendingCandidateEmail();
+  if (!email) {
+    params.set("resend", "expired");
+    redirect(`/carreiras/cadastro?${params.toString()}`);
+  }
+
+  if ((await getCandidateResendAvailableAt()) > Date.now()) {
+    params.set("resend", "wait");
+    redirect(`/carreiras/cadastro?${params.toString()}`);
+  }
+
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) {
+    params.set("resend", "error");
+    redirect(`/carreiras/cadastro?${params.toString()}`);
+  }
+  const { error } = await supabase.auth.resend({
+    type: "signup",
+    email,
+    options: { emailRedirectTo: careersCallbackUrl(next) },
+  });
+  if (error) {
+    params.set(
+      "resend",
+      error.status === 429 || /rate/i.test(error.message) ? "wait" : "error",
+    );
+    redirect(`/carreiras/cadastro?${params.toString()}`);
+  }
+
+  await setCandidateResendCooldown();
+  params.set("resend", "sent");
+  redirect(`/carreiras/cadastro?${params.toString()}`);
 }
 
 export async function candidateRequestPasswordAction(formData: FormData) {

@@ -1,11 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import {
-  candidateGoogleLoginAction,
-  candidateLoginAction,
-} from "@/app/carreiras/actions";
+import { candidateLoginAction } from "@/app/carreiras/actions";
 import { CareersAuthCard } from "@/components/careers/auth-card";
+import { GoogleAuthForm } from "@/components/careers/google-auth-form";
 import { getCandidateSession } from "@/lib/careers/auth";
 import { isCandidateGoogleAuthEnabled } from "@/lib/careers/auth-providers";
 import { safeCareersDestination } from "@/lib/careers/auth-validation";
@@ -16,7 +14,10 @@ const messages: Record<string, string> = {
   invalid: "Revise o e-mail e a senha informados.",
   credentials: "E-mail ou senha inválidos.",
   config: "O acesso está temporariamente indisponível.",
-  google: "Não foi possível continuar com o Google.",
+  google:
+    "Não foi possível entrar com o Google. Tente novamente ou utilize seu e-mail.",
+  oauth:
+    "Não foi possível entrar com o Google. Tente novamente ou utilize seu e-mail.",
   session: "Entre novamente para acessar sua área privada.",
   "not-candidate": "Esta conta não está vinculada ao portal de candidatos.",
   account: "Não foi possível preparar sua conta de candidato.",
@@ -63,28 +64,7 @@ export default async function CandidateLoginPage({
         </p>
       ) : null}
 
-      {googleEnabled ? (
-        <>
-          <form action={candidateGoogleLoginAction} className="mt-5">
-            <input type="hidden" name="next" value={next} />
-            <button
-              type="submit"
-              className="border-border-light text-ink focus-visible:ring-tech hover:bg-surface flex min-h-12 w-full items-center justify-center gap-3 rounded-full border bg-white px-5 font-bold transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
-            >
-              <span aria-hidden="true" className="text-brand text-lg font-bold">
-                G
-              </span>
-              Continuar com Google
-            </button>
-          </form>
-
-          <div className="text-muted my-6 flex items-center gap-3 text-xs">
-            <span className="bg-border-light h-px flex-1" />
-            <span>ou</span>
-            <span className="bg-border-light h-px flex-1" />
-          </div>
-        </>
-      ) : null}
+      {googleEnabled ? <GoogleAuthForm next={next} source="entrar" /> : null}
 
       <form action={candidateLoginAction} className="space-y-5">
         <input type="hidden" name="next" value={next} />
