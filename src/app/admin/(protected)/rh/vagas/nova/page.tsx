@@ -1,8 +1,10 @@
+import Link from "next/link";
 import { AdminPageHeading } from "@/components/admin/admin-page-heading";
 import { HrNavigation } from "@/components/admin/hr-navigation";
 import { HrJobForm } from "@/components/admin/hr-job-form";
 import { requireHrAccess } from "@/lib/careers/hr-auth";
 import type { CareerJobArea } from "@/lib/careers/jobs";
+import type { CompanyUnit } from "@/lib/careers/logistics";
 import { createCareerJobAction } from "../actions";
 
 export default async function NewCareerJobPage({
@@ -12,13 +14,17 @@ export default async function NewCareerJobPage({
 }) {
   const { supabase } = await requireHrAccess("jobs:manage");
   const query = await searchParams;
-  const { data } = await supabase
-    .from("career_job_areas")
-    .select("*")
-    .eq("is_active", true)
-    .order("sort_order")
-    .order("name");
-  const areas = (data as CareerJobArea[] | null) ?? [];
+  const [areasResult, unitsResult] = await Promise.all([
+    supabase
+      .from("career_job_areas")
+      .select("*")
+      .eq("is_active", true)
+      .order("sort_order")
+      .order("name"),
+    supabase.from("company_units").select("*").eq("active", true).order("name"),
+  ]);
+  const areas = (areasResult.data as CareerJobArea[] | null) ?? [];
+  const units = (unitsResult.data as CompanyUnit[] | null) ?? [];
 
   return (
     <>
@@ -39,7 +45,7 @@ export default async function NewCareerJobPage({
         </p>
       ) : null}
       {areas.length ? (
-        <HrJobForm action={createCareerJobAction} areas={areas} />
+        <HrJobForm action={createCareerJobAction} areas={areas} units={units} />
       ) : (
         <div className="border-border-light rounded-3xl border bg-white p-6">
           <p className="text-ink font-bold">
@@ -56,4 +62,3 @@ export default async function NewCareerJobPage({
     </>
   );
 }
-import Link from "next/link";

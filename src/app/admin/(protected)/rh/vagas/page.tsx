@@ -1,4 +1,4 @@
-import { BriefcaseBusiness, FolderCog, Plus } from "lucide-react";
+import { BriefcaseBusiness, Building2, FolderCog, Plus } from "lucide-react";
 import Link from "next/link";
 import { AdminPageHeading } from "@/components/admin/admin-page-heading";
 import { HrNavigation } from "@/components/admin/hr-navigation";
@@ -22,7 +22,9 @@ export default async function HrJobsPage() {
   const { supabase } = await requireHrAccess("jobs:manage");
   const { data, error } = await supabase
     .from("career_jobs")
-    .select("*, area:career_job_areas(id, name, slug, is_active)")
+    .select(
+      "*, area:career_job_areas(id, name, slug, is_active), unit:company_units(id, name, address, neighborhood, city, state, postal_code, active)",
+    )
     .order("updated_at", { ascending: false });
   const jobs = error ? [] : ((data as CareerJob[] | null) ?? []);
   const counts = Object.fromEntries(
@@ -55,6 +57,13 @@ export default async function HrJobsPage() {
         >
           <FolderCog size={18} aria-hidden="true" />
           Administrar áreas
+        </Link>
+        <Link
+          href="/admin/rh/unidades"
+          className="border-brand/30 text-brand-dark hover:bg-mint inline-flex min-h-11 items-center gap-2 rounded-full border px-6 text-sm font-bold"
+        >
+          <Building2 size={18} aria-hidden="true" />
+          Administrar unidades
         </Link>
       </div>
 
@@ -114,6 +123,11 @@ export default async function HrJobsPage() {
                       {workModeLabels[job.work_mode]} · {job.positions}{" "}
                       posição(ões)
                     </p>
+                    {job.unit ? (
+                      <p className="text-muted mt-1 text-xs">
+                        Unidade: {job.unit.name}
+                      </p>
+                    ) : null}
                   </div>
                   <span className="bg-surface text-muted grid size-11 place-items-center rounded-2xl">
                     <BriefcaseBusiness size={20} aria-hidden="true" />

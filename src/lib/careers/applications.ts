@@ -85,6 +85,7 @@ export type CareerJobApplication = {
   job_id: string;
   candidate_id: string;
   status: ApplicationStatus;
+  source?: string;
   profile_snapshot: unknown;
   process_label: string | null;
   submitted_at: string;

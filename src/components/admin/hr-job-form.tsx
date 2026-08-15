@@ -1,4 +1,6 @@
 import type { CareerJob, CareerJobArea } from "@/lib/careers/jobs";
+import type { CompanyUnit } from "@/lib/careers/logistics";
+import { formatCompanyUnitLocation } from "@/lib/careers/logistics";
 import { workModeLabels, workModes } from "@/lib/careers/jobs";
 
 const inputClass =
@@ -17,10 +19,12 @@ function FieldHelp({ children }: { children: React.ReactNode }) {
 export function HrJobForm({
   action,
   areas,
+  units,
   job,
 }: {
   action: (formData: FormData) => void | Promise<void>;
   areas: CareerJobArea[];
+  units: CompanyUnit[];
   job?: CareerJob;
 }) {
   const today = new Date().toISOString().slice(0, 10);
@@ -106,6 +110,26 @@ export function HrJobForm({
                 </option>
               ))}
             </select>
+          </label>
+          <label className={`${labelClass} sm:col-span-2`}>
+            Unidade de trabalho
+            <select
+              className={inputClass}
+              name="unit_id"
+              defaultValue={job?.unit_id ?? ""}
+            >
+              <option value="">Sem unidade — somente vaga remota</option>
+              {units.map((unit) => (
+                <option key={unit.id} value={unit.id}>
+                  {unit.name} — {formatCompanyUnitLocation(unit)}
+                  {!unit.active ? " (inativa)" : ""}
+                </option>
+              ))}
+            </select>
+            <FieldHelp>
+              Obrigatória para vagas presenciais ou híbridas. As unidades são
+              administradas centralmente pelo RH.
+            </FieldHelp>
           </label>
           <label className={`${labelClass} sm:col-span-2`}>
             Jornada ou horário, quando pertinente

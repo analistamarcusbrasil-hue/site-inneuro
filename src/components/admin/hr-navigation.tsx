@@ -12,7 +12,14 @@ import {
 import Link from "next/link";
 
 type HrNavigationKey =
-  "dashboard" | "jobs" | "processes" | "candidates" | "talent" | "evaluations";
+  | "dashboard"
+  | "jobs"
+  | "processes"
+  | "candidates"
+  | "talent"
+  | "evaluations"
+  | "reports"
+  | "settings";
 
 type HrNavigationItem = {
   key: string;
@@ -58,8 +65,18 @@ const hrNavigationItems: HrNavigationItem[] = [
     icon: Star,
     href: "/admin/rh/avaliacoes",
   },
-  { key: "reports", label: "Relatórios", icon: BarChart3 },
-  { key: "settings", label: "Configurações", icon: Settings },
+  {
+    key: "reports",
+    label: "Relatórios",
+    icon: BarChart3,
+    href: "/admin/rh/relatorios",
+  },
+  {
+    key: "settings",
+    label: "Configurações",
+    icon: Settings,
+    href: "/admin/rh/configuracoes",
+  },
 ];
 
 export function HrNavigation({
@@ -69,6 +86,8 @@ export function HrNavigation({
   canManageProcesses = canManageJobs,
   canManageTalentPool = canManageCandidates,
   canEvaluate = true,
+  canViewReports = canManageCandidates,
+  canManageSettings = false,
 }: {
   current: HrNavigationKey;
   canManageJobs: boolean;
@@ -76,6 +95,8 @@ export function HrNavigation({
   canManageProcesses?: boolean;
   canManageTalentPool?: boolean;
   canEvaluate?: boolean;
+  canViewReports?: boolean;
+  canManageSettings?: boolean;
 }) {
   return (
     <nav aria-label="Módulos de RH" className="mb-8">
@@ -86,7 +107,9 @@ export function HrNavigation({
             (key === "jobs" && !canManageJobs) ||
             (key === "processes" && !canManageProcesses) ||
             (key === "talent" && !canManageTalentPool) ||
-            (key === "evaluations" && !canEvaluate)
+            (key === "evaluations" && !canEvaluate) ||
+            (key === "reports" && !canViewReports) ||
+            (key === "settings" && !canManageSettings)
               ? undefined
               : href;
           const active = key === current;
@@ -101,7 +124,9 @@ export function HrNavigation({
                   key === "jobs" ||
                   key === "processes" ||
                   key === "talent" ||
-                  key === "evaluations"
+                  key === "evaluations" ||
+                  key === "reports" ||
+                  key === "settings"
                     ? "Acesso restrito"
                     : "Em desenvolvimento"}
                 </span>

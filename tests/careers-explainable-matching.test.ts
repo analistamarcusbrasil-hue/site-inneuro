@@ -87,7 +87,7 @@ const snapshot: CareerApplicationSnapshot = {
   resume: null,
 };
 
-test("matriz exige seis critérios únicos com pesos totalizando 100%", () => {
+test("matriz exige sete critérios únicos com pesos totalizando 100%", () => {
   assert.equal(
     matchMatrixCriteriaSchema.safeParse(defaultMatchCriteria).success,
     true,
@@ -102,6 +102,7 @@ test("matriz exige seis critérios únicos com pesos totalizando 100%", () => {
         sector_experience: 15,
         certifications: 10,
         availability: 9,
+        operational_compatibility: 10,
       },
     }).success,
     false,
@@ -117,8 +118,37 @@ test("calcula aderência específica à vaga e hard skills separadamente", () =>
   assert.equal(result.hardSkillsScore, 50);
   assert.ok(result.overallScore >= 0 && result.overallScore <= 100);
   assert.equal(result.sourcePolicy, "confirmed_application_snapshot");
-  assert.equal(result.items.length, 6);
+  assert.equal(result.items.length, 7);
   assert.ok(result.items.some((item) => item.evidence.length > 0));
+});
+
+test("compatibilidade operacional não usa meio de transporte ou vale-transporte", () => {
+  const result = calculateExplainableMatch({
+    job,
+    snapshot,
+    criteria: defaultMatchCriteria,
+    logistics: {
+      application_id: "b748c94a-e6b9-4be2-885a-3e6f30ecb616",
+      unit_id: null,
+      unit_snapshot: null,
+      candidate_neighborhood_snapshot: "Centro",
+      candidate_city_snapshot: "Macapá",
+      candidate_state_snapshot: "AP",
+      commute_feasibility: "yes",
+      commute_time: "up_to_30",
+      transport_modes: ["public_transport"],
+      transit_benefit: "yes",
+      created_at: "2026-08-15T12:00:00.000Z",
+    },
+  });
+  const operational = result.items.find(
+    (item) => item.key === "operational_compatibility",
+  );
+  assert.equal(operational?.score, 100);
+  assert.doesNotMatch(
+    JSON.stringify(operational),
+    /public_transport|transit_benefit|vale-transporte/i,
+  );
 });
 
 test("registro profissional informado sempre requer validação oficial", () => {

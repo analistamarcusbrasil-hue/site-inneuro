@@ -6,6 +6,7 @@ export type CandidateProfessionalProfile = {
   whatsapp: string | null;
   city: string | null;
   state: string | null;
+  neighborhood?: string | null;
   professional_objective: string | null;
   about: string | null;
   availability: string | null;

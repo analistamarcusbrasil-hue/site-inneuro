@@ -32,6 +32,7 @@ export type CareerJob = {
   slug: string;
   title: string;
   area_id: string;
+  unit_id?: string | null;
   positions: number;
   location: string;
   work_mode: WorkMode;
@@ -54,6 +55,16 @@ export type CareerJob = {
   created_at: string;
   updated_at: string;
   area?: Pick<CareerJobArea, "id" | "name" | "slug" | "is_active"> | null;
+  unit?: {
+    id: string;
+    name: string;
+    address: string;
+    neighborhood: string;
+    city: string;
+    state: string;
+    postal_code: string | null;
+    active: boolean;
+  } | null;
 };
 
 export function slugifyJobValue(value: string) {

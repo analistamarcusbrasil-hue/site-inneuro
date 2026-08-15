@@ -35,6 +35,7 @@ const errorMessages: Record<string, string> = {
   transition: "Esta mudança de status não é permitida.",
   "publish-validation": "Revise todos os campos antes de publicar.",
   area: "A área da vaga precisa estar ativa para publicar.",
+  unit: "A unidade da vaga precisa estar ativa para publicar.",
   duplicate: "Não foi possível duplicar a vaga.",
 };
 
@@ -66,7 +67,9 @@ export default async function CareerJobDetailPage({
   const [jobResult, applicationsResult] = await Promise.all([
     supabase
       .from("career_jobs")
-      .select("*, area:career_job_areas(id, name, slug, is_active)")
+      .select(
+        "*, area:career_job_areas(id, name, slug, is_active), unit:company_units(id, name, address, neighborhood, city, state, postal_code, active)",
+      )
       .eq("id", id)
       .maybeSingle(),
     supabase
@@ -124,6 +127,12 @@ export default async function CareerJobDetailPage({
                 ? ` · Encerramento em ${formatJobDate(job.closes_on)}`
                 : ""}
             </p>
+            {job.unit ? (
+              <p className="text-muted mt-2 text-xs">
+                Unidade: {job.unit.name} · {job.unit.neighborhood} ·{" "}
+                {job.unit.city}/{job.unit.state}
+              </p>
+            ) : null}
           </div>
           <div className="flex flex-wrap gap-3">
             <a

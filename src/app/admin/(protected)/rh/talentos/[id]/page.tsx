@@ -10,7 +10,6 @@ import {
 } from "@/lib/careers/applications";
 import { requireHrAccess } from "@/lib/careers/hr-auth";
 import {
-  CANDIDATE_RESUME_BUCKET,
   formatCandidateMonth,
   formatFileSize,
   type CandidateCertification,
@@ -179,14 +178,6 @@ export default async function HrTalentDetailPage({
   const admin = createSupabaseAdminClient();
   const authResult = admin ? await admin.auth.admin.getUserById(id) : null;
   const email = authResult?.data.user?.email ?? null;
-  const resumeLinks = await Promise.all(
-    resumes.map(async (resume) => {
-      const { data } = await supabase.storage
-        .from(CANDIDATE_RESUME_BUCKET)
-        .createSignedUrl(resume.storage_path, 300);
-      return { ...resume, signedUrl: data?.signedUrl ?? null };
-    }),
-  );
 
   return (
     <>
@@ -390,9 +381,9 @@ export default async function HrTalentDetailPage({
         </DetailSection>
 
         <DetailSection title="Currículo privado">
-          {resumeLinks.length ? (
+          {resumes.length ? (
             <ol className="grid gap-3">
-              {resumeLinks.map((resume) => (
+              {resumes.map((resume) => (
                 <li
                   key={resume.id}
                   className="border-border-light flex flex-wrap items-center justify-between gap-3 rounded-2xl border p-4"
@@ -406,20 +397,14 @@ export default async function HrTalentDetailPage({
                       {formatFileSize(resume.size_bytes)}
                     </p>
                   </div>
-                  {resume.signedUrl ? (
-                    <a
-                      className="text-brand text-sm font-bold hover:underline"
-                      href={resume.signedUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Abrir PDF temporário
-                    </a>
-                  ) : (
-                    <span className="text-muted text-xs">
-                      Arquivo indisponível
-                    </span>
-                  )}
+                  <a
+                    className="text-brand text-sm font-bold hover:underline"
+                    href={`/api/admin/rh/curriculos/${resume.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Abrir PDF com acesso auditado
+                  </a>
                 </li>
               ))}
             </ol>
@@ -427,7 +412,8 @@ export default async function HrTalentDetailPage({
             <p className="text-muted text-sm">Nenhum currículo enviado.</p>
           )}
           <p className="text-muted mt-4 text-xs">
-            Os links expiram em 5 minutos.
+            Cada acesso é autorizado no servidor, auditado e usa link
+            temporário.
           </p>
         </DetailSection>
 

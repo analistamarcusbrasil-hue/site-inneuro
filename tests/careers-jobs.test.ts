@@ -14,6 +14,7 @@ import {
 const validJob = {
   title: "Assistente de atendimento",
   areaId: "6e36ad17-5450-4cdd-81d8-ae029d1bbd93",
+  unitId: "059a9c1d-9315-4c0e-9fed-f22fef91db1c",
   positions: 2,
   location: "Macapá/AP",
   workMode: "onsite",

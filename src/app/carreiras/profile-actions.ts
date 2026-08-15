@@ -66,6 +66,7 @@ export async function saveCandidateProfileAction(formData: FormData) {
     whatsapp: value(formData, "whatsapp"),
     city: value(formData, "city"),
     state: value(formData, "state"),
+    neighborhood: value(formData, "neighborhood"),
     professionalObjective: value(formData, "professional_objective"),
     about: value(formData, "about"),
     availability: value(formData, "availability"),
@@ -91,6 +92,7 @@ export async function saveCandidateProfileAction(formData: FormData) {
         whatsapp: parsed.data.whatsapp,
         city: parsed.data.city,
         state: parsed.data.state,
+        neighborhood: parsed.data.neighborhood,
         professional_objective: parsed.data.professionalObjective,
         about: parsed.data.about,
         availability: parsed.data.availability,
@@ -100,6 +102,7 @@ export async function saveCandidateProfileAction(formData: FormData) {
           whatsapp: "manual",
           city: "manual",
           state: "manual",
+          neighborhood: "manual",
           professional_objective: "manual",
           about: "manual",
           availability: "manual",
@@ -436,6 +439,21 @@ export async function uploadCandidateResumeAction(formData: FormData) {
     .select("id")
     .single();
   if (metadataError || !resume) {
+    await supabase.storage.from(CANDIDATE_RESUME_BUCKET).remove([storagePath]);
+    fail("resume-save");
+  }
+  const { error: consentError } = await supabase
+    .from("candidate_consents")
+    .insert({
+      candidate_id: user.id,
+      consent_type: "resume_processing",
+      purpose:
+        "Processamento do currículo PDF para identificar informações profissionais que serão revisadas pelo candidato.",
+      text_version: "2026-08-v1",
+      granted: true,
+    });
+  if (consentError) {
+    await supabase.from("candidate_resumes").delete().eq("id", resume.id);
     await supabase.storage.from(CANDIDATE_RESUME_BUCKET).remove([storagePath]);
     fail("resume-save");
   }

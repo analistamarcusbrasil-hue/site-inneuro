@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { CareerApplicationSnapshot } from "@/lib/careers/applications";
 import type { CareerJob } from "@/lib/careers/jobs";
+import type { ApplicationLogistics } from "@/lib/careers/logistics";
 
 export const matchCriterionKeys = [
   "related_experience",
@@ -9,6 +10,7 @@ export const matchCriterionKeys = [
   "sector_experience",
   "certifications",
   "availability",
+  "operational_compatibility",
 ] as const;
 
 export type MatchCriterionKey = (typeof matchCriterionKeys)[number];
@@ -20,24 +22,25 @@ export const matchCriterionLabels: Record<MatchCriterionKey, string> = {
   sector_experience: "Experiência no setor",
   certifications: "Certificações",
   availability: "Disponibilidade",
+  operational_compatibility: "Compatibilidade operacional",
 };
 
 export const defaultMatchCriteria = [
   {
     key: "related_experience",
     label: matchCriterionLabels.related_experience,
-    weight: 25,
+    weight: 22,
   },
   {
     key: "technical_skills",
     label: matchCriterionLabels.technical_skills,
-    weight: 25,
+    weight: 23,
   },
   { key: "education", label: matchCriterionLabels.education, weight: 15 },
   {
     key: "sector_experience",
     label: matchCriterionLabels.sector_experience,
-    weight: 15,
+    weight: 10,
   },
   {
     key: "certifications",
@@ -45,6 +48,11 @@ export const defaultMatchCriteria = [
     weight: 10,
   },
   { key: "availability", label: matchCriterionLabels.availability, weight: 10 },
+  {
+    key: "operational_compatibility",
+    label: matchCriterionLabels.operational_compatibility,
+    weight: 10,
+  },
 ] satisfies MatchMatrixCriterion[];
 
 export type MatchMatrixCriterion = {
@@ -61,11 +69,12 @@ export const matchMatrixCriteriaSchema = z
       weight: z.number().int().min(0).max(100),
     }),
   )
-  .length(matchCriterionKeys.length)
+  .min(matchCriterionKeys.length - 1)
+  .max(matchCriterionKeys.length)
   .superRefine((criteria, context) => {
     if (
       new Set(criteria.map((criterion) => criterion.key)).size !==
-      matchCriterionKeys.length
+      criteria.length
     ) {
       context.addIssue({
         code: "custom",
@@ -101,7 +110,10 @@ export const matchResultItemSchema = z.object({
 export const matchResultSchema = z.object({
   overallScore: z.number().int().min(0).max(100),
   hardSkillsScore: z.number().int().min(0).max(100),
-  items: z.array(matchResultItemSchema).length(matchCriterionKeys.length),
+  items: z
+    .array(matchResultItemSchema)
+    .min(matchCriterionKeys.length - 1)
+    .max(matchCriterionKeys.length),
   sourcePolicy: z.literal("confirmed_application_snapshot"),
 });
 
@@ -176,6 +188,7 @@ function sourceEntries(
   snapshot: CareerApplicationSnapshot,
   key: MatchCriterionKey,
 ): SourceEntry[] {
+  if (key === "operational_compatibility") return [];
   if (key === "related_experience" || key === "sector_experience") {
     return snapshot.experiences.map((item, index) => ({
       source: `Experiência ${index + 1}`,
@@ -219,7 +232,62 @@ function targetText(job: CareerJob, key: MatchCriterionKey) {
   if (key === "sector_experience")
     return `${job.area?.name ?? ""} ${job.description}`;
   if (key === "certifications") return job.certifications ?? "";
+  if (key === "operational_compatibility") return "";
   return `${job.work_schedule ?? ""} ${job.work_mode} ${job.location}`;
+}
+
+function operationalCompatibility(
+  job: CareerJob,
+  logistics: ApplicationLogistics | null | undefined,
+) {
+  if (job.work_mode === "remote") {
+    return {
+      score: 100,
+      status: "attended" as const,
+      evidence: [
+        {
+          source: "Modalidade da vaga",
+          text: "Vaga remota, sem exigência de deslocamento até uma unidade.",
+        },
+      ],
+      pointsToVerify: [] as string[],
+    };
+  }
+  if (!logistics?.commute_feasibility) {
+    return {
+      score: 0,
+      status: "not_informed" as const,
+      evidence: [],
+      pointsToVerify: [
+        "Compatibilidade operacional: deslocamento não informado pelo candidato.",
+      ],
+    };
+  }
+  const score =
+    logistics.commute_feasibility === "yes"
+      ? 100
+      : logistics.commute_feasibility === "evaluate"
+        ? 50
+        : 0;
+  const requiresValidation =
+    logistics.commute_feasibility !== "yes" ||
+    logistics.commute_time === "over_90" ||
+    logistics.commute_time === "unknown";
+  return {
+    score,
+    status: requiresValidation
+      ? ("requires_validation" as const)
+      : ("attended" as const),
+    evidence: [
+      {
+        source: "Declaração operacional do candidato",
+        text: `Possibilidade de deslocamento: ${logistics.commute_feasibility}. Tempo estimado: ${logistics.commute_time ?? "não informado"}.`,
+      },
+    ],
+    pointsToVerify: requiresValidation
+      ? ["Confirmar disponibilidade e condições de deslocamento na entrevista."]
+      : [],
+  };
 }
 
 function overlapScore(target: string, sources: SourceEntry[]) {
@@ -281,13 +349,25 @@ export function calculateExplainableMatch({
   job,
   snapshot,
   criteria,
+  logistics,
 }: {
   job: CareerJob;
   snapshot: CareerApplicationSnapshot;
   criteria: MatchMatrixCriterion[];
+  logistics?: ApplicationLogistics | null;
 }): ExplainableMatchResult {
   const hardSkillsScore = calculateHardSkillsScore(job, snapshot);
   const items = criteria.map((criterion): MatchResultItem => {
+    if (criterion.key === "operational_compatibility") {
+      const operational = operationalCompatibility(job, logistics);
+      return {
+        ...criterion,
+        ...operational,
+        weightedScore: Number(
+          ((operational.score * criterion.weight) / 100).toFixed(2),
+        ),
+      };
+    }
     const target = targetText(job, criterion.key);
     const sources = sourceEntries(snapshot, criterion.key);
     const score =

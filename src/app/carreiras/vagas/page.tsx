@@ -25,7 +25,9 @@ export default async function PublicCareerJobsPage() {
   const result = supabase
     ? await supabase
         .from("career_jobs")
-        .select("*, area:career_job_areas!inner(id, name, slug, is_active)")
+        .select(
+          "*, area:career_job_areas!inner(id, name, slug, is_active), unit:company_units(id, name, address, neighborhood, city, state, postal_code, active)",
+        )
         .eq("status", "published")
         .lte("opens_on", today)
         .or(`closes_on.is.null,closes_on.gte.${today}`)
@@ -96,6 +98,7 @@ export default async function PublicCareerJobsPage() {
                       {job.location}
                     </span>
                     <span>{workModeLabels[job.work_mode]}</span>
+                    {job.unit ? <span>{job.unit.name}</span> : null}
                   </div>
                   <p className="text-ink mt-5 line-clamp-4 text-sm leading-relaxed">
                     {job.description}

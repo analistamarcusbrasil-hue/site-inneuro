@@ -72,6 +72,7 @@ export const candidatePersonalProfileSchema = z.object({
     }, "Informe um WhatsApp válido."),
   city: requiredText("sua cidade", 100),
   state: z.enum(brazilianStates),
+  neighborhood: optionalText(120),
   professionalObjective: optionalText(500),
   about: optionalText(3000),
   availability: optionalText(800),

@@ -31,6 +31,7 @@ function jobFormData(formData: FormData) {
   return {
     title: value(formData, "title"),
     areaId: value(formData, "area_id"),
+    unitId: value(formData, "unit_id"),
     positions: value(formData, "positions"),
     location: value(formData, "location"),
     workMode: value(formData, "work_mode"),
@@ -55,6 +56,7 @@ function databasePayload(
   return {
     title: parsed.title,
     area_id: parsed.areaId,
+    unit_id: parsed.unitId,
     positions: parsed.positions,
     location: parsed.location,
     work_mode: parsed.workMode,
@@ -108,6 +110,15 @@ export async function createCareerJobAction(formData: FormData) {
     .eq("is_active", true)
     .maybeSingle();
   if (!area) fail(`${jobsPath}/nova`, "area");
+  if (parsed.data.unitId) {
+    const { data: unit } = await supabase
+      .from("company_units")
+      .select("id")
+      .eq("id", parsed.data.unitId)
+      .eq("active", true)
+      .maybeSingle();
+    if (!unit) fail(`${jobsPath}/nova`, "unit");
+  }
   const slug = await uniqueSlug(supabase, parsed.data.title, "career_jobs");
   const { data, error } = await supabase
     .from("career_jobs")
@@ -120,6 +131,17 @@ export async function createCareerJobAction(formData: FormData) {
     .select("id")
     .single();
   if (error || !data) fail(`${jobsPath}/nova`, "save");
+  await supabase.from("audit_logs").insert({
+    actor_id: user.id,
+    action: "career_job_created",
+    entity_type: "career_job",
+    entity_id: data.id,
+    after_data: {
+      ...databasePayload(parsed.data, user.id),
+      slug,
+      status: "draft",
+    },
+  });
   revalidateJobs(slug);
   redirect(`${jobsPath}/${data.id}?status=created`);
 }
@@ -138,6 +160,20 @@ export async function updateCareerJobAction(formData: FormData) {
     .eq("is_active", true)
     .maybeSingle();
   if (!area) fail(location, "area");
+  if (parsed.data.unitId) {
+    const { data: unit } = await supabase
+      .from("company_units")
+      .select("id")
+      .eq("id", parsed.data.unitId)
+      .eq("active", true)
+      .maybeSingle();
+    if (!unit) fail(location, "unit");
+  }
+  const { data: before } = await supabase
+    .from("career_jobs")
+    .select("*")
+    .eq("id", id.data.id)
+    .maybeSingle();
   const { data, error } = await supabase
     .from("career_jobs")
     .update(databasePayload(parsed.data, user.id))
@@ -145,6 +181,14 @@ export async function updateCareerJobAction(formData: FormData) {
     .select("id, slug")
     .maybeSingle();
   if (error || !data) fail(location, "save");
+  await supabase.from("audit_logs").insert({
+    actor_id: user.id,
+    action: "career_job_updated",
+    entity_type: "career_job",
+    entity_id: data.id,
+    before_data: before,
+    after_data: databasePayload(parsed.data, user.id),
+  });
   revalidateJobs(data.slug);
   redirect(`${jobsPath}/${data.id}?status=updated`);
 }
@@ -171,6 +215,7 @@ export async function transitionCareerJobAction(formData: FormData) {
     const valid = careerJobFormSchema.safeParse({
       title: current.title,
       areaId: current.area_id,
+      unitId: current.unit_id ?? "",
       positions: current.positions,
       location: current.location,
       workMode: current.work_mode,
@@ -194,6 +239,15 @@ export async function transitionCareerJobAction(formData: FormData) {
       .eq("is_active", true)
       .maybeSingle();
     if (!area) fail(location, "area");
+    if (current.unit_id) {
+      const { data: unit } = await supabase
+        .from("company_units")
+        .select("id")
+        .eq("id", current.unit_id)
+        .eq("active", true)
+        .maybeSingle();
+      if (!unit) fail(location, "unit");
+    }
   }
   const now = new Date().toISOString();
   const update: {
@@ -214,6 +268,14 @@ export async function transitionCareerJobAction(formData: FormData) {
     .update(update)
     .eq("id", current.id);
   if (error) fail(location, "transition");
+  await supabase.from("audit_logs").insert({
+    actor_id: user.id,
+    action: "career_job_status_changed",
+    entity_type: "career_job",
+    entity_id: current.id,
+    before_data: { status: current.status },
+    after_data: { status: parsed.data.status },
+  });
   revalidateJobs(current.slug);
   redirect(`${location}?status=${encodeURIComponent(parsed.data.status)}`);
 }
@@ -237,6 +299,7 @@ export async function duplicateCareerJobAction(formData: FormData) {
       slug,
       title,
       area_id: source.area_id,
+      unit_id: source.unit_id ?? null,
       positions: source.positions,
       location: source.location,
       work_mode: source.work_mode,
@@ -259,6 +322,13 @@ export async function duplicateCareerJobAction(formData: FormData) {
     .single();
   if (duplicateError || !duplicate)
     fail(`${jobsPath}/${source.id}`, "duplicate");
+  await supabase.from("audit_logs").insert({
+    actor_id: user.id,
+    action: "career_job_duplicated",
+    entity_type: "career_job",
+    entity_id: duplicate.id,
+    after_data: { source_job_id: source.id, slug, status: "draft" },
+  });
   revalidateJobs(slug);
   redirect(`${jobsPath}/${duplicate.id}/editar?status=duplicated`);
 }

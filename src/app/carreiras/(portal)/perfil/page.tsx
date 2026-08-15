@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { candidateLogoutAction } from "@/app/carreiras/actions";
+import { requestCandidateDataDeletionAction } from "@/app/carreiras/privacy-actions";
 import {
   addCandidateSkillAction,
   deleteCandidateCertificationAction,
@@ -67,6 +68,8 @@ const statusMessages: Record<string, string> = {
   "talent-left": "Você saiu do Banco de Talentos.",
   "talent-deletion-requested":
     "Solicitação de exclusão da participação registrada.",
+  "data-deletion-requested":
+    "Solicitação de exclusão dos dados registrada para análise.",
 };
 
 const errorMessages: Record<string, string> = {
@@ -103,6 +106,8 @@ const errorMessages: Record<string, string> = {
   "talent-deletion": "Não foi possível solicitar a exclusão.",
   "talent-deletion-pending":
     "Sua solicitação de exclusão ainda está sendo processada.",
+  "data-deletion": "Não foi possível registrar a solicitação de exclusão.",
+  "data-deletion-pending": "Já existe uma solicitação de exclusão em análise.",
 };
 
 function ProfileSection({
@@ -145,6 +150,8 @@ export default async function CandidateProfilePage({
     talentMembershipResult,
     talentInterestsResult,
     talentAreasResult,
+    consentsResult,
+    deletionRequestResult,
   ] = await Promise.all([
     supabase
       .from("candidate_profiles")
@@ -201,6 +208,18 @@ export default async function CandidateProfilePage({
       .eq("is_active", true)
       .order("sort_order", { ascending: true })
       .order("name", { ascending: true }),
+    supabase
+      .from("candidate_consents")
+      .select("id, consent_type, purpose, granted, recorded_at")
+      .eq("candidate_id", user.id)
+      .order("recorded_at", { ascending: false }),
+    supabase
+      .from("candidate_data_deletion_requests")
+      .select("id, status, requested_at")
+      .eq("candidate_id", user.id)
+      .order("requested_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   const profile =
@@ -222,6 +241,8 @@ export default async function CandidateProfilePage({
     const parsed = resumeExtractionRecordSchema.safeParse(item);
     return parsed.success ? [parsed.data] : [];
   });
+  const consents = consentsResult.data ?? [];
+  const deletionRequest = deletionRequestResult.data;
   const resumeLinks = await Promise.all(
     resumes.map(async (resume) => {
       const { data } = await supabase.storage
@@ -722,6 +743,73 @@ export default async function CandidateProfilePage({
                 Nenhum currículo enviado.
               </p>
             ) : null}
+          </ProfileSection>
+
+          <ProfileSection
+            title="Privacidade e seus dados"
+            description="Consulte autorizações registradas e solicite a exclusão dos dados da conta. A solicitação passa por análise para preservar obrigações legais e históricos necessários."
+          >
+            <div className="grid gap-5 lg:grid-cols-2">
+              <div>
+                <h3 className="text-ink font-bold">
+                  Histórico de autorizações
+                </h3>
+                {consents.length ? (
+                  <ol className="mt-3 grid gap-3 text-sm">
+                    {consents.map((consent) => (
+                      <li
+                        key={consent.id}
+                        className="border-border-light rounded-2xl border p-4"
+                      >
+                        <p className="font-bold">
+                          {consent.granted
+                            ? "Autorização registrada"
+                            : "Autorização encerrada"}
+                        </p>
+                        <p className="text-muted mt-1 leading-relaxed">
+                          {consent.purpose}
+                        </p>
+                        <p className="text-muted mt-2 text-xs">
+                          {new Date(consent.recorded_at).toLocaleString(
+                            "pt-BR",
+                          )}
+                        </p>
+                      </li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="text-muted mt-3 text-sm">
+                    Nenhuma autorização adicional registrada.
+                  </p>
+                )}
+              </div>
+              <div className="border-border-light rounded-2xl border p-5">
+                <h3 className="text-ink font-bold">Exclusão dos dados</h3>
+                <p className="text-muted mt-2 text-sm leading-relaxed">
+                  O pedido não apaga dados imediatamente. O RH analisará
+                  candidaturas, obrigações aplicáveis e informará a conclusão.
+                </p>
+                {deletionRequest &&
+                ["requested", "in_review"].includes(deletionRequest.status) ? (
+                  <p className="bg-mint text-brand-dark mt-4 rounded-xl p-3 text-sm font-bold">
+                    Solicitação em análise desde{" "}
+                    {new Date(deletionRequest.requested_at).toLocaleDateString(
+                      "pt-BR",
+                    )}
+                    .
+                  </p>
+                ) : (
+                  <form
+                    action={requestCandidateDataDeletionAction}
+                    className="mt-4"
+                  >
+                    <button className="border-error text-error min-h-11 rounded-full border px-5 text-sm font-bold">
+                      Solicitar exclusão dos meus dados
+                    </button>
+                  </form>
+                )}
+              </div>
+            </div>
           </ProfileSection>
         </div>
       </Container>

@@ -47,6 +47,9 @@ export const careerJobFormSchema = z
   .object({
     title: requiredText("o título da vaga", 3, 120),
     areaId: z.string().uuid("Selecione uma área válida."),
+    unitId: z
+      .union([z.string().uuid(), z.literal("")])
+      .transform((value) => value || null),
     positions: z.coerce.number().int().min(1).max(100),
     location: requiredText("o local", 2, 160),
     workMode: z.enum(workModes),
@@ -67,7 +70,15 @@ export const careerJobFormSchema = z
   .refine((value) => !value.closesOn || value.closesOn >= value.opensOn, {
     path: ["closesOn"],
     message: "O encerramento deve ser posterior à abertura.",
-  });
+  })
+  .refine(
+    (value) =>
+      !["onsite", "hybrid"].includes(value.workMode) || Boolean(value.unitId),
+    {
+      path: ["unitId"],
+      message: "Selecione a unidade de trabalho.",
+    },
+  );
 
 export const careerJobIdSchema = z.object({ id: z.string().uuid() });
 

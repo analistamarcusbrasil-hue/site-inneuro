@@ -14,6 +14,15 @@ import {
 } from "@/lib/careers/applications";
 import { requireHrAccess } from "@/lib/careers/hr-auth";
 import {
+  applicationSourceLabels,
+  commuteFeasibilityLabels,
+  commuteTimeLabels,
+  transitBenefitLabels,
+  transportModeLabels,
+  type ApplicationLogistics,
+  type ApplicationSource,
+} from "@/lib/careers/logistics";
+import {
   matchResultSchema,
   matchStatusLabels,
   type ExplainableMatchResult,
@@ -76,6 +85,7 @@ export default async function CareerApplicationDetailPage({
     historyResult,
     matchRunsResult,
     matrixResult,
+    logisticsResult,
   ] = await Promise.all([
     supabase.from("career_jobs").select("id, title").eq("id", id).maybeSingle(),
     supabase
@@ -103,6 +113,11 @@ export default async function CareerApplicationDetailPage({
       .order("version", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    supabase
+      .from("career_application_logistics")
+      .select("*")
+      .eq("application_id", applicationId)
+      .maybeSingle(),
   ]);
   if (
     jobResult.error ||
@@ -124,6 +139,8 @@ export default async function CareerApplicationDetailPage({
     ? parsedMatch.data
     : null;
   const transitions = adminApplicationTransitions[application.status];
+  const logistics =
+    (logisticsResult.data as ApplicationLogistics | null) ?? null;
   const query = await searchParams;
 
   return (
@@ -247,6 +264,75 @@ export default async function CareerApplicationDetailPage({
           </ConfirmCommandForm>
         ) : null}
       </section>
+
+      <SnapshotSection title="Logística da vaga">
+        {logistics ? (
+          <dl className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <dt className="text-muted">Unidade no envio</dt>
+              <dd className="font-bold">
+                {logistics.unit_snapshot?.name ?? "Não se aplica"}
+              </dd>
+              {logistics.unit_snapshot ? (
+                <dd className="text-muted mt-1 text-xs">
+                  {logistics.unit_snapshot.neighborhood} ·{" "}
+                  {logistics.unit_snapshot.city}/{logistics.unit_snapshot.state}
+                </dd>
+              ) : null}
+            </div>
+            <div>
+              <dt className="text-muted">Possibilidade de deslocamento</dt>
+              <dd className="font-bold">
+                {logistics.commute_feasibility
+                  ? commuteFeasibilityLabels[logistics.commute_feasibility]
+                  : "Não se aplica"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-muted">Tempo estimado</dt>
+              <dd className="font-bold">
+                {logistics.commute_time
+                  ? commuteTimeLabels[logistics.commute_time]
+                  : "Não se aplica"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-muted">Vale-transporte</dt>
+              <dd className="font-bold">
+                {logistics.transit_benefit
+                  ? transitBenefitLabels[logistics.transit_benefit]
+                  : "Não se aplica"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-muted">Meios informados</dt>
+              <dd className="font-bold">
+                {logistics.transport_modes.length
+                  ? logistics.transport_modes
+                      .map((mode) => transportModeLabels[mode])
+                      .join(", ")
+                  : "Não informado"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-muted">Origem da candidatura</dt>
+              <dd className="font-bold">
+                {applicationSourceLabels[
+                  (application.source ?? "site_inneuro") as ApplicationSource
+                ] ?? "Não informada"}
+              </dd>
+            </div>
+          </dl>
+        ) : (
+          <p className="text-muted">
+            Esta candidatura não possui declaração logística registrada.
+          </p>
+        )}
+        <p className="text-muted mt-5 text-xs">
+          Informações operacionais autodeclaradas. Meio de transporte e
+          vale-transporte não atribuem bônus ou penalidade à aderência.
+        </p>
+      </SnapshotSection>
 
       <section className="border-border-light mt-6 rounded-3xl border bg-white p-5 sm:p-7">
         <div className="flex flex-wrap items-start justify-between gap-5">

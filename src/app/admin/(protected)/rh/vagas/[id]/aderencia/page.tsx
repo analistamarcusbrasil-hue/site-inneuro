@@ -7,6 +7,8 @@ import { HrNavigation } from "@/components/admin/hr-navigation";
 import { requireHrAccess } from "@/lib/careers/hr-auth";
 import {
   defaultMatchCriteria,
+  matchCriterionKeys,
+  matchCriterionLabels,
   matchMatrixCriteriaSchema,
   type MatchMatrixCriterion,
 } from "@/lib/careers/matching";
@@ -54,7 +56,14 @@ export default async function JobMatchingMatrixPage({
     matrices[0]?.criteria,
   );
   const currentCriteria: MatchMatrixCriterion[] = parsedCurrent.success
-    ? parsedCurrent.data
+    ? matchCriterionKeys.map(
+        (key) =>
+          parsedCurrent.data.find((criterion) => criterion.key === key) ?? {
+            key,
+            label: matchCriterionLabels[key],
+            weight: 0,
+          },
+      )
     : defaultMatchCriteria;
   const query = await searchParams;
 
@@ -97,7 +106,7 @@ export default async function JobMatchingMatrixPage({
           className="bg-error/10 text-error mb-6 rounded-2xl p-4 text-sm font-bold"
         >
           {query.error === "weights"
-            ? "A soma dos seis pesos deve ser exatamente 100%."
+            ? "A soma dos sete pesos deve ser exatamente 100%."
             : query.error === "calculation"
               ? "A matriz foi criada, mas nem todos os cálculos puderam ser gravados. Recalcule a candidatura na tela individual."
               : "Não foi possível salvar a matriz de aderência."}
@@ -163,7 +172,9 @@ export default async function JobMatchingMatrixPage({
             <p className="text-muted max-w-2xl text-xs leading-relaxed">
               Fontes usadas: snapshot confirmado do perfil, experiências,
               formação, habilidades, certificações e disponibilidade. Dados de
-              currículo não confirmados não entram no cálculo.
+              currículo não confirmados não entram no cálculo. A compatibilidade
+              operacional usa apenas a declaração de deslocamento; meio de
+              transporte e vale-transporte não alteram a pontuação.
             </p>
             <button className="bg-brand hover:bg-brand-dark min-h-11 rounded-full px-6 text-sm font-bold text-white">
               Salvar nova versão

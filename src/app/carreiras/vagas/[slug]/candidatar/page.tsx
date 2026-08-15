@@ -7,6 +7,19 @@ import { getCandidateSession } from "@/lib/careers/auth";
 import { requireCareersPortalEnabled } from "@/lib/careers/guards";
 import type { CareerJob } from "@/lib/careers/jobs";
 import {
+  applicationSourceLabels,
+  applicationSources,
+  commuteFeasibilityLabels,
+  commuteFeasibilities,
+  commuteTimeLabels,
+  commuteTimes,
+  formatCompanyUnitLocation,
+  transitBenefitLabels,
+  transitBenefitOptions,
+  transportModeLabels,
+  transportModes,
+} from "@/lib/careers/logistics";
+import {
   formatCandidateMonth,
   formatFileSize,
   type CandidateEducation,
@@ -62,7 +75,9 @@ export default async function ReviewCareerApplicationPage({
   ] = await Promise.all([
     session.supabase
       .from("career_jobs")
-      .select("*, area:career_job_areas(id, name, slug, is_active)")
+      .select(
+        "*, area:career_job_areas(id, name, slug, is_active), unit:company_units(id, name, address, neighborhood, city, state, postal_code, active)",
+      )
       .eq("slug", slug)
       .eq("status", "published")
       .lte("opens_on", today)
@@ -108,6 +123,8 @@ export default async function ReviewCareerApplicationPage({
     .not("status", "in", "(finalized,withdrawn)")
     .maybeSingle();
   const query = await searchParams;
+  const requiresCommute =
+    job.work_mode === "onsite" || job.work_mode === "hybrid";
 
   return (
     <main
@@ -170,8 +187,9 @@ export default async function ReviewCareerApplicationPage({
               <div>
                 <dt className="text-muted">Localização</dt>
                 <dd className="font-bold">
-                  {[profile?.city, profile?.state].filter(Boolean).join("/") ||
-                    "Não informada"}
+                  {[profile?.neighborhood, profile?.city, profile?.state]
+                    .filter(Boolean)
+                    .join(" · ") || "Não informada"}
                 </dd>
               </div>
             </dl>
@@ -257,16 +275,150 @@ export default async function ReviewCareerApplicationPage({
               >
                 Ver minha candidatura
               </Link>
-            ) : (
-              <form action={submitCareerJobApplicationAction}>
-                <input type="hidden" name="job_id" value={job.id} />
-                <input type="hidden" name="slug" value={job.slug} />
-                <button className="bg-brand hover:bg-brand-dark focus-visible:ring-tech min-h-12 rounded-full px-6 font-bold text-white focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none">
-                  Enviar candidatura
-                </button>
-              </form>
-            )}
+            ) : null}
           </div>
+
+          {!activeApplication ? (
+            <form
+              action={submitCareerJobApplicationAction}
+              className="mt-7 grid gap-6"
+            >
+              <input type="hidden" name="job_id" value={job.id} />
+              <input type="hidden" name="slug" value={job.slug} />
+              {requiresCommute ? (
+                <fieldset className="border-border-light grid gap-5 rounded-2xl border p-4 sm:p-5">
+                  <legend className="font-heading text-brand-dark px-2 text-lg font-semibold">
+                    Logística para esta vaga
+                  </legend>
+                  {job.unit ? (
+                    <div className="bg-surface rounded-2xl p-4 text-sm">
+                      <p className="font-bold">{job.unit.name}</p>
+                      <p className="text-muted mt-1">{job.unit.address}</p>
+                      <p className="text-muted">
+                        {formatCompanyUnitLocation(job.unit)}
+                      </p>
+                    </div>
+                  ) : null}
+                  <label className="grid gap-2 text-sm font-bold">
+                    Você consegue se deslocar até esta unidade?
+                    <select
+                      name="commute_feasibility"
+                      required
+                      className="border-border-light min-h-12 rounded-xl border bg-white px-3 font-normal"
+                    >
+                      <option value="">Selecione</option>
+                      {commuteFeasibilities.map((value) => (
+                        <option key={value} value={value}>
+                          {commuteFeasibilityLabels[value]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="grid gap-2 text-sm font-bold">
+                    Tempo estimado de deslocamento
+                    <select
+                      name="commute_time"
+                      required
+                      className="border-border-light min-h-12 rounded-xl border bg-white px-3 font-normal"
+                    >
+                      <option value="">Selecione</option>
+                      {commuteTimes.map((value) => (
+                        <option key={value} value={value}>
+                          {commuteTimeLabels[value]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <fieldset>
+                    <legend className="text-sm font-bold">
+                      Como pretende realizar o deslocamento? (opcional)
+                    </legend>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                      {transportModes.map((value) => (
+                        <label
+                          key={value}
+                          className="flex items-center gap-2 text-sm"
+                        >
+                          <input
+                            type="checkbox"
+                            name="transport_modes"
+                            value={value}
+                          />
+                          {transportModeLabels[value]}
+                        </label>
+                      ))}
+                    </div>
+                    <p className="text-muted mt-3 text-xs">
+                      O meio de transporte não gera vantagem ou desvantagem na
+                      triagem.
+                    </p>
+                  </fieldset>
+                  <label className="grid gap-2 text-sm font-bold">
+                    Pretende utilizar vale-transporte?
+                    <select
+                      name="transit_benefit"
+                      required
+                      className="border-border-light min-h-12 rounded-xl border bg-white px-3 font-normal"
+                    >
+                      <option value="">Selecione</option>
+                      {transitBenefitOptions.map((value) => (
+                        <option key={value} value={value}>
+                          {transitBenefitLabels[value]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </fieldset>
+              ) : null}
+
+              <label className="grid gap-2 text-sm font-bold sm:max-w-md">
+                Como soube desta vaga?
+                <select
+                  name="source"
+                  defaultValue="site_inneuro"
+                  className="border-border-light min-h-12 rounded-xl border bg-white px-3 font-normal"
+                >
+                  {applicationSources.map((value) => (
+                    <option key={value} value={value}>
+                      {applicationSourceLabels[value]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="grid gap-3 text-sm leading-relaxed">
+                <label className="flex items-start gap-3">
+                  <input
+                    className="mt-1"
+                    type="checkbox"
+                    name="recruitment_consent"
+                    required
+                  />
+                  <span>
+                    Autorizo o tratamento dos meus dados profissionais para
+                    participar deste processo seletivo.
+                  </span>
+                </label>
+                <label className="flex items-start gap-3">
+                  <input
+                    className="mt-1"
+                    type="checkbox"
+                    name="automated_support_consent"
+                    required
+                  />
+                  <span>
+                    Estou ciente de que ferramentas automatizadas podem apoiar a
+                    organização e a triagem. Elas não decidem contratação nem
+                    fazem rejeição automática.
+                  </span>
+                </label>
+              </div>
+
+              <button className="bg-brand hover:bg-brand-dark focus-visible:ring-tech min-h-12 justify-self-start rounded-full px-6 font-bold text-white focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none">
+                Enviar candidatura
+              </button>
+            </form>
+          ) : null}
         </section>
       </Container>
     </main>

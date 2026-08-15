@@ -103,6 +103,21 @@ export function CandidateBaseProfileForm({
         </label>
       </div>
       <label className={`${labelClass} sm:col-span-2`}>
+        Bairro (opcional)
+        <input
+          className={inputClass}
+          name="neighborhood"
+          autoComplete="address-level3"
+          maxLength={120}
+          placeholder="Informe apenas o bairro; não precisamos do endereço completo."
+          defaultValue={profile?.neighborhood ?? ""}
+        />
+        <span className="text-muted mt-1 block text-xs font-normal">
+          Usado somente como contexto operacional. Não informe rua, número ou
+          localização GPS.
+        </span>
+      </label>
+      <label className={`${labelClass} sm:col-span-2`}>
         Objetivo profissional
         <textarea
           className={textareaClass}

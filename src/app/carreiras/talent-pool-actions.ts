@@ -15,7 +15,7 @@ export async function saveTalentPoolMembershipAction(formData: FormData) {
   );
   if (!parsed.success) redirect(`${profilePath}?error=talent-areas`);
 
-  const { supabase } = await requireCandidateSession();
+  const { supabase, user } = await requireCandidateSession();
   const { error } = await supabase.rpc("set_talent_pool_membership", {
     p_area_ids: parsed.data,
   });
@@ -25,15 +25,31 @@ export async function saveTalentPoolMembershipAction(formData: FormData) {
       : "talent-save";
     redirect(`${profilePath}?error=${reason}`);
   }
+  await supabase.from("candidate_consents").insert({
+    candidate_id: user.id,
+    consent_type: "talent_pool",
+    purpose:
+      "Participação voluntária no Banco de Talentos para buscas por critérios profissionais.",
+    text_version: "2026-08-v1",
+    granted: true,
+  });
   revalidatePath(profilePath);
   redirect(`${profilePath}?status=talent-saved`);
 }
 
 export async function leaveTalentPoolAction() {
   requireCareersPortalEnabled();
-  const { supabase } = await requireCandidateSession();
+  const { supabase, user } = await requireCandidateSession();
   const { error } = await supabase.rpc("leave_talent_pool");
   if (error) redirect(`${profilePath}?error=talent-leave`);
+  await supabase.from("candidate_consents").insert({
+    candidate_id: user.id,
+    consent_type: "talent_pool",
+    purpose:
+      "Saída voluntária do Banco de Talentos e encerramento da autorização para novas buscas.",
+    text_version: "2026-08-v1",
+    granted: false,
+  });
   revalidatePath(profilePath);
   redirect(`${profilePath}?status=talent-left`);
 }

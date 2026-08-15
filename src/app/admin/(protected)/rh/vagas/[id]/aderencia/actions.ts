@@ -8,6 +8,7 @@ import {
 } from "@/lib/careers/applications";
 import { requireHrAccess } from "@/lib/careers/hr-auth";
 import type { CareerJob } from "@/lib/careers/jobs";
+import type { ApplicationLogistics } from "@/lib/careers/logistics";
 import {
   calculateExplainableMatch,
   matchCriterionKeys,
@@ -38,7 +39,9 @@ function matrixPath(jobId: string) {
 async function loadJob(supabase: HrSupabase, jobId: string) {
   const { data } = await supabase
     .from("career_jobs")
-    .select("*, area:career_job_areas(id, name, slug, is_active)")
+    .select(
+      "*, area:career_job_areas(id, name, slug, is_active), unit:company_units(id, name, address, neighborhood, city, state, postal_code, active)",
+    )
     .eq("id", jobId)
     .maybeSingle();
   return (data as CareerJob | null) ?? null;
@@ -49,6 +52,7 @@ function buildRun(
   matrix: MatchMatrixRow,
   application: MatchApplicationRow,
   actorId: string,
+  logistics?: ApplicationLogistics | null,
 ) {
   const criteria = matchMatrixCriteriaSchema.safeParse(matrix.criteria);
   const snapshot = careerApplicationSnapshotSchema.safeParse(
@@ -59,6 +63,7 @@ function buildRun(
     job,
     snapshot: snapshot.data as CareerApplicationSnapshot,
     criteria: criteria.data,
+    logistics,
   });
   return {
     application_id: application.id,
@@ -129,8 +134,31 @@ export async function saveJobMatchMatrixAction(formData: FormData) {
     .from("career_job_applications")
     .select("id, profile_snapshot")
     .eq("job_id", job.id);
+  const applicationIds = (
+    (applicationData as MatchApplicationRow[] | null) ?? []
+  ).map((application) => application.id);
+  const { data: logisticsData } = applicationIds.length
+    ? await supabase
+        .from("career_application_logistics")
+        .select("*")
+        .in("application_id", applicationIds)
+    : { data: [] };
+  const logisticsByApplication = new Map(
+    ((logisticsData as ApplicationLogistics[] | null) ?? []).map((item) => [
+      item.application_id,
+      item,
+    ]),
+  );
   const runs = ((applicationData as MatchApplicationRow[] | null) ?? [])
-    .map((application) => buildRun(job, matrix, application, user.id))
+    .map((application) =>
+      buildRun(
+        job,
+        matrix,
+        application,
+        user.id,
+        logisticsByApplication.get(application.id),
+      ),
+    )
     .filter((run): run is NonNullable<typeof run> => Boolean(run));
   if (runs.length) {
     const { error } = await supabase
@@ -159,22 +187,28 @@ export async function recalculateApplicationMatchAction(formData: FormData) {
   });
   if (!parsed.success) redirect("/admin/rh/vagas?error=calculation");
   const detailPath = `/admin/rh/vagas/${parsed.data.jobId}/candidaturas/${parsed.data.applicationId}`;
-  const [job, matrixResult, applicationResult] = await Promise.all([
-    loadJob(supabase, parsed.data.jobId),
-    supabase
-      .from("career_job_match_matrices")
-      .select("id, job_id, version, criteria")
-      .eq("job_id", parsed.data.jobId)
-      .order("version", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    supabase
-      .from("career_job_applications")
-      .select("id, profile_snapshot")
-      .eq("id", parsed.data.applicationId)
-      .eq("job_id", parsed.data.jobId)
-      .maybeSingle(),
-  ]);
+  const [job, matrixResult, applicationResult, logisticsResult] =
+    await Promise.all([
+      loadJob(supabase, parsed.data.jobId),
+      supabase
+        .from("career_job_match_matrices")
+        .select("id, job_id, version, criteria")
+        .eq("job_id", parsed.data.jobId)
+        .order("version", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("career_job_applications")
+        .select("id, profile_snapshot")
+        .eq("id", parsed.data.applicationId)
+        .eq("job_id", parsed.data.jobId)
+        .maybeSingle(),
+      supabase
+        .from("career_application_logistics")
+        .select("*")
+        .eq("application_id", parsed.data.applicationId)
+        .maybeSingle(),
+    ]);
   if (!job || !matrixResult.data || !applicationResult.data) {
     redirect(`${detailPath}?error=calculation`);
   }
@@ -183,6 +217,7 @@ export async function recalculateApplicationMatchAction(formData: FormData) {
     matrixResult.data as MatchMatrixRow,
     applicationResult.data as MatchApplicationRow,
     user.id,
+    (logisticsResult.data as ApplicationLogistics | null) ?? null,
   );
   if (!run) redirect(`${detailPath}?error=calculation`);
   const { data: runData, error } = await supabase

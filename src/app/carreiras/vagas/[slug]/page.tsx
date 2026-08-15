@@ -9,6 +9,7 @@ import {
   workModeLabels,
   type CareerJob,
 } from "@/lib/careers/jobs";
+import { formatCompanyUnitLocation } from "@/lib/careers/logistics";
 import { createPageMetadata } from "@/lib/metadata";
 import { createSupabasePublicClient } from "@/lib/supabase/server";
 
@@ -52,7 +53,9 @@ export default async function PublicCareerJobDetailPage({
   const today = new Date().toISOString().slice(0, 10);
   const { data, error } = await supabase
     .from("career_jobs")
-    .select("*, area:career_job_areas!inner(id, name, slug, is_active)")
+    .select(
+      "*, area:career_job_areas!inner(id, name, slug, is_active), unit:company_units(id, name, address, neighborhood, city, state, postal_code, active)",
+    )
     .eq("slug", slug)
     .eq("status", "published")
     .lte("opens_on", today)
@@ -122,6 +125,15 @@ export default async function PublicCareerJobDetailPage({
               <p className="text-muted border-border-light mt-5 border-t pt-5 text-sm">
                 Inscrições previstas até {formatJobDate(job.closes_on)}.
               </p>
+            ) : null}
+            {job.unit ? (
+              <div className="border-border-light mt-5 border-t pt-5 text-sm">
+                <p className="text-ink font-bold">{job.unit.name}</p>
+                <p className="text-muted mt-1">{job.unit.address}</p>
+                <p className="text-muted">
+                  {formatCompanyUnitLocation(job.unit)}
+                </p>
+              </div>
             ) : null}
           </section>
 
