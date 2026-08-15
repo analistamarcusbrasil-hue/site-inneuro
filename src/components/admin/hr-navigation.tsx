@@ -11,7 +11,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
-type HrNavigationKey = "dashboard" | "jobs" | "processes" | "candidates";
+type HrNavigationKey =
+  "dashboard" | "jobs" | "processes" | "candidates" | "talent";
 
 type HrNavigationItem = {
   key: string;
@@ -45,7 +46,12 @@ const hrNavigationItems: HrNavigationItem[] = [
     icon: Users,
     href: "/admin/rh/candidatos",
   },
-  { key: "talent", label: "Banco de Talentos", icon: Database },
+  {
+    key: "talent",
+    label: "Banco de Talentos",
+    icon: Database,
+    href: "/admin/rh/talentos",
+  },
   { key: "evaluations", label: "Avaliações", icon: Star },
   { key: "reports", label: "Relatórios", icon: BarChart3 },
   { key: "settings", label: "Configurações", icon: Settings },
@@ -56,11 +62,13 @@ export function HrNavigation({
   canManageJobs,
   canManageCandidates,
   canManageProcesses = canManageJobs,
+  canManageTalentPool = canManageCandidates,
 }: {
   current: HrNavigationKey;
   canManageJobs: boolean;
   canManageCandidates: boolean;
   canManageProcesses?: boolean;
+  canManageTalentPool?: boolean;
 }) {
   return (
     <nav aria-label="Módulos de RH" className="mb-8">
@@ -69,7 +77,8 @@ export function HrNavigation({
           const allowedHref =
             (key === "candidates" && !canManageCandidates) ||
             (key === "jobs" && !canManageJobs) ||
-            (key === "processes" && !canManageProcesses)
+            (key === "processes" && !canManageProcesses) ||
+            (key === "talent" && !canManageTalentPool)
               ? undefined
               : href;
           const active = key === current;
@@ -80,7 +89,10 @@ export function HrNavigation({
               <span className="min-w-0 flex-1 text-sm font-bold">{label}</span>
               {!allowedHref ? (
                 <span className="text-[0.6rem] font-bold tracking-wide uppercase">
-                  {key === "candidates" || key === "jobs" || key === "processes"
+                  {key === "candidates" ||
+                  key === "jobs" ||
+                  key === "processes" ||
+                  key === "talent"
                     ? "Acesso restrito"
                     : "Em desenvolvimento"}
                 </span>

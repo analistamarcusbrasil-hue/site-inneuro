@@ -14,7 +14,6 @@ import { requireHrAccess } from "@/lib/careers/hr-auth";
 const futureCards = [
   { label: "Novas candidaturas", icon: Inbox },
   { label: "Entrevistas", icon: CalendarClock },
-  { label: "Banco de talentos", icon: Database },
 ] as const;
 
 const roleLabels = {
@@ -26,21 +25,26 @@ const roleLabels = {
 export default async function HrDashboardPage() {
   const { supabase, hrRole } = await requireHrAccess();
   const canSeeCandidateTotal = hrRole !== "reviewer";
-  const [candidateResult, jobsResult, processesResult] = canSeeCandidateTotal
-    ? await Promise.all([
-        supabase
-          .from("candidate_accounts")
-          .select("id", { count: "exact", head: true }),
-        supabase
-          .from("career_jobs")
-          .select("id", { count: "exact", head: true })
-          .eq("status", "published"),
-        supabase
-          .from("career_selection_processes")
-          .select("id", { count: "exact", head: true })
-          .in("status", ["open", "in_progress"]),
-      ])
-    : [null, null, null];
+  const [candidateResult, jobsResult, processesResult, talentPoolResult] =
+    canSeeCandidateTotal
+      ? await Promise.all([
+          supabase
+            .from("candidate_accounts")
+            .select("id", { count: "exact", head: true }),
+          supabase
+            .from("career_jobs")
+            .select("id", { count: "exact", head: true })
+            .eq("status", "published"),
+          supabase
+            .from("career_selection_processes")
+            .select("id", { count: "exact", head: true })
+            .in("status", ["open", "in_progress"]),
+          supabase
+            .from("career_talent_pool_memberships")
+            .select("candidate_id", { count: "exact", head: true })
+            .eq("status", "active"),
+        ])
+      : [null, null, null, null];
   const candidateCount = candidateResult?.error
     ? null
     : (candidateResult?.count ?? 0);
@@ -48,6 +52,9 @@ export default async function HrDashboardPage() {
   const activeProcessesCount = processesResult?.error
     ? null
     : (processesResult?.count ?? 0);
+  const talentPoolCount = talentPoolResult?.error
+    ? null
+    : (talentPoolResult?.count ?? 0);
 
   return (
     <>
@@ -106,6 +113,36 @@ export default async function HrDashboardPage() {
             ) : (
               <p className="text-muted mt-2 text-sm font-semibold">
                 Acesso restrito aos candidatos autorizados futuramente
+              </p>
+            )}
+          </li>
+
+          <li className="border-border-light rounded-3xl border bg-white p-6">
+            <span className="bg-mint text-brand grid size-11 place-items-center rounded-2xl">
+              <Database aria-hidden="true" size={21} />
+            </span>
+            <p className="text-muted mt-6 text-sm">Banco de talentos</p>
+            {canSeeCandidateTotal ? (
+              talentPoolCount === null ? (
+                <p className="text-warning mt-2 text-sm font-bold">
+                  Indicador temporariamente indisponível
+                </p>
+              ) : (
+                <>
+                  <p className="font-heading text-brand-dark mt-1 text-3xl font-semibold">
+                    {talentPoolCount.toLocaleString("pt-BR")}
+                  </p>
+                  <Link
+                    className="text-brand mt-2 inline-block text-xs font-bold hover:underline"
+                    href="/admin/rh/talentos"
+                  >
+                    Consultar talentos
+                  </Link>
+                </>
+              )
+            ) : (
+              <p className="text-muted mt-2 text-sm font-semibold">
+                Acesso restrito ao RH autorizado
               </p>
             )}
           </li>

@@ -18,6 +18,7 @@ import {
   CandidateEducationForm,
   CandidateExperienceForm,
 } from "@/components/careers/candidate-profile-forms";
+import { CandidateTalentPool } from "@/components/careers/candidate-talent-pool";
 import { Container } from "@/components/layout/container";
 import { requireCandidateSession } from "@/lib/careers/auth";
 import {
@@ -33,6 +34,10 @@ import {
   type CandidateSkill,
 } from "@/lib/careers/profile";
 import { resumeExtractionRecordSchema } from "@/lib/careers/resume-extraction";
+import type {
+  TalentPoolArea,
+  TalentPoolMembership,
+} from "@/lib/careers/talent-pool";
 
 export const metadata: Metadata = {
   title: "Perfil profissional | Carreiras INNEURO",
@@ -58,6 +63,10 @@ const statusMessages: Record<string, string> = {
   "resume-deleted": "Versão do currículo excluída.",
   "order-saved": "Ordem atualizada.",
   "order-unchanged": "O item já está nessa posição.",
+  "talent-saved": "Participação no Banco de Talentos atualizada.",
+  "talent-left": "Você saiu do Banco de Talentos.",
+  "talent-deletion-requested":
+    "Solicitação de exclusão da participação registrada.",
 };
 
 const errorMessages: Record<string, string> = {
@@ -88,6 +97,12 @@ const errorMessages: Record<string, string> = {
     "Não conseguimos identificar todas as informações do currículo. Você pode completar seu perfil manualmente.",
   "resume-delete": "Não foi possível excluir esta versão do currículo.",
   reorder: "Não foi possível alterar a ordem.",
+  "talent-areas": "Escolha pelo menos uma área profissional de interesse.",
+  "talent-save": "Não foi possível atualizar o Banco de Talentos.",
+  "talent-leave": "Não foi possível sair do Banco de Talentos.",
+  "talent-deletion": "Não foi possível solicitar a exclusão.",
+  "talent-deletion-pending":
+    "Sua solicitação de exclusão ainda está sendo processada.",
 };
 
 function ProfileSection({
@@ -127,6 +142,9 @@ export default async function CandidateProfilePage({
     skillsResult,
     resumesResult,
     extractionsResult,
+    talentMembershipResult,
+    talentInterestsResult,
+    talentAreasResult,
   ] = await Promise.all([
     supabase
       .from("candidate_profiles")
@@ -168,6 +186,21 @@ export default async function CandidateProfilePage({
       .eq("candidate_id", user.id)
       .in("status", ["ready", "partial"])
       .order("created_at", { ascending: false }),
+    supabase
+      .from("career_talent_pool_memberships")
+      .select("*")
+      .eq("candidate_id", user.id)
+      .maybeSingle(),
+    supabase
+      .from("career_talent_pool_interests")
+      .select("area_id")
+      .eq("candidate_id", user.id),
+    supabase
+      .from("career_job_areas")
+      .select("id, name, slug, is_active")
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true })
+      .order("name", { ascending: true }),
   ]);
 
   const profile =
@@ -179,6 +212,12 @@ export default async function CandidateProfilePage({
     (certificationsResult.data as CandidateCertification[] | null) ?? [];
   const skills = (skillsResult.data as CandidateSkill[] | null) ?? [];
   const resumes = (resumesResult.data as CandidateResume[] | null) ?? [];
+  const talentMembership =
+    (talentMembershipResult.data as TalentPoolMembership | null) ?? null;
+  const talentAreas = (talentAreasResult.data as TalentPoolArea[] | null) ?? [];
+  const selectedTalentAreaIds = (talentInterestsResult.data ?? []).map(
+    (interest) => String(interest.area_id),
+  );
   const pendingExtractions = (extractionsResult.data ?? []).flatMap((item) => {
     const parsed = resumeExtractionRecordSchema.safeParse(item);
     return parsed.success ? [parsed.data] : [];
@@ -287,6 +326,17 @@ export default async function CandidateProfilePage({
               fullName={account.full_name}
               email={user.email ?? ""}
               profile={profile}
+            />
+          </ProfileSection>
+
+          <ProfileSection
+            title="Banco de Talentos INNEURO"
+            description="Autorize voluntariamente que o RH encontre seu perfil por critérios exclusivamente profissionais."
+          >
+            <CandidateTalentPool
+              areas={talentAreas}
+              membership={talentMembership}
+              selectedAreaIds={selectedTalentAreaIds}
             />
           </ProfileSection>
 
