@@ -236,6 +236,12 @@ test("migration da bancada conclui de forma atômica e preserva dados", () => {
   );
   assert.doesNotMatch(migration, /\btruncate\b/i);
   assert.doesNotMatch(migration, /\bdelete\s+from\b/i);
+  const typeFix = read(
+    "../supabase/migrations/202608160006_fix_reception_completion_types.sql",
+  );
+  assert.match(typeFix, /seen_exams uuid\[\] := '\{\}'::uuid\[\]/);
+  assert.match(typeFix, /'\{\}'::text\[\]/);
+  assert.doesNotMatch(typeFix, /\bdrop\s+(table|column|constraint|policy)\b/i);
 });
 
 test("reenvio aceita pendente ou falho e mantém trava de concorrência", () => {
