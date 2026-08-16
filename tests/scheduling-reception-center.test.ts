@@ -111,7 +111,10 @@ test("migration preserva tabelas e limita RECEPCAO ao agendamento", () => {
   assert.match(migration, /add value if not exists 'reception'/);
   assert.match(migration, /active boolean not null default true/);
   assert.match(migration, /is_scheduling_staff/);
-  assert.match(migration, /role in \('super_admin', 'admin', 'reception'\)/);
+  assert.match(
+    migration,
+    /role::text in \('super_admin', 'admin', 'reception'\)/,
+  );
   assert.match(migration, /appointment_request_communications/);
   assert.match(migration, /idempotency_key text not null unique/);
   assert.match(migration, /appointment_request_patient_tokens/);

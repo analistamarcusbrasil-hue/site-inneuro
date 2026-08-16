@@ -6,11 +6,11 @@ alter table public.profiles
   add column if not exists email text,
   add column if not exists active boolean not null default true;
 
-update public.profiles set hr_role = null where role = 'reception';
+update public.profiles set hr_role = null where role::text = 'reception';
 
 alter table public.profiles
   add constraint reception_has_no_hr_access
-  check (role <> 'reception' or hr_role is null);
+  check (role::text <> 'reception' or hr_role is null);
 
 alter table public.appointment_requests
   add column if not exists workflow_status text not null default 'NOVO'
@@ -103,7 +103,7 @@ security definer
 set search_path = public
 as $$
   select coalesce(
-    (select active and role in ('super_admin', 'admin', 'reception')
+    (select active and role::text in ('super_admin', 'admin', 'reception')
      from public.profiles where id = auth.uid()),
     false
   );
@@ -156,11 +156,11 @@ create policy "scheduling staff reads published preparations"
   using (public.is_scheduling_staff() and active and status = 'published' and deleted_at is null);
 create policy "scheduling staff reads scheduling profiles"
   on public.profiles for select to authenticated
-  using (public.is_scheduling_staff() and role in ('super_admin', 'admin', 'reception'));
+  using (public.is_scheduling_staff() and role::text in ('super_admin', 'admin', 'reception'));
 create policy "administrators manage reception profiles"
   on public.profiles for update to authenticated
-  using (public.current_app_role() in ('super_admin', 'admin') and role = 'reception')
-  with check (public.current_app_role() in ('super_admin', 'admin') and role = 'reception');
+  using (public.current_app_role() in ('super_admin', 'admin') and role::text = 'reception')
+  with check (public.current_app_role() in ('super_admin', 'admin') and role::text = 'reception');
 
 grant execute on function public.is_scheduling_staff() to authenticated;
 grant select, update on public.appointment_requests, public.appointment_request_exams,
