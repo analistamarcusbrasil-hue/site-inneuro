@@ -218,6 +218,10 @@ test("tela única oferece fila, atalhos e ações conforme status", () => {
   const page = read("../src/app/admin/(protected)/solicitacoes/page.tsx");
   assert.match(page, /requireAdminPermission\([\s\S]*"scheduling\.view"/);
   assert.match(page, /createSupabaseAdminClient\(\) \?\? supabase/);
+  assert.match(
+    page,
+    /appointment_request_communications!appointment_request_communications_appointment_request_id_fkey/,
+  );
   assert.ok(
     page.indexOf('requireAdminPermission("scheduling.view")') <
       page.indexOf("createSupabaseAdminClient()"),
