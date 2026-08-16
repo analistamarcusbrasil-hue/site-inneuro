@@ -11,7 +11,13 @@ import {
   type ApplicationStatus,
 } from "@/lib/careers/applications";
 import { requireCandidateSession } from "@/lib/careers/auth";
-import type { SelectionStage } from "@/lib/careers/selection-processes";
+import {
+  mainSelectionStages,
+  selectionStageCandidateMessages,
+  selectionStageLabels,
+  selectionStageNumbers,
+  type SelectionStage,
+} from "@/lib/careers/selection-processes";
 
 export const metadata: Metadata = {
   title: "Minhas candidaturas | Carreiras INNEURO",
@@ -56,6 +62,19 @@ export default async function CandidateApplicationsPage({
     .eq("candidate_id", user.id)
     .order("submitted_at", { ascending: false });
   const applications = (data as unknown as ApplicationRow[] | null) ?? [];
+  const stageCountEntries = await Promise.all(
+    applications.map(async (application) => {
+      if (!selectionStageNumbers[application.candidate_stage]) {
+        return [application.id, 0] as const;
+      }
+      const { data: count } = await supabase.rpc(
+        "get_candidate_application_stage_count",
+        { p_application_id: application.id },
+      );
+      return [application.id, typeof count === "number" ? count : 0] as const;
+    }),
+  );
+  const stageCounts = new Map(stageCountEntries);
 
   return (
     <main
@@ -148,16 +167,55 @@ export default async function CandidateApplicationsPage({
                         <strong>{application.process_label}</strong>
                       </p>
                     ) : null}
-                    <p className="text-ink mt-3 text-sm">
-                      <span className="text-muted">Etapa atual:</span>{" "}
-                      <strong>
-                        {candidateStageLabels[application.candidate_stage]}
-                      </strong>
-                    </p>
-                    <p className="text-muted mt-1 text-xs">
-                      Última atualização em{" "}
-                      {formatApplicationDate(application.stage_updated_at)}
-                    </p>
+                    <div className="mt-5" aria-label="Andamento da seleção">
+                      <ol className="grid grid-cols-4 gap-2">
+                        {mainSelectionStages.map((stage, index) => {
+                          const current =
+                            selectionStageNumbers[application.candidate_stage];
+                          const complete =
+                            application.candidate_stage === "hired" ||
+                            (current !== undefined && index + 1 <= current);
+                          return (
+                            <li key={stage} className="min-w-0">
+                              <span
+                                className={`block h-2 rounded-full ${complete ? "bg-brand" : "bg-border-light"}`}
+                              />
+                              <span className="text-muted mt-2 block truncate text-[10px] sm:text-xs">
+                                {application.candidate_stage === "hired" ||
+                                (current !== undefined && index + 1 < current)
+                                  ? "✓"
+                                  : current === index + 1
+                                    ? "●"
+                                    : "○"}{" "}
+                                {index + 1}. {selectionStageLabels[stage]}
+                              </span>
+                            </li>
+                          );
+                        })}
+                      </ol>
+                      <p className="text-brand-dark mt-4 font-bold">
+                        {selectionStageNumbers[application.candidate_stage]
+                          ? `Etapa ${selectionStageNumbers[application.candidate_stage]} de 4 — ${candidateStageLabels[application.candidate_stage]}`
+                          : candidateStageLabels[application.candidate_stage]}
+                      </p>
+                      <p className="text-ink mt-1 text-sm">
+                        {
+                          selectionStageCandidateMessages[
+                            application.candidate_stage
+                          ]
+                        }
+                      </p>
+                      {selectionStageNumbers[application.candidate_stage] ? (
+                        <p className="text-muted mt-2 text-sm">
+                          {stageCounts.get(application.id) ?? 0} candidatos
+                          estão nesta etapa.
+                        </p>
+                      ) : null}
+                      <p className="text-muted mt-2 text-xs">
+                        Última atualização em{" "}
+                        {formatApplicationDate(application.stage_updated_at)}
+                      </p>
+                    </div>
                   </div>
                   <span
                     className={`rounded-full px-3 py-1 text-xs font-bold ${statusClasses[application.status]}`}

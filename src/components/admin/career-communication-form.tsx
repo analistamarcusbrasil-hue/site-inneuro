@@ -22,9 +22,11 @@ export function CareerCommunicationForm({
 }) {
   const [template, setTemplate] =
     useState<AdminCareerCommunicationTemplate>("UNDER_REVIEW");
-  const interview = ["INTERVIEW_INVITE", "INTERVIEW_REMINDER"].includes(
-    template,
-  );
+  const interview = [
+    "INTERVIEW_INVITE",
+    "INTERVIEW_REMINDER",
+    "PRACTICAL_TEST_INVITE",
+  ].includes(template);
 
   return (
     <form
@@ -73,7 +75,7 @@ export function CareerCommunicationForm({
       {interview ? (
         <div className="grid gap-4 sm:grid-cols-3">
           <label className="text-ink text-sm font-bold">
-            Data da entrevista
+            Data
             <input
               name="interview_date"
               type="date"

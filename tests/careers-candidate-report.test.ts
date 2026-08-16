@@ -54,7 +54,7 @@ const application = {
   id: "1bd72a78-d4da-41c6-b473-aea95eef55c6",
   candidate_id: "8dd5709e-cb5b-4d78-8f1c-5ebfe5b2f4f0",
   status: "submitted" as const,
-  candidate_stage: "registered" as const,
+  candidate_stage: "resume" as const,
   profile_snapshot: snapshot,
   submitted_at: "2026-08-16T12:00:00.000Z",
 } satisfies Pick<
@@ -100,7 +100,7 @@ test("relatório filtra por critérios profissionais e resume faixas", () => {
       education: "informed",
       customerService: "yes",
       similarRole: "yes",
-      stage: "registered",
+      stage: "resume",
     }).length,
     1,
   );
@@ -126,10 +126,11 @@ test("painel expõe relatório explicável, filtros e currículo privado", () =>
     ),
     "utf8",
   );
-  assert.match(page, /Perfis dos candidatos/);
-  assert.match(page, /Alta aderência/);
-  assert.match(page, /Aderência intermediária/);
-  assert.match(page, /Requer análise/);
+  assert.match(page, /Processo seletivo/);
+  assert.match(page, /1\. Currículo/);
+  assert.match(page, /2\. Entrevista/);
+  assert.match(page, /3\. Teste Prático/);
+  assert.match(page, /4\. Contratação/);
   assert.match(page, /name="escolaridade"/);
   assert.match(page, /name="atendimento"/);
   assert.match(page, /name="funcao"/);

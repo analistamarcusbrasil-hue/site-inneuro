@@ -37,42 +37,39 @@ test("ciclo permite abrir, iniciar, encerrar e cancelar sem reabrir finalizados"
   assert.equal(canManageSelectionCandidates("cancelled"), false);
 });
 
-test("pipeline contém as seis etapas e os dois estados auxiliares", () => {
+test("pipeline contém quatro etapas e dois resultados finais", () => {
   assert.deepEqual(selectionStages, [
-    "registered",
-    "screening",
+    "resume",
     "interview",
-    "evaluation",
-    "finalists",
-    "selected",
-    "talent_pool",
-    "not_selected",
+    "practical_test",
+    "hiring",
+    "hired",
+    "not_approved",
   ]);
-  assert.equal(selectionStageLabels.registered, "Inscritos");
-  assert.equal(selectionStageLabels.selected, "Selecionado");
-  assert.equal(selectionStageLabels.talent_pool, "Banco de Talentos");
-  assert.equal(selectionStageLabels.not_selected, "Não selecionado");
+  assert.equal(selectionStageLabels.resume, "Currículo");
+  assert.equal(selectionStageLabels.practical_test, "Teste Prático");
+  assert.equal(selectionStageLabels.hired, "Contratado");
+  assert.equal(selectionStageLabels.not_approved, "Não aprovado");
 });
 
 test("migração protege dados internos e audita toda movimentação", () => {
   const migration = readFileSync(
     new URL(
-      "../supabase/migrations/202608150003_selection_process_workflow.sql",
+      "../supabase/migrations/202608160001_four_stage_recruitment_funnel.sql",
       import.meta.url,
     ),
     "utf8",
   );
   assert.match(
     migration,
-    /create table if not exists public\.career_selection_processes/,
+    /create table if not exists public\.career_application_stage_history/,
   );
-  assert.match(migration, /career_selection_process_candidates/);
-  assert.match(migration, /career_selection_movements/);
+  assert.match(migration, /decide_career_application_stage/);
   assert.match(migration, /from_stage/);
   assert.match(migration, /to_stage/);
-  assert.match(migration, /moved_by/);
-  assert.match(migration, /moved_at/);
-  assert.match(migration, /internal_note/);
+  assert.match(migration, /admin_id/);
+  assert.match(migration, /created_at/);
+  assert.match(migration, /internal_notes/);
   assert.match(migration, /using \(public\.can_manage_hr\(\)\)/);
   assert.doesNotMatch(migration, /candidate reads selection/i);
   assert.doesNotMatch(migration, /score/i);

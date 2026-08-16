@@ -35,6 +35,7 @@ export type AdminCommunicationFields = {
   location?: string;
   subject?: string;
   message?: string;
+  talentPoolAuthorized?: boolean;
 };
 
 function adminUrl(context: ApplicationCommunicationContext) {
@@ -95,6 +96,7 @@ function candidateVariables(
       };
     case "INTERVIEW_INVITE":
     case "INTERVIEW_REMINDER":
+    case "PRACTICAL_TEST_INVITE":
       return {
         ...common,
         interviewDate: fields.interviewDate,
@@ -108,6 +110,8 @@ function candidateVariables(
         subject: fields.subject,
         message: fields.message,
       };
+    case "REJECTED":
+      return { ...common, talentPoolAuthorized: fields.talentPoolAuthorized };
     default:
       return common;
   }
@@ -125,6 +129,17 @@ export async function sendApplicationCommunication(input: {
     input.applicationId,
   );
   const fields = input.fields ?? {};
+  if (input.template === "REJECTED") {
+    const admin = createSupabaseAdminClient();
+    if (!admin) throw new Error("career_communications_not_configured");
+    const { data: membership } = await admin
+      .from("career_talent_pool_memberships")
+      .select("status")
+      .eq("candidate_id", context.candidateId)
+      .eq("status", "active")
+      .maybeSingle();
+    fields.talentPoolAuthorized = membership?.status === "active";
+  }
   const idempotencyKey = input.idempotencyKey ?? randomUUID();
   adminSendCommunicationSchema.parse({
     applicationId: input.applicationId,
@@ -196,13 +211,11 @@ export function communicationForSelectionStage(
   stage: string,
 ): AdminCareerCommunicationTemplate | null {
   const mapping: Record<string, AdminCareerCommunicationTemplate> = {
-    screening: "UNDER_REVIEW",
-    interview: "INTERVIEW_INVITE",
-    evaluation: "NEXT_STAGE",
-    finalists: "NEXT_STAGE",
-    selected: "APPROVED",
-    talent_pool: "TALENT_POOL",
-    not_selected: "REJECTED",
+    interview: "STAGE_1_APPROVED",
+    practical_test: "STAGE_2_APPROVED",
+    hiring: "STAGE_3_APPROVED",
+    hired: "FINAL_APPROVED",
+    not_approved: "REJECTED",
   };
   return mapping[stage] ?? null;
 }
@@ -217,5 +230,5 @@ export function communicationForApplicationStatus(
 }
 
 export function isSensitiveTemplate(template: CareerCommunicationTemplate) {
-  return template === "INTERVIEW_INVITE";
+  return ["INTERVIEW_INVITE", "PRACTICAL_TEST_INVITE"].includes(template);
 }

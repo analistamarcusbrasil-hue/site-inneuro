@@ -385,7 +385,7 @@ test("painel mostra envio e histórico; candidato vê somente a etapa pública",
   assert.match(adminPage, /Histórico de comunicações/);
   assert.match(adminPage, /Reenviar/);
   assert.match(candidatePage, /candidate_stage/);
-  assert.match(candidatePage, /Etapa atual/);
+  assert.match(candidatePage, /selectionStageNumbers/);
   assert.doesNotMatch(candidatePage, /career_communications|last_error_code/);
 });
 
@@ -417,7 +417,8 @@ test("mudanças de status e etapa permitem comunicação auditável", () => {
   assert.match(applicationAction, /send_communication/);
   assert.match(applicationAction, /sendApplicationCommunication/);
   assert.match(processAction, /communicationForSelectionStage/);
-  assert.match(processAction, /INTERVIEW_INVITE/);
+  assert.match(applicationAction, /INTERVIEW_INVITE/);
+  assert.match(applicationAction, /PRACTICAL_TEST_INVITE/);
   assert.match(processAction, /PROCESS_CLOSED/);
 });
 

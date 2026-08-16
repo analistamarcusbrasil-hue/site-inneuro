@@ -52,3 +52,29 @@ export const selectionCandidateNoteSchema = z.object({
     .transform((value) => value || null),
   view: z.enum(["kanban", "list"]).catch("kanban"),
 });
+
+export const careerStageDecisionSchema = z.object({
+  applicationId: z.string().uuid(),
+  jobId: z.string().uuid(),
+  expectedStage: z.enum(selectionStages),
+  decision: z.enum(["approve", "not_approve"]),
+});
+
+export const careerStageEventSchema = z.object({
+  applicationId: z.string().uuid(),
+  jobId: z.string().uuid(),
+  stage: z.enum(["interview", "practical_test"]),
+  scheduledDate: dateSchema,
+  scheduledTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+  location: z.string().trim().min(2).max(240),
+  instructions: z
+    .string()
+    .trim()
+    .max(2000)
+    .transform((value) => value || null),
+  internalNotes: z
+    .string()
+    .trim()
+    .max(4000)
+    .transform((value) => value || null),
+});

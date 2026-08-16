@@ -22,14 +22,12 @@ export const candidateStageLabels: Record<
   CareerJobApplication["candidate_stage"],
   string
 > = {
-  registered: "Candidatura recebida",
-  screening: "Em análise",
+  resume: "Currículo",
   interview: "Entrevista",
-  evaluation: "Próxima etapa",
-  finalists: "Finalista",
-  selected: "Aprovado",
-  talent_pool: "Banco de talentos",
-  not_selected: "Não selecionado",
+  practical_test: "Teste Prático",
+  hiring: "Contratação",
+  hired: "Contratado",
+  not_approved: "Não aprovado",
 };
 
 const optionalText = z.string().nullable();
@@ -103,14 +101,12 @@ export type CareerJobApplication = {
   profile_snapshot: unknown;
   process_label: string | null;
   candidate_stage:
-    | "registered"
-    | "screening"
+    | "resume"
     | "interview"
-    | "evaluation"
-    | "finalists"
-    | "selected"
-    | "talent_pool"
-    | "not_selected";
+    | "practical_test"
+    | "hiring"
+    | "hired"
+    | "not_approved";
   stage_updated_at: string;
   submitted_at: string;
   withdrawn_at: string | null;
