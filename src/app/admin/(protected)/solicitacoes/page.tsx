@@ -5,6 +5,7 @@ import {
 } from "@/components/admin/reception-center";
 import { requireAdminPermission } from "@/lib/cms/auth";
 import { defaultDocumentsToBring } from "@/lib/scheduling/operations";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 function preparationText(value: unknown) {
   if (!Array.isArray(value)) return "";
@@ -33,9 +34,13 @@ function preparationText(value: unknown) {
 export default async function AppointmentRequestsPage() {
   const { supabase, user, profile } =
     await requireAdminPermission("scheduling.view");
+  // A autorização continua sendo feita pela sessão do usuário. Depois do guard,
+  // o cliente de serviço evita que joins administrativos legítimos sejam
+  // reduzidos por políticas RLS diferentes entre as tabelas relacionadas.
+  const dataClient = createSupabaseAdminClient() ?? supabase;
   const [{ data, error }, { data: exams }, { data: preparations }] =
     await Promise.all([
-      supabase
+      dataClient
         .from("appointment_requests")
         .select(
           "id,protocol,patient_name,cpf,phone,email,service_type,insurance_name,insurance_card_number,workflow_status,assigned_to,claimed_at,insurer_reference,authorization_number,authorization_valid_until,pending_reason,pending_correction,pending_guidance,documents_received_at,unit_name,confirmation_status,confirmation_communication_id,completed_by,completed_at,created_at,updated_at,assigned:profiles!assigned_to(full_name),completed:profiles!appointment_requests_completed_by_fkey(full_name),appointment_request_exams(id,exam_name,exam_id,modality,scheduled_date,scheduled_time,preparation_text,documents_to_bring),appointment_request_documents(id,document_type,file_name,checked_at,source,created_at),appointment_request_history(id,action,details,created_at),appointment_request_communications(id,communication_type,subject,text_body,status,attempt_count,created_at,sent_at)",
@@ -43,8 +48,10 @@ export default async function AppointmentRequestsPage() {
         .order("documents_received_at", { ascending: false, nullsFirst: false })
         .order("created_at", { ascending: true })
         .limit(500),
-      supabase.from("exams").select("id,preparation_slug"),
-      supabase.from("preparations").select("slug,preparation_groups,documents"),
+      dataClient.from("exams").select("id,preparation_slug"),
+      dataClient
+        .from("preparations")
+        .select("slug,preparation_groups,documents"),
     ]);
   const preparationBySlug = new Map(
     (preparations ?? []).map((item) => [
