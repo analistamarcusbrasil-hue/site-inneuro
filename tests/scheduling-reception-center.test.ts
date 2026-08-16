@@ -217,6 +217,11 @@ test("tela única oferece fila, atalhos e ações conforme status", () => {
   assert.match(layout, /requireAdmin\(\)/);
   const page = read("../src/app/admin/(protected)/solicitacoes/page.tsx");
   assert.match(page, /requireAdminPermission\([\s\S]*"scheduling\.view"/);
+  assert.match(page, /createSupabaseAdminClient\(\) \?\? supabase/);
+  assert.ok(
+    page.indexOf('requireAdminPermission("scheduling.view")') <
+      page.indexOf("createSupabaseAdminClient()"),
+  );
 });
 
 test("migration da bancada conclui de forma atômica e preserva dados", () => {
