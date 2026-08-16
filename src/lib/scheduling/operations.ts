@@ -13,14 +13,72 @@ export type WorkflowStatus = (typeof workflowStatuses)[number];
 
 export const workflowLabels: Record<WorkflowStatus, string> = {
   NOVO: "Novo",
-  EM_ANALISE: "Em análise",
+  EM_ANALISE: "Em atendimento",
   AGUARDANDO_CONVENIO: "Aguardando convênio",
   PENDENCIA: "Pendência",
   RECUSADO: "Recusado pelo convênio",
   AUTORIZADO: "Autorizado",
-  CONCLUIDO: "Concluído",
+  CONCLUIDO: "Atendido",
   CANCELADO: "Cancelado",
 };
+
+export type ConfirmationStatus = "NOT_REQUIRED" | "PENDING" | "SENT" | "FAILED";
+
+export function isConfirmationPending(
+  workflowStatus: WorkflowStatus,
+  confirmationStatus: ConfirmationStatus,
+) {
+  return (
+    workflowStatus === "CONCLUIDO" &&
+    ["PENDING", "FAILED"].includes(confirmationStatus)
+  );
+}
+
+export function isAttendedRequest(
+  workflowStatus: WorkflowStatus,
+  confirmationStatus: ConfirmationStatus,
+) {
+  return (
+    workflowStatus === "CONCLUIDO" &&
+    !isConfirmationPending(workflowStatus, confirmationStatus)
+  );
+}
+
+export function isActiveRequest(
+  workflowStatus: WorkflowStatus,
+  confirmationStatus: ConfirmationStatus,
+) {
+  return (
+    isConfirmationPending(workflowStatus, confirmationStatus) ||
+    !["CONCLUIDO", "CANCELADO"].includes(workflowStatus)
+  );
+}
+
+export function normalizeWhatsAppPhone(value: string | null | undefined) {
+  const digits = String(value ?? "").replace(/\D/g, "");
+  const national = digits.startsWith("55") ? digits.slice(2) : digits;
+  if (!/^[1-9]\d(?:[2-9]\d{7}|9\d{8})$/.test(national)) return null;
+  return `55${national}`;
+}
+
+export function buildAppointmentWhatsAppUrl(input: {
+  phone: string | null | undefined;
+  patientName: string;
+  protocol?: string | null;
+}) {
+  const phone = normalizeWhatsAppPhone(input.phone);
+  if (!phone) return null;
+  const firstName = input.patientName.trim().split(/\s+/)[0] || "Olá";
+  const protocol = input.protocol?.trim()
+    ? ` Protocolo: ${input.protocol.trim()}.`
+    : "";
+  const message = `Olá, ${firstName}. Aqui é da recepção da INNEURO. Estamos entrando em contato sobre sua solicitação de pré-agendamento.${protocol}`;
+  return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+}
+
+export function hasValidSchedulingEmail(value: string | null | undefined) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value ?? "").trim());
+}
 
 export const quickPendingReasons = [
   "Pedido médico incompleto",

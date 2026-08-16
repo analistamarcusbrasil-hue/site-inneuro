@@ -187,7 +187,7 @@ export async function retrySchedulingCommunication(id: string) {
     .select("*")
     .eq("id", id)
     .single();
-  if (!data || data.status !== "FAILED") return data;
+  if (!data || !["PENDING", "FAILED"].includes(data.status)) return data;
   const attemptedAt = new Date().toISOString();
   const { data: claimed } = await admin
     .from("appointment_request_communications")
@@ -197,7 +197,7 @@ export async function retrySchedulingCommunication(id: string) {
       last_attempt_at: attemptedAt,
     })
     .eq("id", id)
-    .eq("status", "FAILED")
+    .in("status", ["PENDING", "FAILED"])
     .select("id")
     .maybeSingle();
   if (!claimed) return data;

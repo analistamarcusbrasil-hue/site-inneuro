@@ -6,8 +6,14 @@ import {
   buildPendingMessage,
 } from "../src/lib/scheduling/communications/templates";
 import {
+  buildAppointmentWhatsAppUrl,
   defaultDocumentsToBring,
   formatWaitingTime,
+  hasValidSchedulingEmail,
+  isActiveRequest,
+  isAttendedRequest,
+  isConfirmationPending,
+  normalizeWhatsAppPhone,
   pendingSuggestions,
   quickPendingReasons,
   workflowStatuses,
@@ -57,6 +63,33 @@ test("tempo de espera é legível para minutos, horas e dias", () => {
   assert.equal(formatWaitingTime("2026-08-16T14:42:00Z", now), "há 18 min");
   assert.equal(formatWaitingTime("2026-08-16T12:00:00Z", now), "há 3 h");
   assert.equal(formatWaitingTime("2026-08-14T12:00:00Z", now), "há 2 dias");
+});
+
+test("WhatsApp normaliza telefones brasileiros e monta mensagem segura", () => {
+  assert.equal(normalizeWhatsAppPhone("(96) 99999-9999"), "5596999999999");
+  assert.equal(normalizeWhatsAppPhone("+55 96 99999-9999"), "5596999999999");
+  assert.equal(normalizeWhatsAppPhone("96999999999"), "5596999999999");
+  assert.equal(normalizeWhatsAppPhone("123"), null);
+  assert.equal(normalizeWhatsAppPhone(null), null);
+  const url = buildAppointmentWhatsAppUrl({
+    phone: "+55 (96) 99999-9999",
+    patientName: "Maria Silva",
+    protocol: "INN-20260816-ABC234",
+  });
+  assert.match(url ?? "", /^https:\/\/wa\.me\/5596999999999\?text=/);
+  assert.match(decodeURIComponent(url ?? ""), /Olá, Maria\./);
+  assert.match(decodeURIComponent(url ?? ""), /INN-20260816-ABC234/);
+});
+
+test("fila distingue atendidos de confirmações pendentes", () => {
+  assert.equal(isActiveRequest("NOVO", "NOT_REQUIRED"), true);
+  assert.equal(isConfirmationPending("CONCLUIDO", "FAILED"), true);
+  assert.equal(isActiveRequest("CONCLUIDO", "FAILED"), true);
+  assert.equal(isAttendedRequest("CONCLUIDO", "SENT"), true);
+  assert.equal(isAttendedRequest("CONCLUIDO", "NOT_REQUIRED"), true);
+  assert.equal(isActiveRequest("CONCLUIDO", "SENT"), false);
+  assert.equal(hasValidSchedulingEmail("paciente@example.com"), true);
+  assert.equal(hasValidSchedulingEmail("sem-email"), false);
 });
 
 test("e-mail de pendência inclui protocolo, contexto e link seguro", () => {
@@ -137,7 +170,12 @@ test("endpoint administrativo registra autoria, idempotência e falha de e-mail"
   assert.match(route, /response\("Acesso negado\.", 403\)/);
   assert.match(route, /operation_id: operationId/);
   assert.match(route, /queueAndSendSchedulingCommunication/);
-  assert.match(route, /O e-mail precisa ser reenviado/);
+  assert.match(route, /prepare_appointment_completion/);
+  assert.match(route, /confirmation_status/);
+  assert.match(route, /retry_confirmation/);
+  assert.match(route, /schedule-confirmation/);
+  assert.match(route, /removeFromActive/);
+  assert.match(route, /eq\("appointment_request_id", requestId\)/);
   assert.match(route, /appointment_request_history/);
   assert.match(route, /assigned_to[\s\S]*user\.id/);
 });
@@ -162,15 +200,47 @@ test("correção do paciente usa token hash, armazenamento privado e destaca a f
 test("tela única oferece fila, atalhos e ações conforme status", () => {
   const component = read("../src/components/admin/reception-center.tsx");
   const layout = read("../src/app/admin/(protected)/layout.tsx");
-  assert.match(component, /Meus atendimentos/);
+  assert.match(component, /\["mine", "Meus"\]/);
   assert.match(component, /Assumir atendimento/);
-  assert.match(component, /Concluir agendamento/);
-  assert.match(component, /Próximo atendimento/);
+  assert.match(component, /FILA ATIVA/);
+  assert.match(component, /ATENDIDOS/);
+  assert.match(component, /Confirmar data e horário/);
+  assert.match(component, /PRÓXIMO/);
   assert.match(component, /event\.key === "\/"/);
+  assert.match(component, /event\.key\.toLowerCase\(\) === "w"/);
+  assert.match(component, /WhatsApp/);
+  assert.match(component, /Corrigir contato/);
+  assert.match(component, /Confirmação pendente/);
   assert.match(component, /DOCUMENTO RECEBIDO/);
   assert.match(component, /Registrar e avisar paciente/);
-  assert.match(component, /Confirmar agendamento e enviar/);
+  assert.match(component, /Confirmar agendamento e avisar paciente/);
   assert.match(layout, /requireAdmin\(\)/);
   const page = read("../src/app/admin/(protected)/solicitacoes/page.tsx");
   assert.match(page, /requireAdminPermission\([\s\S]*"scheduling\.view"/);
+});
+
+test("migration da bancada conclui de forma atômica e preserva dados", () => {
+  const migration = read(
+    "../supabase/migrations/202608160005_reception_queue_workbench.sql",
+  );
+  assert.match(migration, /completed_by uuid/);
+  assert.match(migration, /confirmation_status text/);
+  assert.match(migration, /completion_operation_id uuid/);
+  assert.match(migration, /prepare_appointment_completion/);
+  assert.match(migration, /for update/);
+  assert.match(migration, /'Agendamento definido'/);
+  assert.match(migration, /grant execute[\s\S]*service_role/);
+  assert.doesNotMatch(
+    migration,
+    /\bdrop\s+(table|column|constraint|policy)\b/i,
+  );
+  assert.doesNotMatch(migration, /\btruncate\b/i);
+  assert.doesNotMatch(migration, /\bdelete\s+from\b/i);
+});
+
+test("reenvio aceita pendente ou falho e mantém trava de concorrência", () => {
+  const server = read("../src/lib/scheduling/communications/server.ts");
+  assert.match(server, /\["PENDING", "FAILED"\]\.includes\(data\.status\)/);
+  assert.match(server, /\.in\("status", \["PENDING", "FAILED"\]\)/);
+  assert.match(server, /status: "SENDING"/);
 });
