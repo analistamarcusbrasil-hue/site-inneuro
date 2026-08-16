@@ -597,51 +597,90 @@ export async function uploadMediaAction(
 }
 
 export async function inviteUserAction(formData: FormData) {
-  const { user } = await requireAdmin(["super_admin"]);
+  const { user, profile } = await requireAdmin(["super_admin", "admin"]);
   const parsed = z
     .object({
+      full_name: z.string().trim().min(2).max(120),
       email: z.string().email(),
-      role: z.enum(["super_admin", "admin", "editor"]),
+      role: z.enum(["super_admin", "admin", "editor", "reception"]),
+      active: z.boolean(),
     })
-    .safeParse(Object.fromEntries(formData));
+    .safeParse({
+      full_name: formData.get("full_name"),
+      email: formData.get("email"),
+      role: formData.get("role"),
+      active: formData.get("active") !== "inactive",
+    });
   if (!parsed.success) redirect("/admin/usuarios?error=validation");
+  if (profile.role === "admin" && parsed.data.role !== "reception")
+    redirect("/admin/usuarios?error=permission");
   const admin = createSupabaseAdminClient();
   if (!admin) redirect("/admin/usuarios?error=config");
   const { data, error } = await admin.auth.admin.inviteUserByEmail(
     parsed.data.email,
-    { data: { full_name: "" } },
+    { data: { full_name: parsed.data.full_name } },
   );
   if (error || !data.user) redirect("/admin/usuarios?error=invite");
-  const { error: profileError } = await admin
-    .from("profiles")
-    .upsert({ id: data.user.id, role: parsed.data.role });
+  const { error: profileError } = await admin.from("profiles").upsert({
+    id: data.user.id,
+    full_name: parsed.data.full_name,
+    email: parsed.data.email,
+    role: parsed.data.role,
+    active: parsed.data.active,
+  });
   if (profileError) redirect("/admin/usuarios?error=profile");
   await admin.from("audit_logs").insert({
     actor_id: user.id,
     action: "invite",
     entity_type: "profiles",
     entity_id: data.user.id,
-    after_data: { role: parsed.data.role },
+    after_data: {
+      role: parsed.data.role,
+      active: parsed.data.active,
+      full_name: parsed.data.full_name,
+    },
   });
   revalidatePath("/admin/usuarios");
   redirect("/admin/usuarios?success=invited");
 }
 
 export async function updateUserRoleAction(formData: FormData) {
-  const { user } = await requireAdmin(["super_admin"]);
+  const { user, profile } = await requireAdmin(["super_admin", "admin"]);
   const parsed = z
     .object({
       id: z.string().uuid(),
-      role: z.enum(["super_admin", "admin", "editor"]),
+      full_name: z.string().trim().min(2).max(120),
+      role: z.enum(["super_admin", "admin", "editor", "reception"]),
+      active: z.boolean(),
     })
-    .safeParse(Object.fromEntries(formData));
+    .safeParse({
+      id: formData.get("id"),
+      full_name: formData.get("full_name"),
+      role: formData.get("role"),
+      active: formData.get("active") !== "inactive",
+    });
   if (!parsed.success || parsed.data.id === user.id)
     redirect("/admin/usuarios?error=validation");
   const admin = createSupabaseAdminClient();
   if (!admin) redirect("/admin/usuarios?error=config");
+  const { data: current } = await admin
+    .from("profiles")
+    .select("role")
+    .eq("id", parsed.data.id)
+    .single();
+  if (
+    profile.role === "admin" &&
+    (current?.role !== "reception" || parsed.data.role !== "reception")
+  )
+    redirect("/admin/usuarios?error=permission");
   const { error } = await admin
     .from("profiles")
-    .update({ role: parsed.data.role })
+    .update({
+      full_name: parsed.data.full_name,
+      role: parsed.data.role,
+      active: parsed.data.active,
+      ...(parsed.data.role === "reception" ? { hr_role: null } : {}),
+    })
     .eq("id", parsed.data.id);
   if (error) redirect("/admin/usuarios?error=role");
   await admin.from("audit_logs").insert({
@@ -649,7 +688,11 @@ export async function updateUserRoleAction(formData: FormData) {
     action: "role_update",
     entity_type: "profiles",
     entity_id: parsed.data.id,
-    after_data: { role: parsed.data.role },
+    after_data: {
+      role: parsed.data.role,
+      active: parsed.data.active,
+      full_name: parsed.data.full_name,
+    },
   });
   revalidatePath("/admin/usuarios");
   redirect("/admin/usuarios?success=role");

@@ -42,6 +42,7 @@ export function resolveHrAccessRole(
   if (profile.role === "super_admin" || profile.role === "admin") {
     return "administrator";
   }
+  if (profile.role === "reception") return null;
   return profile.hr_role;
 }
 

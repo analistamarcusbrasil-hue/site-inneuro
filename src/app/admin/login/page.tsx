@@ -37,7 +37,9 @@ export default async function AdminLoginPage({
             role="alert"
             className="bg-error/10 text-error mt-5 rounded-xl p-3 text-sm"
           >
-            Não foi possível entrar. Verifique os dados informados.
+            {query.error === "inactive"
+              ? "Este acesso está inativo. Procure a administração."
+              : "Não foi possível entrar. Verifique os dados informados."}
           </p>
         ) : null}
         <form action={loginAction} className="mt-7 space-y-5">

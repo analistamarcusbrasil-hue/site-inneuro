@@ -9,7 +9,7 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  await requireAdmin();
+  await requireAdmin(["reception", "admin", "super_admin"]);
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(id))
     redirect("/admin/solicitacoes?error=document");

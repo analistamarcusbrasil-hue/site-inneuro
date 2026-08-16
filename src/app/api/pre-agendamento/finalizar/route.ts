@@ -153,6 +153,7 @@ export async function POST(request: NextRequest) {
     const cpf = sanitizeSchedulingText(body.cpf, 18).replace(/\D/g, "");
     const birthDate = sanitizeSchedulingText(body.birthDate, 10);
     const phone = sanitizeSchedulingText(body.phone, 24);
+    const email = sanitizeSchedulingText(body.email, 254).toLowerCase();
     const insuranceId = sanitizeSchedulingText(body.insuranceId, 40);
     const insuranceName = sanitizeSchedulingText(body.insuranceName, 100);
     const observations = sanitizeSchedulingText(body.observations, 500);
@@ -174,6 +175,8 @@ export async function POST(request: NextRequest) {
         { error: "Informe pelo menos um exame e sua modalidade." },
         400,
       );
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+      return json({ error: "Informe um e-mail válido." }, 400);
     if (dates.length < 1 || dates.some((date) => !isValidDate(date, true)))
       return json({ error: "Escolha uma data preferencial válida." }, 400);
     if (
@@ -297,7 +300,7 @@ export async function POST(request: NextRequest) {
       exams: manifestExams,
       preferredDates: dates,
       preferredPeriods: periods,
-      email: null,
+      email,
       cpf,
       city: null,
       responsibleName: null,
@@ -323,7 +326,7 @@ export async function POST(request: NextRequest) {
       cpf,
       birthDate,
       phone,
-      email: null,
+      email,
       city: null,
       responsibleName: null,
       serviceType: session.serviceType,
