@@ -82,6 +82,9 @@ export default async function PublicCareerJobsPage() {
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div>
+                      <p className="text-brand text-xs font-bold tracking-[0.14em] uppercase">
+                        {job.vacancy_number}
+                      </p>
                       <p className="text-brand text-xs font-bold tracking-wide uppercase">
                         {job.area?.name}
                       </p>

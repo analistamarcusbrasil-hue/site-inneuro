@@ -8,6 +8,7 @@ import { requireCareersJobsAccess } from "@/lib/careers/jobs-access";
 import {
   currentMacapaDate,
   formatJobDate,
+  isJobPubliclyAvailable,
   workModeLabels,
   type CareerJob,
 } from "@/lib/careers/jobs";
@@ -59,12 +60,12 @@ export default async function PublicCareerJobDetailPage({
       "*, area:career_job_areas!inner(id, name, slug, is_active), unit:company_units(id, name, address, neighborhood, city, state, postal_code, active)",
     )
     .eq("slug", slug)
-    .eq("status", "published")
+    .in("status", ["published", "closed"])
     .lte("opens_on", today)
-    .or(`closes_on.is.null,closes_on.gte.${today}`)
     .maybeSingle();
   if (error || !data) notFound();
   const job = data as CareerJob;
+  const isAvailable = isJobPubliclyAvailable(job);
 
   return (
     <main id="main-content" tabIndex={-1}>
@@ -86,6 +87,9 @@ export default async function PublicCareerJobDetailPage({
           <section className="border-border-light rounded-3xl border bg-white p-6 sm:p-8">
             <div className="flex flex-wrap items-start justify-between gap-5">
               <div>
+                <p className="text-brand text-xs font-bold tracking-[0.14em] uppercase">
+                  {job.vacancy_number}
+                </p>
                 <p className="text-brand text-xs font-bold tracking-wide uppercase">
                   {job.area?.name}
                 </p>
@@ -186,6 +190,10 @@ export default async function PublicCareerJobDetailPage({
             {isInternalPreview ? (
               <span className="text-muted text-sm font-bold">
                 Candidatura indisponível na visualização interna
+              </span>
+            ) : !isAvailable ? (
+              <span className="text-error text-sm font-bold">
+                Esta vaga não está mais recebendo candidaturas.
               </span>
             ) : (
               <Link

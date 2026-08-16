@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 import { AdminPageHeading } from "@/components/admin/admin-page-heading";
+import { CareerStageDecisionPanel } from "@/components/admin/career-stage-decision-panel";
 import { ConfirmCommandForm } from "@/components/admin/confirm-command-form";
 import { CareerCommunicationForm } from "@/components/admin/career-communication-form";
 import { HrNavigation } from "@/components/admin/hr-navigation";
@@ -86,6 +87,8 @@ type StageHistoryRow = {
   from_stage: SelectionStage | null;
   to_stage: SelectionStage;
   decision: "submitted" | "approved" | "not_approved" | "hired" | "migrated";
+  vacancy_number: string;
+  internal_note: string | null;
   created_at: string;
   admin: { full_name: string | null } | null;
 };
@@ -154,7 +157,13 @@ export default async function CareerApplicationDetailPage({
     stageHistoryResult,
     stageEventsResult,
   ] = await Promise.all([
-    supabase.from("career_jobs").select("id, title").eq("id", id).maybeSingle(),
+    supabase
+      .from("career_jobs")
+      .select(
+        "id, title, vacancy_number, location, unit:company_units(name, neighborhood, city, state)",
+      )
+      .eq("id", id)
+      .maybeSingle(),
     supabase
       .from("career_job_applications")
       .select("*")
@@ -195,7 +204,7 @@ export default async function CareerApplicationDetailPage({
     supabase
       .from("career_application_stage_history")
       .select(
-        "id, from_stage, to_stage, decision, created_at, admin:profiles!career_application_stage_history_admin_id_fkey(full_name)",
+        "id, from_stage, to_stage, decision, vacancy_number, internal_note, created_at, admin:profiles!career_application_stage_history_admin_id_fkey(full_name)",
       )
       .eq("application_id", applicationId)
       .order("created_at", { ascending: false }),
@@ -213,6 +222,16 @@ export default async function CareerApplicationDetailPage({
     !applicationResult.data
   )
     notFound();
+  const job = jobResult.data as {
+    id: string;
+    title: string;
+    vacancy_number: string;
+    location: string;
+    unit:
+      | { name: string; neighborhood: string; city: string; state: string }
+      | { name: string; neighborhood: string; city: string; state: string }[]
+      | null;
+  };
   const application = applicationResult.data as CareerJobApplication;
   const { data: latestResume } = await supabase
     .from("candidate_resumes")
@@ -245,13 +264,30 @@ export default async function CareerApplicationDetailPage({
   );
   const query = await searchParams;
   const detailPath = `/admin/rh/vagas/${id}/candidaturas/${applicationId}`;
+  const jobUnit = Array.isArray(job.unit) ? job.unit[0] : job.unit;
+  const currentStageNumber = selectionStageNumbers[application.candidate_stage];
+  const decisionStatus =
+    application.candidate_stage === "hired"
+      ? "CONTRATADO"
+      : application.candidate_stage === "not_approved"
+        ? "REPROVADO"
+        : "EM ANÁLISE";
+  const latestStageDecision = stageHistory[0]?.decision;
+  const latestDecisionLabel =
+    latestStageDecision === "approved"
+      ? "APROVADO PARA PRÓXIMA FASE"
+      : latestStageDecision === "hired"
+        ? "CONTRATADO"
+        : latestStageDecision === "not_approved"
+          ? "REPROVADO"
+          : null;
 
   return (
     <>
       <AdminPageHeading
         eyebrow="RH / Vagas / Candidatura"
         title={snapshot?.candidate.full_name ?? "Candidatura"}
-        description={`Snapshot profissional enviado para a vaga ${jobResult.data.title}.`}
+        description={`Snapshot profissional enviado para a vaga ${job.vacancy_number} — ${job.title}.`}
       />
       <HrNavigation current="jobs" canManageJobs canManageCandidates />
 
@@ -342,16 +378,27 @@ export default async function CareerApplicationDetailPage({
       ) : null}
 
       <section className="border-border-light rounded-3xl border bg-white p-5 sm:p-7">
-        <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="grid gap-6 lg:grid-cols-[1.35fr_1fr]">
           <div>
-            <p className="text-muted text-xs font-bold tracking-wide uppercase">
-              Status atual
+            <p className="text-brand text-xs font-bold tracking-[0.14em] uppercase">
+              {job.vacancy_number}
             </p>
-            <p className="font-heading text-brand-dark mt-1 text-2xl font-semibold">
-              {applicationStatusLabels[application.status]}
-            </p>
+            <h2 className="font-heading text-brand-dark mt-2 text-2xl font-semibold">
+              {job.title}
+            </h2>
             <p className="text-muted mt-2 text-sm">
-              Enviada em {formatApplicationDate(application.submitted_at)}
+              {jobUnit?.name ? `${jobUnit.name} · ` : ""}
+              {job.location}
+            </p>
+            <p className="text-ink mt-5 text-sm">
+              Candidato:{" "}
+              <strong>
+                {snapshot?.candidate.full_name ?? "Não identificado"}
+              </strong>
+            </p>
+            <p className="text-muted mt-2 text-xs">
+              Candidatura enviada em{" "}
+              {formatApplicationDate(application.submitted_at)}
             </p>
             {application.process_label ? (
               <p className="text-ink mt-2 text-sm">
@@ -359,67 +406,62 @@ export default async function CareerApplicationDetailPage({
               </p>
             ) : null}
           </div>
-        </div>
-        <div className="border-border-light mt-6 border-t pt-6">
-          <p className="text-muted text-xs font-bold tracking-wide uppercase">
-            Etapa da seleção
-          </p>
-          <p className="font-heading text-brand-dark mt-1 text-2xl font-semibold">
-            {selectionStageNumbers[application.candidate_stage]
-              ? `Etapa ${selectionStageNumbers[application.candidate_stage]} de 4 — ${candidateStageLabels[application.candidate_stage]}`
-              : candidateStageLabels[application.candidate_stage]}
-          </p>
-          {selectionStageApprovalLabels[application.candidate_stage] ? (
-            <div className="mt-5 flex flex-wrap gap-3">
-              <ConfirmCommandForm
-                action={decideCareerApplicationStageAction}
-                message="Confirma a aprovação e o avanço desta candidatura? A decisão será registrada no histórico."
-              >
-                <input
-                  type="hidden"
-                  name="application_id"
-                  value={application.id}
-                />
-                <input type="hidden" name="job_id" value={id} />
-                <input
-                  type="hidden"
-                  name="expected_stage"
-                  value={application.candidate_stage}
-                />
-                <input type="hidden" name="decision" value="approve" />
-                <button className="bg-brand hover:bg-brand-dark min-h-11 rounded-full px-5 text-sm font-bold text-white">
-                  {selectionStageApprovalLabels[application.candidate_stage]}
-                </button>
-              </ConfirmCommandForm>
-              <ConfirmCommandForm
-                action={decideCareerApplicationStageAction}
-                message="Confirma que esta candidatura não foi aprovada nesta etapa? Esta ação encerra a participação neste processo."
-              >
-                <input
-                  type="hidden"
-                  name="application_id"
-                  value={application.id}
-                />
-                <input type="hidden" name="job_id" value={id} />
-                <input
-                  type="hidden"
-                  name="expected_stage"
-                  value={application.candidate_stage}
-                />
-                <input type="hidden" name="decision" value="not_approve" />
-                <button className="border-error/40 text-error min-h-11 rounded-full border px-5 text-sm font-bold">
-                  NÃO APROVAR
-                </button>
-              </ConfirmCommandForm>
+          <div className="bg-surface grid content-center gap-3 rounded-2xl p-5">
+            <div>
+              <p className="text-muted text-xs font-bold tracking-wide uppercase">
+                Etapa atual
+              </p>
+              <p className="font-heading text-brand-dark mt-1 text-xl font-semibold">
+                {currentStageNumber
+                  ? `ETAPA ${currentStageNumber} DE 4 — ${candidateStageLabels[application.candidate_stage].toLocaleUpperCase("pt-BR")}`
+                  : candidateStageLabels[
+                      application.candidate_stage
+                    ].toLocaleUpperCase("pt-BR")}
+              </p>
             </div>
-          ) : (
-            <p className="text-muted mt-3 text-sm">
-              Esta participação chegou a um resultado final e não aceita novas
-              decisões.
-            </p>
-          )}
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-bold ${
+                  application.candidate_stage === "not_approved"
+                    ? "bg-rose-100 text-rose-800"
+                    : application.candidate_stage === "hired"
+                      ? "bg-emerald-100 text-emerald-800"
+                      : "bg-sky-100 text-sky-800"
+                }`}
+              >
+                {decisionStatus}
+              </span>
+              {latestDecisionLabel && latestDecisionLabel !== decisionStatus ? (
+                <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">
+                  Última decisão: {latestDecisionLabel}
+                </span>
+              ) : null}
+              <span className="text-muted text-xs">
+                Status operacional:{" "}
+                {applicationStatusLabels[application.status]}
+              </span>
+            </div>
+          </div>
         </div>
       </section>
+
+      {selectionStageApprovalLabels[application.candidate_stage] ? (
+        <CareerStageDecisionPanel
+          action={decideCareerApplicationStageAction}
+          applicationId={application.id}
+          jobId={id}
+          currentStage={application.candidate_stage}
+        />
+      ) : (
+        <section className="border-border-light mt-6 rounded-3xl border bg-white p-5 sm:p-7">
+          <p className="font-heading text-brand-dark text-xl font-semibold">
+            Decisão final registrada: {decisionStatus}
+          </p>
+          <p className="text-muted mt-2 text-sm">
+            Esta participação não aceita novas decisões pelo fluxo comum.
+          </p>
+        </section>
+      )}
 
       {["interview", "practical_test"].includes(application.candidate_stage) ? (
         <section className="border-border-light mt-6 rounded-3xl border bg-white p-5 sm:p-7">
@@ -1027,6 +1069,14 @@ export default async function CareerApplicationDetailPage({
                             ? "Aprovado"
                             : "Registro inicial"}
                     </span>
+                    <span className="text-muted mt-1 block text-xs">
+                      Referência: {entry.vacancy_number}
+                    </span>
+                    {entry.internal_note ? (
+                      <span className="bg-surface text-ink mt-2 block rounded-xl p-3 text-xs">
+                        Observação interna: {entry.internal_note}
+                      </span>
+                    ) : null}
                   </span>
                   <span className="text-muted text-xs">
                     {formatApplicationDate(entry.created_at)} ·{" "}

@@ -52,7 +52,11 @@ export default async function CareerJobApplicationsPage({
   const query = await searchParams;
   const { supabase } = await requireHrAccess("jobs:manage");
   const [jobResult, applicationsResult] = await Promise.all([
-    supabase.from("career_jobs").select("id, title").eq("id", id).maybeSingle(),
+    supabase
+      .from("career_jobs")
+      .select("id, title, vacancy_number")
+      .eq("id", id)
+      .maybeSingle(),
     supabase
       .from("career_job_applications")
       .select(
@@ -139,7 +143,7 @@ export default async function CareerJobApplicationsPage({
       <AdminPageHeading
         eyebrow="RH / Vagas / Candidaturas"
         title={`Processo seletivo — ${jobResult.data.title}`}
-        description="Acompanhe as quatro etapas, filtre candidatos e registre decisões exclusivamente humanas."
+        description={`${jobResult.data.vacancy_number} · Acompanhe as quatro etapas, filtre candidatos e registre decisões exclusivamente humanas.`}
       />
       <HrNavigation current="jobs" canManageJobs canManageCandidates />
 

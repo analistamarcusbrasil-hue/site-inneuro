@@ -5,7 +5,11 @@ import { submitCareerJobApplicationAction } from "@/app/carreiras/application-ac
 import { Container } from "@/components/layout/container";
 import { getCandidateSession } from "@/lib/careers/auth";
 import { requireCareersPortalEnabled } from "@/lib/careers/guards";
-import { currentMacapaDate, type CareerJob } from "@/lib/careers/jobs";
+import {
+  currentMacapaDate,
+  isJobPubliclyAvailable,
+  type CareerJob,
+} from "@/lib/careers/jobs";
 import {
   applicationSourceLabels,
   applicationSources,
@@ -79,9 +83,8 @@ export default async function ReviewCareerApplicationPage({
         "*, area:career_job_areas(id, name, slug, is_active), unit:company_units(id, name, address, neighborhood, city, state, postal_code, active)",
       )
       .eq("slug", slug)
-      .eq("status", "published")
+      .in("status", ["published", "closed"])
       .lte("opens_on", today)
-      .or(`closes_on.is.null,closes_on.gte.${today}`)
       .maybeSingle(),
     session.supabase
       .from("candidate_profiles")
@@ -109,18 +112,18 @@ export default async function ReviewCareerApplicationPage({
   if (jobResult.error || !jobResult.data) notFound();
 
   const job = jobResult.data as CareerJob;
+  const isAvailable = isJobPubliclyAvailable(job);
   const profile =
     (profileResult.data as CandidateProfessionalProfile | null) ?? null;
   const experiences =
     (experiencesResult.data as CandidateExperience[] | null) ?? [];
   const education = (educationResult.data as CandidateEducation[] | null) ?? [];
   const resume = (resumeResult.data as CandidateResume | null) ?? null;
-  const { data: activeApplication } = await session.supabase
+  const { data: existingApplication } = await session.supabase
     .from("career_job_applications")
     .select("id")
     .eq("job_id", job.id)
     .eq("candidate_id", session.user.id)
-    .not("status", "in", "(finalized,withdrawn)")
     .maybeSingle();
   const query = await searchParams;
   const requiresCommute = Boolean(
@@ -142,7 +145,7 @@ export default async function ReviewCareerApplicationPage({
         </Link>
         <header className="mt-5">
           <p className="text-brand text-xs font-bold tracking-widest uppercase">
-            Candidatura para {job.title}
+            {job.vacancy_number} · Candidatura para {job.title}
           </p>
           <h1 className="font-heading text-brand-dark mt-3 text-3xl font-semibold sm:text-4xl">
             Revise seu perfil antes de se candidatar.
@@ -151,6 +154,11 @@ export default async function ReviewCareerApplicationPage({
             Esta é a versão que será enviada ao RH. Você pode atualizar seu
             perfil antes de confirmar.
           </p>
+          {!isAvailable ? (
+            <p className="bg-error/10 text-error mt-5 rounded-2xl p-4 font-bold">
+              Esta vaga não está mais recebendo candidaturas.
+            </p>
+          ) : null}
         </header>
 
         {query.error ? (
@@ -159,7 +167,7 @@ export default async function ReviewCareerApplicationPage({
             className="bg-error/10 text-error mt-6 rounded-2xl p-4 text-sm font-bold"
           >
             {query.error === "duplicate"
-              ? "Você já possui uma candidatura ativa para esta vaga."
+              ? "Você já possui uma candidatura para esta vaga."
               : query.error === "unavailable"
                 ? "Esta vaga não está mais disponível para candidatura."
                 : "Não foi possível enviar a candidatura. Tente novamente."}
@@ -269,17 +277,22 @@ export default async function ReviewCareerApplicationPage({
             >
               Atualizar perfil
             </Link>
-            {activeApplication ? (
-              <Link
-                className="bg-brand inline-flex min-h-12 items-center rounded-full px-6 font-bold text-white"
-                href="/carreiras/candidaturas"
-              >
-                Ver minha candidatura
-              </Link>
+            {existingApplication ? (
+              <div className="bg-mint text-brand-dark w-full rounded-2xl p-4">
+                <p className="font-bold">
+                  Você já possui uma candidatura para esta vaga.
+                </p>
+                <Link
+                  className="mt-3 inline-flex min-h-11 items-center rounded-full bg-white px-5 text-sm font-bold"
+                  href="/carreiras/candidaturas"
+                >
+                  Ver minha candidatura
+                </Link>
+              </div>
             ) : null}
           </div>
 
-          {!activeApplication ? (
+          {!existingApplication && isAvailable ? (
             <form
               action={submitCareerJobApplicationAction}
               className="mt-7 grid gap-6"

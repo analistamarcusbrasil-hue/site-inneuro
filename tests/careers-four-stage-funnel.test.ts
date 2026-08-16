@@ -37,6 +37,7 @@ test("funil avança apenas na ordem fixa das quatro etapas", () => {
     selectionStageApprovalLabels.practical_test,
     "APROVAR PARA CONTRATAÇÃO",
   );
+  assert.equal(selectionStageApprovalLabels.hiring, "APROVAR CONTRATAÇÃO");
 });
 
 test("decisão humana aceita aprovação ou não aprovação em cada etapa ativa", () => {
@@ -48,6 +49,8 @@ test("decisão humana aceita aprovação ou não aprovação em cada etapa ativa
           jobId,
           expectedStage,
           decision,
+          internalNote:
+            decision === "not_approve" ? "Observação apenas do RH." : "",
         }).success,
         true,
       );
@@ -161,6 +164,7 @@ test("ações usam RPC atômica e chaves idempotentes por transição e convite"
   );
   assert.match(actions, /requireHrAccess\("jobs:manage"\)/);
   assert.match(actions, /decide_career_application_stage/);
+  assert.match(actions, /p_internal_note:\s*parsed\.data\.internalNote/);
   assert.match(actions, /application:\$\{parsed\.data\.applicationId\}:stage:/);
   assert.match(
     actions,

@@ -113,6 +113,9 @@ export default async function HrJobsPage() {
                     >
                       {jobStatusLabels[job.status]}
                     </span>
+                    <p className="text-brand mt-3 text-xs font-bold tracking-[0.14em] uppercase">
+                      {job.vacancy_number}
+                    </p>
                     <h3 className="font-heading text-brand-dark mt-3 text-xl font-semibold">
                       {job.title}
                     </h3>
