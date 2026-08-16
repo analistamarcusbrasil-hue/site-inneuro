@@ -6,6 +6,7 @@ import type { CareerJob } from "../src/lib/careers/jobs";
 import {
   calculateExplainableMatch,
   defaultMatchCriteria,
+  getMatchAdherenceBand,
   matchMatrixCriteriaSchema,
 } from "../src/lib/careers/matching";
 import { matchMatrixFormSchema } from "../src/lib/careers/matching-validation";
@@ -175,6 +176,24 @@ test("informação ausente é marcada como não informada sem invenção", () =>
   );
   assert.equal(certification?.status, "not_informed");
   assert.deepEqual(certification?.evidence, []);
+  const informed = result.items.filter(
+    (item) => item.status !== "not_informed",
+  );
+  const expected = Math.round(
+    (informed.reduce((total, item) => total + item.weightedScore, 0) /
+      informed.reduce((total, item) => total + item.weight, 0)) *
+      100,
+  );
+  assert.equal(result.overallScore, expected);
+  assert.ok(result.informationCoverage < 100);
+});
+
+test("faixas do relatório são transparentes e incluem não calculados em análise", () => {
+  assert.equal(getMatchAdherenceBand(82), "high");
+  assert.equal(getMatchAdherenceBand(60), "intermediate");
+  assert.equal(getMatchAdherenceBand(30), "review");
+  assert.equal(getMatchAdherenceBand(null), "review");
+  assert.equal(getMatchAdherenceBand(95, 20), "review");
 });
 
 test("migração preserva matriz, versão, evidências e histórico imutável", () => {

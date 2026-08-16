@@ -31,6 +31,7 @@ import {
   type ApplicationSource,
 } from "@/lib/careers/logistics";
 import {
+  calculateMatchInformationCoverage,
   matchResultSchema,
   matchStatusLabels,
   type ExplainableMatchResult,
@@ -174,6 +175,13 @@ export default async function CareerApplicationDetailPage({
   )
     notFound();
   const application = applicationResult.data as CareerJobApplication;
+  const { data: latestResume } = await supabase
+    .from("candidate_resumes")
+    .select("id")
+    .eq("candidate_id", application.candidate_id)
+    .order("version", { ascending: false })
+    .limit(1)
+    .maybeSingle();
   const snapshotResult = careerApplicationSnapshotSchema.safeParse(
     application.profile_snapshot,
   );
@@ -462,14 +470,18 @@ export default async function CareerApplicationDetailPage({
               Apoio à triagem
             </p>
             <h2 className="font-heading text-brand-dark mt-1 text-2xl font-semibold">
-              {match
-                ? `Aderência à vaga: ${match.overallScore}%`
-                : "Aderência ainda não calculada"}
+              ADERÊNCIA À VAGA
             </h2>
+            <p className="text-brand-dark mt-2 font-bold">
+              {match
+                ? `Indicador profissional: ${match.overallScore}%`
+                : "Indicador ainda não calculado"}
+            </p>
             {match ? (
               <p className="text-muted mt-2 text-sm">
                 Hard skills vinculadas à vaga: {match.hardSkillsScore}% · Matriz
-                v{latestMatch?.matrix_version}
+                v{latestMatch?.matrix_version} · Cobertura das informações:{" "}
+                {calculateMatchInformationCoverage(match.items)}%
               </p>
             ) : null}
           </div>
@@ -727,6 +739,16 @@ export default async function CareerApplicationDetailPage({
                 <p className="text-muted mt-1 text-xs">
                   {formatFileSize(snapshot.resume.size_bytes)}
                 </p>
+                {latestResume ? (
+                  <a
+                    className="text-brand mt-4 inline-flex min-h-11 items-center font-bold hover:underline"
+                    href={`/api/admin/rh/curriculos/${latestResume.id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Visualizar currículo original
+                  </a>
+                ) : null}
               </>
             ) : (
               <p className="text-muted">Nenhum currículo foi incluído.</p>

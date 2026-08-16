@@ -8,7 +8,6 @@ const optionalString = (max: number) =>
     .max(max)
     .nullable()
     .transform((value) => value || null);
-
 const optionalMonth = z
   .string()
   .regex(/^\d{4}-(0[1-9]|1[0-2])$/)
@@ -86,35 +85,68 @@ export type ResumeCurrentProfile = {
   about?: string | null;
 };
 
-export const RESUME_PARSER_VERSION = "text-v1";
+export const RESUME_PARSER_VERSION = "text-v2";
 export const RESUME_TEXT_MAX_CHARACTERS = 200_000;
+export const RESUME_MIN_TEXT_CHARACTERS = 80;
+export const RESUME_MIN_WORDS = 12;
 
 const sectionAliases = {
-  objective: ["objetivo", "objetivo profissional"],
+  objective: [
+    "objetivo",
+    "objetivo profissional",
+    "objetivos profissionais",
+    "area de interesse",
+    "cargo pretendido",
+    "pretensao profissional",
+  ],
   summary: [
     "resumo",
     "resumo profissional",
     "perfil profissional",
+    "perfil",
     "sobre mim",
+    "apresentacao",
+    "qualificacoes profissionais",
+    "sintese profissional",
   ],
   experience: [
     "experiencia",
     "experiencias",
     "experiencia profissional",
     "experiencias profissionais",
+    "historico profissional",
+    "trajetoria profissional",
+    "vivencia profissional",
+    "atuacao profissional",
   ],
-  education: ["formacao", "formacao academica", "escolaridade"],
+  education: [
+    "formacao",
+    "formacao academica",
+    "formacao escolar",
+    "escolaridade",
+    "educacao",
+    "educacao academica",
+    "historico academico",
+  ],
   certifications: [
     "cursos",
     "certificacoes",
     "cursos e certificacoes",
+    "cursos complementares",
+    "cursos extracurriculares",
     "qualificacoes",
+    "aperfeicoamento",
+    "formacao complementar",
   ],
   skills: [
     "habilidades",
     "competencias",
     "conhecimentos",
     "competencias profissionais",
+    "habilidades e competencias",
+    "principais competencias",
+    "conhecimentos tecnicos",
+    "aptidoes",
   ],
 } as const;
 
@@ -127,6 +159,7 @@ function stripDiacritics(value: string) {
 function normalizedHeading(value: string) {
   return stripDiacritics(value)
     .toLowerCase()
+    .replace(/[&]/g, " e ")
     .replace(/[:|]/g, "")
     .replace(/[^a-z\s]/g, " ")
     .replace(/\s+/g, " ")
@@ -135,35 +168,79 @@ function normalizedHeading(value: string) {
 
 function cleanLine(value: string) {
   return value
-    .replace(/^[\s•·▪◦►➤✓✔*-]+/, "")
+    .replace(/^[\s•·▪◦►➤✓✔●○■□◆◇–—*-]+/, "")
     .replace(/\s+/g, " ")
     .trim();
 }
 
-function limit(value: string | null, max: number) {
+function limit(value: string | null | undefined, max: number) {
   if (!value) return null;
-  const cleaned = value.trim();
+  const cleaned = cleanLine(value);
   return cleaned ? cleaned.slice(0, max) : null;
 }
 
-function sectionName(line: string): SectionName | null {
-  const normalized = normalizedHeading(line);
+function normalizedKey(value: string) {
+  return stripDiacritics(value)
+    .toLocaleLowerCase("pt-BR")
+    .replace(/\W+/g, " ")
+    .trim();
+}
+
+function sectionHeading(line: string) {
+  const [possibleHeading, ...rest] = line.split(/\s*:\s*/);
+  const normalized = normalizedHeading(possibleHeading);
   for (const [name, aliases] of Object.entries(sectionAliases) as Array<
     [SectionName, readonly string[]]
   >) {
-    if (aliases.includes(normalized)) return name;
+    if (aliases.includes(normalized))
+      return { name, inlineValue: cleanLine(rest.join(": ")) || null };
   }
   return null;
+}
+
+function prepareResumeLines(rawText: string) {
+  const text = rawText
+    .normalize("NFKC")
+    .replace(/\r/g, "")
+    .replace(/\u00a0/g, " ")
+    .slice(0, RESUME_TEXT_MAX_CHARACTERS);
+  const lines = text.split("\n").flatMap((line) =>
+    line
+      .replace(/\t+/g, "   ")
+      .split(/\s{3,}/)
+      .map(cleanLine),
+  );
+  return { text, lines };
+}
+
+export function assessResumeText(rawText: string) {
+  const { text } = prepareResumeLines(rawText);
+  const letters = (text.match(/[A-Za-zÀ-ÖØ-öø-ÿ]/g) ?? []).length;
+  const words = text.match(/[A-Za-zÀ-ÖØ-öø-ÿ]{2,}/g)?.length ?? 0;
+  const quality =
+    !text.trim() || letters < 10
+      ? "image_only"
+      : letters < RESUME_MIN_TEXT_CHARACTERS || words < RESUME_MIN_WORDS
+        ? "insufficient"
+        : "native_text";
+  return z
+    .object({
+      quality: z.enum(["native_text", "insufficient", "image_only"]),
+      letterCount: z.number().int().nonnegative(),
+      wordCount: z.number().int().nonnegative(),
+    })
+    .parse({ quality, letterCount: letters, wordCount: words });
 }
 
 function splitSections(lines: string[]) {
   const sections: Partial<Record<SectionName, string[]>> = {};
   let current: SectionName | null = null;
   for (const line of lines) {
-    const heading = sectionName(line);
+    const heading = sectionHeading(line);
     if (heading) {
-      current = heading;
+      current = heading.name;
       sections[current] ??= [];
+      if (heading.inlineValue) sections[current]?.push(heading.inlineValue);
       continue;
     }
     if (current) sections[current]?.push(line);
@@ -172,14 +249,19 @@ function splitSections(lines: string[]) {
 }
 
 function joinedSection(lines: string[] | undefined, max: number) {
-  return limit(lines?.join("\n") ?? null, max);
+  return limit(lines?.filter(Boolean).join("\n"), max);
 }
 
 function extractName(lines: string[]) {
+  const labeled = lines
+    .slice(0, 20)
+    .map((line) => line.match(/^(?:nome(?: completo)?)\s*[:|-]\s*(.+)$/i)?.[1])
+    .find(Boolean);
+  if (labeled) return limit(labeled, 120);
   const excluded =
-    /curr[ií]culo|resume|contato|telefone|e-?mail|linkedin|objetivo|perfil/i;
+    /curr[ií]culo|curriculum|resume|contato|telefone|whatsapp|e-?mail|linkedin|objetivo|perfil|experi[eê]ncia|forma[cç][aã]o|habilidade|compet[eê]ncia/i;
   return (
-    lines.slice(0, 12).find((line) => {
+    lines.slice(0, 15).find((line) => {
       const words = line.split(/\s+/);
       return (
         !excluded.test(line) &&
@@ -193,25 +275,27 @@ function extractName(lines: string[]) {
 }
 
 function extractPhone(text: string) {
-  const match = text.match(
-    /(?:\+?55\s*)?(?:\(?\d{2}\)?[\s.-]*)?(?:9\s*)?\d{4}[\s.-]*\d{4}/,
+  const matches = text.match(
+    /(?:\+?55[\s.-]*)?(?:\(?\d{2}\)?[\s.-]*)?(?:9[\s.-]*)?\d{4}[\s.-]*\d{4}/g,
   );
-  if (!match) return null;
-  const digits = match[0].replace(/\D/g, "");
-  return digits.length >= 10 && digits.length <= 13 ? match[0].trim() : null;
+  for (const match of matches ?? []) {
+    const digits = match.replace(/\D/g, "");
+    if (digits.length >= 10 && digits.length <= 13) return match.trim();
+  }
+  return null;
 }
 
 function extractLocation(text: string) {
   const statePattern = brazilianStates.join("|");
   const match = text.match(
     new RegExp(
-      `(?:cidade\\s*[:|-]\\s*)?([A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ' .]{1,98}?)\\s*(?:,|\\s-\\s|/)\\s*(${statePattern})(?:\\b|$)`,
+      `(?:cidade|localidade|endere[cç]o)?\\s*[:|-]?\\s*(?:reside(?:nte)? em|moro em)?\\s*([A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ' .]{1,98}?)\\s*(?:,|\\s-\\s|/)\\s*(${statePattern})(?:\\b|$)`,
       "i",
     ),
   );
   if (!match) return { city: null, state: null };
   const city = cleanLine(match[1]).replace(
-    /^(?:reside(?:nte)? em|moro em)\s+/i,
+    /^(?:cidade|localidade|endere[cç]o|reside(?:nte)? em|moro em)\s*[:|-]?\s*/i,
     "",
   );
   return {
@@ -240,7 +324,7 @@ function parseMonth(value: string) {
   const numeric = normalized.match(/\b(0?[1-9]|1[0-2])[/-](19\d{2}|20\d{2})\b/);
   if (numeric) return `${numeric[2]}-${numeric[1].padStart(2, "0")}`;
   const named = normalized.match(
-    /\b(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)[a-z]*[/.\s-]+(19\d{2}|20\d{2})\b/,
+    /\b(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)[a-z]*[/.\s-]+(?:de\s+)?(19\d{2}|20\d{2})\b/,
   );
   if (named) return `${named[2]}-${monthNames[named[1]]}`;
   const year = normalized.match(/\b(19\d{2}|20\d{2})\b/);
@@ -248,14 +332,20 @@ function parseMonth(value: string) {
 }
 
 function parsePeriod(line: string) {
-  const present = /atual|presente|momento/i.test(line);
-  const pieces = line.split(/\s+(?:a|até|–|—|-)\s+/i);
-  if (pieces.length < 2 && !present) return null;
-  const startMonth = parseMonth(pieces[0]);
+  const normalized = stripDiacritics(line).toLowerCase();
+  const present = /\b(atual|presente|momento|em andamento|desde)\b/i.test(
+    normalized,
+  );
+  const dateParts = normalized.match(
+    /(?:0?[1-9]|1[0-2])[/-](?:19|20)\d{2}|(?:jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)[a-z]*[/.\s-]+(?:de\s+)?(?:19|20)\d{2}|(?:19|20)\d{2}/g,
+  );
+  if (!dateParts?.length) return null;
+  const startMonth = parseMonth(dateParts[0]);
   if (!startMonth) return null;
-  const endMonth = present ? null : parseMonth(pieces.slice(1).join(" "));
-  if (!present && !endMonth) return null;
-  return { startMonth, endMonth, isCurrent: present };
+  if (present) return { startMonth, endMonth: null, isCurrent: true };
+  if (dateParts.length < 2) return null;
+  const endMonth = parseMonth(dateParts[1]);
+  return endMonth ? { startMonth, endMonth, isCurrent: false } : null;
 }
 
 function labeledValue(lines: string[], labels: string[]) {
@@ -272,155 +362,301 @@ function splitBlocks(lines: string[]) {
     if (!line) {
       if (current.length) blocks.push(current);
       current = [];
-    } else {
-      current.push(line);
-    }
+    } else current.push(line);
   }
   if (current.length) blocks.push(current);
   return blocks;
 }
 
+const jobTitlePattern =
+  /\b(recepcionista|atendente|assistente|auxiliar|analista|coordenador|supervisor|gerente|estagi[aá]rio|t[eé]cnico|consultor|vendedor|operador|secret[aá]ri|administrador|enfermeir|fisioterapeuta|psic[oó]log|m[eé]dic|professor)\b/i;
+
+function removePeriod(value: string) {
+  return cleanLine(
+    value.replace(
+      /\b(?:desde\s+)?(?:(?:0?[1-9]|1[0-2])[/-])?(?:19|20)\d{2}\s*(?:a|at[eé]|-|–|—)?\s*(?:(?:(?:0?[1-9]|1[0-2])[/-])?(?:19|20)\d{2}|atual|presente|momento|em andamento)?\b/gi,
+      "",
+    ),
+  );
+}
+
+function experienceBlocks(lines: string[]) {
+  const explicit = splitBlocks(lines);
+  if (explicit.length > 1) return explicit;
+  const periodIndexes = lines.flatMap((line, index) =>
+    parsePeriod(line) ? [index] : [],
+  );
+  if (periodIndexes.length <= 1) return explicit;
+  return periodIndexes.map((periodIndex, index) => {
+    const previousPeriod = periodIndexes[index - 1] ?? -1;
+    const nextPeriod = periodIndexes[index + 1] ?? lines.length;
+    return lines.slice(
+      Math.max(previousPeriod + 1, periodIndex - 2),
+      Math.max(periodIndex + 1, nextPeriod - 2),
+    );
+  });
+}
+
 function extractExperiences(lines: string[] | undefined) {
   if (!lines) return [];
-  const results: ResumeExtraction["experiences"] = [];
-  for (const block of splitBlocks(lines)) {
+  const unique = new Map<string, ResumeExtraction["experiences"][number]>();
+  for (const block of experienceBlocks(lines)) {
     const periodIndex = block.findIndex((line) => parsePeriod(line));
     const period = periodIndex >= 0 ? parsePeriod(block[periodIndex]) : null;
-    const company =
-      labeledValue(block, ["empresa", "organizacao", "organização"]) ??
-      (periodIndex >= 2 ? block[periodIndex - 2] : null);
-    const jobTitle =
-      labeledValue(block, ["cargo", "funcao", "função"]) ??
-      (periodIndex >= 1 ? block[periodIndex - 1] : null);
-    if (!company || !jobTitle || !period) continue;
-    const activityLabel = block.findIndex((line) =>
-      /^atividades?\s*[:|-]/i.test(line),
+    if (!period) continue;
+    let company = labeledValue(block, [
+      "empresa",
+      "empregador",
+      "organizacao",
+      "organização",
+    ]);
+    let jobTitle = labeledValue(block, [
+      "cargo",
+      "funcao",
+      "função",
+      "posicao",
+      "posição",
+    ]);
+    const periodLineParts = removePeriod(block[periodIndex])
+      .split(/\s*[|•·—–]\s*/)
+      .filter(Boolean);
+    const preceding = block
+      .slice(Math.max(0, periodIndex - 2), periodIndex)
+      .filter(Boolean);
+    const candidates = [...preceding, ...periodLineParts].filter(
+      (item) => !/^(?:empresa|cargo|fun[cç][aã]o)\s*[:|-]/i.test(item),
     );
-    const activityLines =
+    jobTitle ??= candidates.find((item) => jobTitlePattern.test(item)) ?? null;
+    company ??=
+      periodLineParts.find((item) => item !== jobTitle) ??
+      candidates.find((item) => item !== jobTitle) ??
+      null;
+    if (!jobTitle && candidates.length >= 2)
+      jobTitle = candidates.at(-1) ?? null;
+    if (!company && candidates.length >= 2) company = candidates.at(-2) ?? null;
+    const activityLabel = block.findIndex((line) =>
+      /^(?:atividades?|responsabilidades?|atribui[cç][oõ]es)/i.test(line),
+    );
+    const activityLines = (
       activityLabel >= 0
         ? [
-            block[activityLabel].replace(/^atividades?\s*[:|-]\s*/i, ""),
+            block[activityLabel].replace(
+              /^(?:atividades?|responsabilidades?|atribui[cç][oõ]es)\s*[:|-]?\s*/i,
+              "",
+            ),
             ...block.slice(activityLabel + 1),
           ]
-        : block.slice(periodIndex + 1);
+        : block.slice(periodIndex + 1)
+    ).filter((line) => line && !parsePeriod(line));
     const candidate = {
       company: limit(
-        company.replace(/^(?:empresa|organizacao|organização)\s*[:|-]\s*/i, ""),
+        company?.replace(
+          /^(?:empresa|empregador|organiza[cç][aã]o)\s*[:|-]\s*/i,
+          "",
+        ),
         160,
       ),
       jobTitle: limit(
-        jobTitle.replace(/^(?:cargo|funcao|função)\s*[:|-]\s*/i, ""),
+        jobTitle?.replace(
+          /^(?:cargo|fun[cç][aã]o|posi[cç][aã]o)\s*[:|-]\s*/i,
+          "",
+        ),
         160,
       ),
       ...period,
       activities: limit(activityLines.join("\n"), 3000),
     };
-    if (candidate.company && candidate.jobTitle) {
-      results.push(candidate as ResumeExtraction["experiences"][number]);
-    }
+    if (candidate.company && candidate.jobTitle)
+      unique.set(
+        normalizedKey(
+          `${candidate.company}|${candidate.jobTitle}|${candidate.startMonth}`,
+        ),
+        candidate as ResumeExtraction["experiences"][number],
+      );
   }
-  return results.slice(0, 30);
+  return [...unique.values()].slice(0, 30);
 }
 
 function normalizeEducationLevel(value: string | null) {
   if (!value) return null;
   const normalized = normalizedHeading(value);
-  return (
-    educationLevels.find((level) => normalizedHeading(level) === normalized) ??
-    educationLevels.find((level) =>
-      normalized.includes(normalizedHeading(level)),
-    ) ??
-    null
-  );
+  const aliases: Array<[RegExp, (typeof educationLevels)[number]]> = [
+    [/ensino fundamental|1[ºo] grau/, "Ensino fundamental"],
+    [/ensino medio|2[ºo] grau/, "Ensino médio"],
+    [/tecnic|tecnolog/, "Curso técnico"],
+    [/pos gradu|especializa|mba/, "Pós-graduação"],
+    [/mestrad/, "Mestrado"],
+    [/doutorad/, "Doutorado"],
+    [/graduacao|bacharel|licenciatura|superior/, "Graduação"],
+  ];
+  return aliases.find(([pattern]) => pattern.test(normalized))?.[1] ?? null;
 }
 
 function extractEducation(lines: string[] | undefined) {
   if (!lines) return [];
-  const results: ResumeExtraction["education"] = [];
-  for (const block of splitBlocks(lines)) {
-    const course = labeledValue(block, ["curso", "formacao", "formação"]);
-    const institution = labeledValue(block, [
+  const unique = new Map<string, ResumeExtraction["education"][number]>();
+  const blocks = splitBlocks(lines);
+  const candidates =
+    blocks.length > 1 ? blocks : lines.filter(Boolean).map((line) => [line]);
+  for (const block of candidates) {
+    const combined = block.join(" | ");
+    const educationLevel = normalizeEducationLevel(combined);
+    const labeledCourse = labeledValue(block, [
+      "curso",
+      "formacao",
+      "formação",
+      "gradua[cç][aã]o",
+    ]);
+    const labeledInstitution = labeledValue(block, [
       "instituicao",
       "instituição",
       "faculdade",
       "universidade",
       "escola",
+      "colegio",
+      "colégio",
     ]);
-    if (!course || !institution) continue;
-    const levelValue = labeledValue(block, ["nivel", "nível", "grau"]);
-    const periodLine = block.find((line) => parsePeriod(line));
-    const period = periodLine ? parsePeriod(periodLine) : null;
-    const inProgress = block.some((line) =>
-      /cursando|em andamento/i.test(line),
+    const parts = combined
+      .split(/\s*[|•·—–]\s*|\s+-\s+/)
+      .map(cleanLine)
+      .filter(Boolean);
+    const periodPart = parts.find(
+      (part) => parsePeriod(part) || /\b(19|20)\d{2}\b/.test(part),
     );
-    results.push({
-      educationLevel: normalizeEducationLevel(levelValue),
-      course: course.slice(0, 180),
-      institution: institution.slice(0, 180),
-      startMonth: period?.startMonth ?? null,
-      endMonth: inProgress ? null : (period?.endMonth ?? null),
+    const statusPart = parts.find((part) =>
+      /cursando|em andamento|conclu[ií]d|completo|incompleto/i.test(part),
+    );
+    const educationPart = parts.find((part) => normalizeEducationLevel(part));
+    const contentParts = parts.filter(
+      (part) => part !== periodPart && part !== statusPart,
+    );
+    let course: string | null =
+      labeledCourse ?? educationPart ?? contentParts[0] ?? null;
+    let institution: string | null =
+      labeledInstitution ??
+      contentParts.find(
+        (part) =>
+          part !== course &&
+          /universidade|faculdade|centro universit[aá]rio|instituto|escola|col[eé]gio|senac|senai|est[aá]cio|unopar|unifap|ueap/i.test(
+            part,
+          ),
+      ) ??
+      null;
+    if (!institution && block.length > 1)
+      institution =
+        block.find((part) => part !== course && !parsePeriod(part)) ?? null;
+    course = limit(
+      course?.replace(
+        /^(?:curso|forma[cç][aã]o|gradua[cç][aã]o)\s*[:|-]\s*/i,
+        "",
+      ),
+      180,
+    );
+    institution = limit(
+      institution?.replace(
+        /^(?:institui[cç][aã]o|faculdade|universidade|escola|col[eé]gio)\s*[:|-]\s*/i,
+        "",
+      ),
+      180,
+    );
+    if (!course || !institution) continue;
+    const periodLine = block.find((line) => parsePeriod(line)) ?? periodPart;
+    const period = periodLine ? parsePeriod(periodLine) : null;
+    const singleMonth = periodLine ? parseMonth(periodLine) : null;
+    const inProgress = /cursando|em andamento|previs[aã]o/i.test(combined);
+    const completed = /conclu[ií]d|completo|finalizado/i.test(combined);
+    const startMonth = period?.startMonth ?? singleMonth;
+    const endMonth = inProgress
+      ? null
+      : (period?.endMonth ?? (completed ? singleMonth : null));
+    const item = {
+      educationLevel,
+      course,
+      institution,
+      startMonth,
+      endMonth,
       inProgress,
-    });
+    };
+    unique.set(
+      normalizedKey(`${course}|${institution}|${startMonth ?? ""}`),
+      item,
+    );
   }
-  return results.slice(0, 30);
+  return [...unique.values()].slice(0, 30);
 }
 
 function extractCertifications(lines: string[] | undefined) {
   if (!lines) return [];
-  const results: ResumeExtraction["certifications"] = [];
-  for (const block of splitBlocks(lines)) {
-    const name = labeledValue(block, [
-      "curso",
-      "certificacao",
-      "certificação",
-      "nome",
-    ]);
-    if (!name) continue;
-    const institution = labeledValue(block, [
-      "instituicao",
-      "instituição",
-      "entidade",
-    ]);
-    const yearValue = labeledValue(block, ["ano", "conclusao", "conclusão"]);
-    const yearMatch = yearValue?.match(/\b(19\d{2}|20\d{2})\b/);
-    results.push({
-      name: name.slice(0, 180),
+  const unique = new Map<string, ResumeExtraction["certifications"][number]>();
+  for (const block of splitBlocks(lines).flatMap((item) =>
+    item.length > 1 &&
+    !item.some((line) =>
+      /^(?:curso|certifica[cç][aã]o|nome|institui[cç][aã]o|entidade)\s*[:|-]/i.test(
+        line,
+      ),
+    )
+      ? item.map((line) => [line])
+      : [item],
+  )) {
+    const combined = block.join(" | ");
+    const parts = combined
+      .split(/\s*[|•·—–]\s*|\s+-\s+/)
+      .map(cleanLine)
+      .filter(Boolean);
+    const name =
+      labeledValue(block, ["curso", "certificacao", "certificação", "nome"]) ??
+      parts[0];
+    if (!name || sectionHeading(name)) continue;
+    const institution =
+      labeledValue(block, [
+        "instituicao",
+        "instituição",
+        "entidade",
+        "emissor",
+      ]) ??
+      parts.slice(1).find((part) => !/^\d{4}$/.test(part)) ??
+      null;
+    const yearMatch = combined.match(/\b(19\d{2}|20\d{2})\b/);
+    const item = {
+      name: cleanLine(
+        name.replace(/^(?:curso|certifica[cç][aã]o|nome)\s*[:|-]\s*/i, ""),
+      ).slice(0, 180),
       institution: limit(institution, 180),
       completionYear: yearMatch ? Number(yearMatch[1]) : null,
-    });
+    };
+    if (item.name.length < 2) continue;
+    const key = normalizedKey(
+      `${item.name}|${item.institution ?? ""}|${item.completionYear ?? ""}`,
+    );
+    if (!unique.has(key)) unique.set(key, item);
   }
-  return results.slice(0, 50);
+  return [...unique.values()].slice(0, 50);
 }
 
 function extractSkills(lines: string[] | undefined) {
   if (!lines) return [];
   const unique = new Map<string, string>();
-  for (const item of lines.flatMap((line) => line.split(/[,;|•·]/))) {
+  for (const item of lines.flatMap((line) => line.split(/[,;|•·\n]/))) {
     const skill = cleanLine(item);
     if (skill.length < 2 || skill.length > 80 || skill.split(/\s+/).length > 8)
       continue;
-    unique.set(stripDiacritics(skill).toLowerCase(), skill);
+    const key = normalizedKey(skill);
+    if (!unique.has(key)) unique.set(key, skill);
   }
   return [...unique.values()].slice(0, 60);
 }
 
 export function parseResumeText(rawText: string): ResumeExtraction {
-  const text = rawText
-    .normalize("NFKC")
-    .replace(/\r/g, "")
-    .replace(/[\t\u00a0]+/g, " ")
-    .slice(0, RESUME_TEXT_MAX_CHARACTERS);
-  const lines = text.split("\n").map(cleanLine);
+  const { text, lines } = prepareResumeLines(rawText);
   const nonEmptyLines = lines.filter(Boolean);
   const sections = splitSections(lines);
   const email =
     text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] ?? null;
-  const location = extractLocation(nonEmptyLines.slice(0, 25).join("\n"));
-
+  const location = extractLocation(nonEmptyLines.slice(0, 30).join("\n"));
   return resumeExtractionSchema.parse({
     fullName: extractName(nonEmptyLines),
     email,
-    whatsapp: extractPhone(nonEmptyLines.slice(0, 30).join("\n")),
+    whatsapp: extractPhone(nonEmptyLines.slice(0, 35).join("\n")),
     city: location.city,
     state: location.state,
     professionalObjective: joinedSection(sections.objective, 500),
@@ -446,6 +682,32 @@ export function countExtractedResumeFields(data: ResumeExtraction) {
     ...data.certifications,
     ...data.skills,
   ].filter(Boolean).length;
+}
+
+export function isCompleteResumeExperience(
+  item: ResumeExtraction["experiences"][number],
+) {
+  return Boolean(
+    item.startMonth &&
+    (item.isCurrent || item.endMonth) &&
+    item.activities?.trim(),
+  );
+}
+
+export function isCompleteResumeEducation(
+  item: ResumeExtraction["education"][number],
+) {
+  return Boolean(
+    item.educationLevel &&
+    item.startMonth &&
+    (item.inProgress || item.endMonth),
+  );
+}
+
+export function isCompleteResumeCertification(
+  item: ResumeExtraction["certifications"][number],
+) {
+  return Boolean(item.institution?.trim() && item.completionYear);
 }
 
 export function buildResumeFieldConflicts(

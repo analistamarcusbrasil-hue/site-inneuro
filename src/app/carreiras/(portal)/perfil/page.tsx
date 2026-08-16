@@ -34,7 +34,11 @@ import {
   type CandidateResume,
   type CandidateSkill,
 } from "@/lib/careers/profile";
-import { resumeExtractionRecordSchema } from "@/lib/careers/resume-extraction";
+import {
+  countExtractedResumeFields,
+  resumeExtractionRecordSchema,
+  type ResumeExtractionRecord,
+} from "@/lib/careers/resume-extraction";
 import type {
   TalentPoolArea,
   TalentPoolMembership,
@@ -97,7 +101,7 @@ const errorMessages: Record<string, string> = {
   "resume-analysis":
     "O currículo foi enviado, mas a análise não pôde ser registrada. Você pode completar o perfil manualmente.",
   "resume-analysis-failed":
-    "Não conseguimos identificar todas as informações do currículo. Você pode completar seu perfil manualmente.",
+    "Não encontramos texto suficiente neste PDF. Ele pode ser uma imagem ou digitalização. Envie uma versão com texto selecionável ou complete seu perfil manualmente.",
   "resume-delete": "Não foi possível excluir esta versão do currículo.",
   reorder: "Não foi possível alterar a ordem.",
   "talent-areas": "Escolha pelo menos uma área profissional de interesse.",
@@ -128,6 +132,139 @@ function ProfileSection({
         {description}
       </p>
       <div className="mt-6">{children}</div>
+    </section>
+  );
+}
+
+function ResumeStartCard({
+  pendingExtractions,
+  resumes,
+}: {
+  pendingExtractions: ResumeExtractionRecord[];
+  resumes: Array<CandidateResume & { signedUrl: string | null }>;
+}) {
+  const latestExtraction = pendingExtractions[0] ?? null;
+  const identifiedCount = latestExtraction
+    ? countExtractedResumeFields(latestExtraction.extracted_data)
+    : 0;
+
+  return (
+    <section className="border-brand/25 bg-mint/70 rounded-[2rem] border p-6 shadow-[0_18px_50px_rgba(3,37,27,0.08)] sm:p-8">
+      <p className="text-brand text-xs font-bold tracking-[0.14em] uppercase">
+        Primeiro passo recomendado
+      </p>
+      <h2 className="font-heading text-brand-dark mt-3 text-2xl font-semibold sm:text-3xl">
+        Comece pelo seu currículo
+      </h2>
+      <p className="text-ink mt-3 max-w-3xl leading-relaxed">
+        Envie seu currículo em PDF. Vamos identificar suas informações
+        profissionais e preencher seu perfil para você revisar.
+      </p>
+
+      {latestExtraction ? (
+        <div className="border-brand/20 mt-6 rounded-2xl border bg-white p-5">
+          <p className="text-brand-dark font-bold">
+            Encontramos {identifiedCount}{" "}
+            {identifiedCount === 1 ? "informação" : "informações"} no seu
+            currículo.
+          </p>
+          <p className="text-muted mt-2 text-sm">
+            Nada será aplicado sem sua confirmação. Se já houver um valor
+            manual, você verá a comparação antes de escolher.
+          </p>
+          <Link
+            className="bg-brand hover:bg-brand-dark mt-4 inline-flex min-h-12 items-center justify-center rounded-full px-6 text-sm font-bold text-white"
+            href={`/carreiras/perfil/revisar-curriculo/${latestExtraction.id}`}
+          >
+            Revisar e preencher meu perfil
+          </Link>
+          {pendingExtractions.length > 1 ? (
+            <details className="border-border-light mt-5 border-t pt-4">
+              <summary className="text-brand cursor-pointer text-sm font-bold">
+                Outras análises pendentes ({pendingExtractions.length - 1})
+              </summary>
+              <ul className="mt-3 grid gap-2 text-sm">
+                {pendingExtractions.slice(1).map((extraction) => (
+                  <li key={extraction.id}>
+                    <Link
+                      className="text-brand font-bold hover:underline"
+                      href={`/carreiras/perfil/revisar-curriculo/${extraction.id}`}
+                    >
+                      Revisar envio de{" "}
+                      {new Date(extraction.created_at).toLocaleString("pt-BR")}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ) : null}
+        </div>
+      ) : null}
+
+      <form
+        action={uploadCandidateResumeAction}
+        className="border-brand/20 mt-6 rounded-2xl border bg-white p-5"
+      >
+        <label className="text-ink block text-sm font-bold">
+          Currículo em PDF
+          <input
+            className="border-border-light mt-2 block w-full rounded-xl border bg-white p-3 text-sm font-normal"
+            name="resume"
+            type="file"
+            accept="application/pdf,.pdf"
+            required
+          />
+        </label>
+        <p className="text-muted mt-2 text-xs">
+          Até 10 MB. O arquivo permanece privado e acessível somente por você e
+          gestores autorizados.
+        </p>
+        <button className="bg-brand hover:bg-brand-dark mt-4 min-h-12 rounded-full px-6 text-sm font-bold text-white">
+          Enviar currículo PDF
+        </button>
+      </form>
+
+      {resumes.length ? (
+        <details className="border-brand/20 mt-5 border-t pt-5">
+          <summary className="text-brand cursor-pointer text-sm font-bold">
+            Currículos enviados ({resumes.length})
+          </summary>
+          <ul className="mt-4 grid gap-3">
+            {resumes.map((resume) => (
+              <li
+                key={resume.id}
+                className="border-border-light flex flex-wrap items-center justify-between gap-4 rounded-2xl border bg-white p-4"
+              >
+                <div>
+                  <p className="text-ink font-bold">
+                    Versão {resume.version} · {resume.original_name}
+                  </p>
+                  <p className="text-muted mt-1 text-xs">
+                    {formatFileSize(resume.size_bytes)} ·{" "}
+                    {new Date(resume.created_at).toLocaleString("pt-BR")}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  {resume.signedUrl ? (
+                    <a
+                      className="text-brand text-sm font-bold hover:underline"
+                      href={resume.signedUrl}
+                    >
+                      Abrir PDF
+                    </a>
+                  ) : null}
+                  <form action={deleteCandidateResumeAction}>
+                    <input type="hidden" name="id" value={resume.id} />
+                    <button className="text-error text-sm font-bold hover:underline">
+                      Excluir
+                    </button>
+                  </form>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
     </section>
   );
 }
@@ -341,6 +478,11 @@ export default async function CandidateProfilePage({
         </header>
 
         <div className="mx-auto mt-8 grid max-w-5xl gap-6">
+          <ResumeStartCard
+            pendingExtractions={pendingExtractions}
+            resumes={resumeLinks}
+          />
+
           <ProfileSection
             title="Dados pessoais e objetivo"
             description="Solicitamos somente as informações necessárias ao recrutamento. Não informe CPF, RG ou dados médicos."
@@ -660,91 +802,6 @@ export default async function CandidateProfilePage({
                 Adicionar
               </button>
             </form>
-          </ProfileSection>
-
-          <ProfileSection
-            title="Currículo"
-            description="Envie somente PDF com texto selecionável, com até 10 MB. O arquivo fica privado; antes de atualizar seu perfil, você revisará tudo o que for identificado."
-          >
-            {pendingExtractions.length ? (
-              <div className="bg-mint text-brand-dark mb-5 rounded-2xl p-5">
-                <p className="font-bold">
-                  Você tem {pendingExtractions.length} análise(s) para revisar.
-                </p>
-                <ul className="mt-3 grid gap-2">
-                  {pendingExtractions.map((extraction) => (
-                    <li key={extraction.id}>
-                      <a
-                        className="text-brand text-sm font-bold hover:underline"
-                        href={`/carreiras/perfil/revisar-curriculo/${extraction.id}`}
-                      >
-                        Revisar informações identificadas em{" "}
-                        {new Date(extraction.created_at).toLocaleString(
-                          "pt-BR",
-                        )}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-            <form
-              action={uploadCandidateResumeAction}
-              className="border-brand/20 bg-mint/30 rounded-2xl border p-5"
-            >
-              <label className="text-ink block text-sm font-bold">
-                Escolher currículo em PDF
-                <input
-                  className="border-border-light mt-2 block w-full rounded-xl border bg-white p-3 text-sm font-normal"
-                  name="resume"
-                  type="file"
-                  accept="application/pdf,.pdf"
-                  required
-                />
-              </label>
-              <button className="bg-brand hover:bg-brand-dark mt-4 min-h-11 rounded-full px-6 text-sm font-bold text-white">
-                Enviar nova versão
-              </button>
-            </form>
-            <ul className="mt-5 grid gap-3">
-              {resumeLinks.map((resume) => (
-                <li
-                  key={resume.id}
-                  className="border-border-light flex flex-wrap items-center justify-between gap-4 rounded-2xl border p-4"
-                >
-                  <div>
-                    <p className="text-ink font-bold">
-                      Versão {resume.version} · {resume.original_name}
-                    </p>
-                    <p className="text-muted mt-1 text-xs">
-                      {formatFileSize(resume.size_bytes)} ·{" "}
-                      {new Date(resume.created_at).toLocaleString("pt-BR")}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {resume.signedUrl ? (
-                      <a
-                        className="text-brand text-sm font-bold hover:underline"
-                        href={resume.signedUrl}
-                      >
-                        Abrir PDF
-                      </a>
-                    ) : null}
-                    <form action={deleteCandidateResumeAction}>
-                      <input type="hidden" name="id" value={resume.id} />
-                      <button className="text-error text-sm font-bold hover:underline">
-                        Excluir
-                      </button>
-                    </form>
-                  </div>
-                </li>
-              ))}
-            </ul>
-            {!resumeLinks.length ? (
-              <p className="text-muted mt-4 text-sm">
-                Nenhum currículo enviado.
-              </p>
-            ) : null}
           </ProfileSection>
 
           <ProfileSection
