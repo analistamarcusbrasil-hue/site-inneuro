@@ -13,6 +13,7 @@ import { matchMatrixFormSchema } from "../src/lib/careers/matching-validation";
 
 const job: CareerJob = {
   id: "6e36ad17-5450-4cdd-81d8-ae029d1bbd93",
+  vacancy_number: "INN-2026-000001",
   slug: "assistente-atendimento",
   title: "Assistente de atendimento",
   area_id: "5c8491ed-c79e-4ad9-a926-ceca7ca27aec",

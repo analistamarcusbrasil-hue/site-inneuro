@@ -75,7 +75,7 @@ export const selectionStageApprovalLabels: Partial<
   resume: "APROVAR PARA ENTREVISTA",
   interview: "APROVAR PARA TESTE PRÁTICO",
   practical_test: "APROVAR PARA CONTRATAÇÃO",
-  hiring: "APROVAR / CONTRATADO",
+  hiring: "APROVAR CONTRATAÇÃO",
 };
 
 export type CareerSelectionProcess = {

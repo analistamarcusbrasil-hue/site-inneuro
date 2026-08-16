@@ -111,6 +111,9 @@ export default async function CareerJobDetailPage({
       <section className="border-border-light rounded-3xl border bg-white p-5 sm:p-7">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
+            <p className="text-brand mb-3 text-xs font-bold tracking-[0.14em] uppercase">
+              {job.vacancy_number}
+            </p>
             <span
               className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${statusClasses[job.status]}`}
             >

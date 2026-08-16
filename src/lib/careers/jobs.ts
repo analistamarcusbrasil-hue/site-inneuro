@@ -29,6 +29,7 @@ export type CareerJobArea = {
 
 export type CareerJob = {
   id: string;
+  vacancy_number: string;
   slug: string;
   title: string;
   area_id: string;

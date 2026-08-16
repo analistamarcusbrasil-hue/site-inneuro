@@ -37,6 +37,7 @@ export async function decideCareerApplicationStageAction(formData: FormData) {
     jobId: field(formData, "job_id"),
     expectedStage: field(formData, "expected_stage"),
     decision: field(formData, "decision"),
+    internalNote: field(formData, "internal_note"),
   });
   if (!parsed.success) redirect("/admin/rh/vagas?error=decision");
   const detailPath = `/admin/rh/vagas/${parsed.data.jobId}/candidaturas/${parsed.data.applicationId}`;
@@ -46,6 +47,7 @@ export async function decideCareerApplicationStageAction(formData: FormData) {
       p_application_id: parsed.data.applicationId,
       p_decision: parsed.data.decision,
       p_expected_stage: parsed.data.expectedStage,
+      p_internal_note: parsed.data.internalNote,
     },
   );
   if (error || typeof nextStage !== "string") {

@@ -32,6 +32,7 @@ type ApplicationRow = {
   submitted_at: string;
   job: {
     id: string;
+    vacancy_number: string;
     slug: string;
     title: string;
     location: string;
@@ -57,7 +58,7 @@ export default async function CandidateApplicationsPage({
   const { data, error } = await supabase
     .from("career_job_applications")
     .select(
-      "id, status, process_label, candidate_stage, stage_updated_at, submitted_at, job:career_jobs(id, slug, title, location, area:career_job_areas(name))",
+      "id, status, process_label, candidate_stage, stage_updated_at, submitted_at, job:career_jobs(id, vacancy_number, slug, title, location, area:career_job_areas(name))",
     )
     .eq("candidate_id", user.id)
     .order("submitted_at", { ascending: false });
@@ -152,12 +153,13 @@ export default async function CandidateApplicationsPage({
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <p className="text-brand text-xs font-bold tracking-wide uppercase">
-                      {application.job?.area?.name ?? "Carreiras INNEURO"}
+                      {application.job?.vacancy_number ?? "Carreiras INNEURO"}
                     </p>
                     <h2 className="font-heading text-brand-dark mt-2 text-xl font-semibold">
                       {application.job?.title ?? "Vaga indisponível"}
                     </h2>
                     <p className="text-muted mt-2 text-sm">
+                      {application.job?.area?.name} ·{" "}
                       {application.job?.location} · Enviada em{" "}
                       {formatApplicationDate(application.submitted_at)}
                     </p>

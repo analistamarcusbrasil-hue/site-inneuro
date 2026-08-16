@@ -58,6 +58,12 @@ export const careerStageDecisionSchema = z.object({
   jobId: z.string().uuid(),
   expectedStage: z.enum(selectionStages),
   decision: z.enum(["approve", "not_approve"]),
+  internalNote: z
+    .string()
+    .trim()
+    .max(4000)
+    .default("")
+    .transform((value) => value || null),
 });
 
 export const careerStageEventSchema = z.object({
