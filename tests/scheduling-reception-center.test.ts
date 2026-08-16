@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import { PDFDocument } from "pdf-lib";
 import {
   buildConfirmationMessage,
   buildPendingMessage,
@@ -19,6 +20,11 @@ import {
   quickPendingReasons,
   workflowStatuses,
 } from "../src/lib/scheduling/operations";
+import {
+  buildSchedulingFormPdf,
+  sanitizeDownloadName,
+  schedulingFormFileName,
+} from "../src/lib/scheduling/form-pdf";
 
 const read = (path: string) =>
   readFileSync(new URL(path, import.meta.url), "utf8");
@@ -270,4 +276,104 @@ test("reenvio aceita pendente ou falho e mantém trava de concorrência", () => 
   assert.match(server, /\["PENDING", "FAILED"\]\.includes\(data\.status\)/);
   assert.match(server, /\.in\("status", \["PENDING", "FAILED"\]\)/);
   assert.match(server, /status: "SENDING"/);
+});
+
+test("PDF completo contém múltiplas páginas válidas e nome sanitizado", async () => {
+  assert.equal(
+    schedulingFormFileName("PA-20260816-ÁBC123", "Maria da Silva"),
+    "INNEURO_PreAgendamento_PA-20260816-ABC123_Maria-da-Silva.pdf",
+  );
+  assert.equal(
+    sanitizeDownloadName("../../pedido médico.pdf"),
+    "pedido-medico.pdf",
+  );
+  const pdf = await buildSchedulingFormPdf({
+    protocol: "PA-20260816-ABC123",
+    patient_name: "Maria da Silva",
+    cpf: "000.000.000-00",
+    birth_date: "1990-01-20",
+    phone: "(96) 99999-9999",
+    email: "maria@example.com",
+    service_type: "INSURANCE",
+    insurance_name: "Convênio Exemplo",
+    insurance_card_number: "123456",
+    insurance_card_expiry: "2027-08-01",
+    insurer_reference: "REF-1",
+    authorization_number: "AUT-1",
+    authorization_valid_until: "2026-09-01",
+    preferred_dates: ["2026-08-20", "2026-08-21"],
+    preferred_periods: ["Manhã", "Tarde"],
+    notes: "Observação originalmente enviada pela paciente. ".repeat(150),
+    workflow_status: "CONCLUIDO",
+    claimed_at: "2026-08-16T13:00:00-03:00",
+    completed_at: "2026-08-16T14:00:00-03:00",
+    created_at: "2026-08-16T12:00:00-03:00",
+    unit_name: "INNEURO — Santa Rita",
+    assigned: { full_name: "Recepcionista" },
+    completed: { full_name: "Recepcionista" },
+    appointment_request_exams: [
+      {
+        exam_name: "Ressonância Magnética de Crânio",
+        modality: "Ressonância",
+        scheduled_date: "2026-08-20",
+        scheduled_time: "14:00:00",
+        preparation_text: "Seguir o preparo informado.",
+        documents_to_bring: ["Pedido médico", "Documento com foto"],
+      },
+      {
+        exam_name: "Tomografia de Tórax",
+        modality: "Tomografia",
+        scheduled_date: "2026-08-20",
+        scheduled_time: "15:00:00",
+        preparation_text: null,
+        documents_to_bring: [],
+      },
+    ],
+    appointment_request_documents: [
+      { document_type: "medical_request", file_name: "pedido.pdf" },
+      { document_type: "insurance_card_front", file_name: "carteirinha.jpg" },
+    ],
+  });
+  assert.equal(new TextDecoder().decode(pdf.slice(0, 5)), "%PDF-");
+  assert.ok(pdf.length > 1_000);
+  const loadedPdf = await PDFDocument.load(pdf);
+  assert.ok(loadedPdf.getPageCount() > 1);
+});
+
+test("downloads administrativos validam permissão, vínculo, privacidade e auditoria", () => {
+  const formRoute = read(
+    "../src/app/api/admin/solicitacoes/[id]/formulario/route.ts",
+  );
+  const documentServer = read(
+    "../src/lib/scheduling/admin-document-response.ts",
+  );
+  const legacyDocumentRoute = read(
+    "../src/app/api/admin/solicitacoes/documentos/[id]/route.ts",
+  );
+  const component = read("../src/components/admin/reception-center.tsx");
+  assert.match(
+    formRoute,
+    /hasAdminPermission\(session\.profile, "scheduling\.view"\)/,
+  );
+  assert.match(formRoute, /APPOINTMENT_FORM_DOWNLOADED/);
+  assert.match(formRoute, /Content-Type": "application\/pdf"/);
+  assert.match(formRoute, /Cache-Control": "private, no-store/);
+  assert.doesNotMatch(formRoute, /storage_path|service_role/i);
+  assert.match(
+    documentServer,
+    /hasAdminPermission\(session\.profile, "scheduling\.view"\)/,
+  );
+  assert.match(documentServer, /eq\("appointment_request_id", requestId\)/);
+  assert.match(documentServer, /\.download\(document\.storage_path\)/);
+  assert.match(documentServer, /APPOINTMENT_DOCUMENT_DOWNLOADED/);
+  assert.match(documentServer, /Content-Disposition/);
+  assert.match(documentServer, /Cache-Control": "private, no-store/);
+  assert.doesNotMatch(documentServer, /createSignedUrl|getPublicUrl/);
+  assert.doesNotMatch(
+    legacyDocumentRoute,
+    /storage_path|createSignedUrl|getPublicUrl/,
+  );
+  assert.match(component, /Formulário completo/);
+  assert.match(component, /Visualizar/);
+  assert.match(component, /Baixar documento/);
 });

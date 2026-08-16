@@ -8,6 +8,8 @@ import {
   ChevronRight,
   Clipboard,
   Clock3,
+  Download,
+  Eye,
   FileDown,
   Mail,
   MessageCircle,
@@ -766,11 +768,24 @@ export function ReceptionCenter({
                       {relationName(selected.assigned, "Não atribuído")}
                     </p>
                   </div>
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-bold ${statusColor(selected)}`}
-                  >
-                    {effectiveStatus(selected)}
-                  </span>
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <a
+                      href={`/api/admin/solicitacoes/${selected.id}/formulario`}
+                      className="bg-brand inline-flex min-h-10 items-center justify-center rounded-full px-4 text-xs font-bold text-white"
+                    >
+                      <FileDown
+                        className="mr-1.5"
+                        size={16}
+                        aria-hidden="true"
+                      />
+                      Formulário completo
+                    </a>
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-bold ${statusColor(selected)}`}
+                    >
+                      {effectiveStatus(selected)}
+                    </span>
+                  </div>
                 </div>
                 {ownedByAnother && view === "active" ? (
                   <p className="mt-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
@@ -970,21 +985,53 @@ export function ReceptionCenter({
                     </div>
                   </dl>
                 </details>
-                <details className="p-2">
+                <details open className="p-2">
                   <summary className="cursor-pointer list-none py-2 font-bold">
-                    Documentos ({selected.appointment_request_documents.length})
+                    Documentos · {selected.appointment_request_documents.length}{" "}
+                    {selected.appointment_request_documents.length === 1
+                      ? "arquivo"
+                      : "arquivos"}
                   </summary>
-                  <div className="flex flex-wrap gap-2 pb-2">
+                  <div className="space-y-2 pb-2">
                     {selected.appointment_request_documents.map((document) => (
-                      <a
+                      <div
                         key={document.id}
-                        href={`/api/admin/solicitacoes/documentos/${document.id}`}
-                        className="rounded-full bg-slate-100 px-3 py-2 text-xs font-bold"
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2.5"
                       >
-                        <FileDown className="mr-1 inline" size={14} />{" "}
-                        {documentLabels[document.document_type] ||
-                          document.file_name}
-                      </a>
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold">
+                            {documentLabels[document.document_type] ||
+                              "Documento"}
+                          </p>
+                          <p className="text-muted truncate text-xs">
+                            {document.file_name}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <a
+                            href={`/api/admin/solicitacoes/${selected.id}/documentos/${document.id}/visualizar`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex min-h-9 items-center rounded-full bg-white px-3 text-xs font-bold ring-1 ring-slate-200"
+                            aria-label={`Visualizar ${document.file_name}`}
+                          >
+                            <Eye
+                              className="mr-1"
+                              size={14}
+                              aria-hidden="true"
+                            />
+                            Visualizar
+                          </a>
+                          <a
+                            href={`/api/admin/solicitacoes/${selected.id}/documentos/${document.id}/download`}
+                            className="inline-flex size-9 items-center justify-center rounded-full bg-white ring-1 ring-slate-200"
+                            aria-label={`Baixar documento ${document.file_name}`}
+                            title="Baixar documento"
+                          >
+                            <Download size={15} aria-hidden="true" />
+                          </a>
+                        </div>
+                      </div>
                     ))}
                     {!selected.appointment_request_documents.length ? (
                       <p className="text-muted text-sm">
