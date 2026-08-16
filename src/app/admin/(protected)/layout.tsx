@@ -9,6 +9,11 @@ export default async function ProtectedAdminLayout({
   children: React.ReactNode;
 }) {
   if (!isCmsConfigured) return <ConfigurationPending />;
-  const { profile } = await requireAdmin();
+  const { profile } = await requireAdmin([
+    "super_admin",
+    "admin",
+    "editor",
+    "reception",
+  ]);
   return <AdminShell profile={profile}>{children}</AdminShell>;
 }

@@ -58,13 +58,19 @@ export function AdminShell({
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
-  const contentLinks = cmsModules.map((item) => ({
+  const isReception = profile.role === "reception";
+  const contentLinks = (isReception ? [] : cmsModules).map((item) => ({
     href: `/admin/${item.key}`,
     label: item.label,
     icon: item.icon,
   }));
-  const managementLinks = extraLinks.filter(
-    (item) => !item.superOnly || profile.role === "super_admin",
+  const receptionLink = extraLinks[0];
+  const managementLinks = extraLinks.filter((item) =>
+    isReception
+      ? false
+      : !item.superOnly ||
+        profile.role === "super_admin" ||
+        (item.href === "/admin/usuarios" && profile.role === "admin"),
   );
   const hrLinks = canAccessHr(profile)
     ? [
@@ -76,7 +82,9 @@ export function AdminShell({
       ]
     : [];
   const links = [
-    { href: "/admin", label: "Visão geral", icon: LayoutDashboard },
+    ...(isReception
+      ? [receptionLink]
+      : [{ href: "/admin", label: "Visão geral", icon: LayoutDashboard }]),
     ...contentLinks,
     ...hrLinks,
     ...managementLinks,
@@ -116,7 +124,10 @@ export function AdminShell({
               href="/admin"
               className="font-heading text-xl font-bold tracking-wide"
             >
-              INNEURO <span className="text-tech">CMS</span>
+              INNEURO{" "}
+              <span className="text-tech">
+                {isReception ? "Recepção" : "CMS"}
+              </span>
             </Link>
             <button
               type="button"
@@ -131,7 +142,7 @@ export function AdminShell({
             {profile.full_name || "Usuário administrativo"}
           </p>
           <p className="text-tech mt-1 text-[0.65rem] font-bold tracking-widest uppercase">
-            {profile.role.replace("_", " ")}
+            {isReception ? "Recepção" : profile.role.replace("_", " ")}
           </p>
         </div>
         <nav aria-label="Administração" className="flex-1 overflow-y-auto p-3">
@@ -141,7 +152,7 @@ export function AdminShell({
                 Comece aqui
               </p>
             </li>
-            {[links[0]].map(({ href, label, icon: Icon }) => (
+            {links.slice(0, 1).map(({ href, label, icon: Icon }) => (
               <li key={href}>
                 <Link
                   href={href}
@@ -154,11 +165,13 @@ export function AdminShell({
                 </Link>
               </li>
             ))}
-            <li>
-              <p className="px-3 pt-5 pb-1 text-[0.65rem] font-bold tracking-widest text-white/45 uppercase">
-                Conteúdo do site
-              </p>
-            </li>
+            {!isReception ? (
+              <li>
+                <p className="px-3 pt-5 pb-1 text-[0.65rem] font-bold tracking-widest text-white/45 uppercase">
+                  Conteúdo do site
+                </p>
+              </li>
+            ) : null}
             {contentLinks.map(({ href, label, icon: Icon }) => (
               <li key={href}>
                 <Link
@@ -192,11 +205,13 @@ export function AdminShell({
                 </Link>
               </li>
             ))}
-            <li>
-              <p className="px-3 pt-5 pb-1 text-[0.65rem] font-bold tracking-widest text-white/45 uppercase">
-                Organização e segurança
-              </p>
-            </li>
+            {!isReception ? (
+              <li>
+                <p className="px-3 pt-5 pb-1 text-[0.65rem] font-bold tracking-widest text-white/45 uppercase">
+                  Organização e segurança
+                </p>
+              </li>
+            ) : null}
             {managementLinks.map(({ href, label, icon: Icon }) => (
               <li key={href}>
                 <Link

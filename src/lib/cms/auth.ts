@@ -13,7 +13,7 @@ export async function getAdminSession() {
 
   const { data } = await supabase
     .from("profiles")
-    .select("id, full_name, role, hr_role")
+    .select("id, full_name, role, hr_role, email, active")
     .eq("id", user.id)
     .single();
 
@@ -27,6 +27,13 @@ export async function getAdminSession() {
 export async function requireAdmin(roles?: AppRole[]) {
   const session = await getAdminSession();
   if (!session.user || !session.profile) redirect("/admin/login");
+  if (!session.profile.active) {
+    await session.supabase?.auth.signOut();
+    redirect("/admin/login?error=inactive");
+  }
+  if (session.profile.role === "reception" && !roles) {
+    redirect("/admin/solicitacoes");
+  }
   if (roles && !roles.includes(session.profile.role)) redirect("/admin");
   return session as typeof session & {
     user: NonNullable<typeof session.user>;

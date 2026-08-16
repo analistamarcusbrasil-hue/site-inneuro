@@ -44,4 +44,5 @@ test("avaliador fica limitado à avaliação de candidatos atribuídos", () => {
 test("candidato e editor sem permissão não acessam o RH", () => {
   assert.equal(canAccessHr(null), false);
   assert.equal(canAccessHr({ role: "editor", hr_role: null }), false);
+  assert.equal(canAccessHr({ role: "reception", hr_role: "reviewer" }), false);
 });

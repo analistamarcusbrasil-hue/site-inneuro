@@ -175,6 +175,7 @@ export function Scheduling({
   const [cpf, setCpf] = useState("");
   const [birthDate, setBirthDate] = useState("");
   const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [serviceType, setServiceType] = useState<ServiceType | "">("");
   const [insuranceSearch, setInsuranceSearch] = useState("");
   const [insuranceId, setInsuranceId] = useState("");
@@ -378,6 +379,8 @@ export function Scheduling({
         next.push("A data de nascimento não pode estar no futuro.");
       if (!/^\d{10,11}$/.test(phone.replace(/\D/g, "")))
         next.push("Informe um Telefone / WhatsApp válido com DDD.");
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
+        next.push("Informe um e-mail válido para receber as orientações.");
       if (!serviceType) next.push("Escolha como será o atendimento.");
       if (serviceType === "INSURANCE" && !insuranceId)
         next.push("Selecione o convênio.");
@@ -492,6 +495,7 @@ export function Scheduling({
           cpf,
           birthDate,
           phone,
+          email,
           exams: examEntries.map(
             ({ modality, description, examId, order }) => ({
               modality,
@@ -747,7 +751,7 @@ export function Scheduling({
                     className={inputClasses}
                   />
                 </label>
-                <label className="text-ink text-sm font-semibold sm:col-span-2">
+                <label className="text-ink text-sm font-semibold">
                   Telefone / WhatsApp <span className="text-error">*</span>
                   <input
                     type="tel"
@@ -758,6 +762,19 @@ export function Scheduling({
                     inputMode="tel"
                     autoComplete="tel"
                     placeholder="(00) 00000-0000"
+                    className={inputClasses}
+                  />
+                </label>
+                <label className="text-ink text-sm font-semibold">
+                  E-mail <span className="text-error">*</span>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(event) =>
+                      setEmail(event.target.value.slice(0, 254))
+                    }
+                    autoComplete="email"
+                    placeholder="voce@exemplo.com.br"
                     className={inputClasses}
                   />
                 </label>
@@ -1146,6 +1163,7 @@ export function Scheduling({
                         Nascimento: {formatDate(birthDate)}
                       </p>
                       <p className="text-muted">WhatsApp: {phone}</p>
+                      <p className="text-muted">E-mail: {email}</p>
                     </section>
                     <section className="rounded-2xl bg-white p-4">
                       <h3 className="text-brand font-bold">ATENDIMENTO</h3>
