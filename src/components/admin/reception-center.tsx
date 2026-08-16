@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import {
   buildAppointmentWhatsAppUrl,
+  formatReceptionDate,
   formatWaitingTime,
   hasValidSchedulingEmail,
   isActiveRequest,
@@ -144,17 +145,6 @@ function relationName(relation: ProfileRelation, fallback: string) {
   return (
     (Array.isArray(relation) ? relation[0]?.full_name : relation?.full_name) ||
     fallback
-  );
-}
-
-function displayDate(value: string | null) {
-  if (!value) return "—";
-  const includesTime = value.includes("T");
-  return new Date(
-    includesTime ? value : `${value}T12:00:00`,
-  ).toLocaleDateString(
-    "pt-BR",
-    includesTime ? { dateStyle: "short", timeStyle: "short" } : undefined,
   );
 }
 
@@ -476,7 +466,7 @@ export function ReceptionCenter({
           <p className="font-bold">Atendimento finalizado</p>
           <p className="mt-1 text-sm">
             Por {relationName(selected.completed, "Atendente não identificado")}{" "}
-            em {displayDate(selected.completed_at)}. Confirmação{" "}
+            em {formatReceptionDate(selected.completed_at)}. Confirmação{" "}
             {selected.confirmation_status === "SENT"
               ? "enviada"
               : "não necessária"}
@@ -732,7 +722,7 @@ export function ReceptionCenter({
                       <Clock3 className="mr-1 inline" size={13} />
                       {view === "active"
                         ? formatWaitingTime(item.created_at)
-                        : displayDate(item.completed_at)}
+                        : formatReceptionDate(item.completed_at)}
                     </span>
                     {received ? (
                       <span className="font-bold text-emerald-800">
@@ -924,7 +914,7 @@ export function ReceptionCenter({
                         <p className="font-bold">{exam.exam_name}</p>
                         {exam.scheduled_date ? (
                           <p className="mt-1 text-emerald-800">
-                            {displayDate(exam.scheduled_date)} ·{" "}
+                            {formatReceptionDate(exam.scheduled_date)} ·{" "}
                             {exam.scheduled_time?.slice(0, 5) ||
                               "horário pendente"}
                           </p>
@@ -973,7 +963,9 @@ export function ReceptionCenter({
                     <div>
                       <dt className="text-muted">Validade</dt>
                       <dd className="font-bold">
-                        {displayDate(selected.authorization_valid_until)}
+                        {formatReceptionDate(
+                          selected.authorization_valid_until,
+                        )}
                       </dd>
                     </div>
                   </dl>
@@ -1034,7 +1026,7 @@ export function ReceptionCenter({
                                 : message.status === "FAILED"
                                   ? "Falhou"
                                   : "Pendente"}{" "}
-                              · {displayDate(message.created_at)}
+                              · {formatReceptionDate(message.created_at)}
                             </span>
                           </button>
                           {message.status === "FAILED" ? (
@@ -1076,7 +1068,7 @@ export function ReceptionCenter({
                         >
                           <p className="font-bold">{entry.action}</p>
                           <p className="text-muted text-xs">
-                            {displayDate(entry.created_at)}
+                            {formatReceptionDate(entry.created_at)}
                           </p>
                         </li>
                       ))}
@@ -1326,7 +1318,7 @@ export function ReceptionCenter({
             {schedules.map((item) => (
               <div key={item.examId} className="mt-3">
                 <strong>{item.name}</strong> ·{" "}
-                {item.date ? displayDate(item.date) : "data pendente"} ·{" "}
+                {item.date ? formatReceptionDate(item.date) : "data pendente"} ·{" "}
                 {item.time || "horário pendente"}
                 <p className="text-muted mt-1 whitespace-pre-line">
                   Preparo:{" "}

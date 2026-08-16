@@ -8,6 +8,7 @@ import {
 import {
   buildAppointmentWhatsAppUrl,
   defaultDocumentsToBring,
+  formatReceptionDate,
   formatWaitingTime,
   hasValidSchedulingEmail,
   isActiveRequest,
@@ -63,6 +64,17 @@ test("tempo de espera é legível para minutos, horas e dias", () => {
   assert.equal(formatWaitingTime("2026-08-16T14:42:00Z", now), "há 18 min");
   assert.equal(formatWaitingTime("2026-08-16T12:00:00Z", now), "há 3 h");
   assert.equal(formatWaitingTime("2026-08-14T12:00:00Z", now), "há 2 dias");
+});
+
+test("data e horário da recepção renderizam sem opção inválida", () => {
+  assert.equal(formatReceptionDate(null), "—");
+  assert.match(formatReceptionDate("2026-08-16"), /16\/08\/2026/);
+  assert.match(
+    formatReceptionDate("2026-08-16T15:30:00-03:00"),
+    /16\/08\/2026/,
+  );
+  const component = read("../src/components/admin/reception-center.tsx");
+  assert.doesNotMatch(component, /toLocaleDateString[\s\S]{0,160}timeStyle/);
 });
 
 test("WhatsApp normaliza telefones brasileiros e monta mensagem segura", () => {
