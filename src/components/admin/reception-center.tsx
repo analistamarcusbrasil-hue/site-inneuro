@@ -6,9 +6,11 @@ import {
   AlertTriangle,
   CheckCircle2,
   ChevronRight,
+  Clipboard,
   Clock3,
   FileDown,
   Mail,
+  MessageCircle,
   RefreshCw,
   Search,
   Send,
@@ -16,11 +18,17 @@ import {
   X,
 } from "lucide-react";
 import {
+  buildAppointmentWhatsAppUrl,
   formatWaitingTime,
+  hasValidSchedulingEmail,
+  isActiveRequest,
+  isAttendedRequest,
+  isConfirmationPending,
   isLongWaiting,
   pendingSuggestions,
   quickPendingReasons,
   workflowLabels,
+  type ConfirmationStatus,
   type WorkflowStatus,
 } from "@/lib/scheduling/operations";
 
@@ -52,6 +60,7 @@ type HistoryRow = {
 };
 type CommunicationRow = {
   id: string;
+  communication_type: string;
   subject: string;
   text_body: string;
   status: string;
@@ -59,6 +68,8 @@ type CommunicationRow = {
   created_at: string;
   sent_at: string | null;
 };
+type ProfileRelation =
+  { full_name: string | null } | Array<{ full_name: string | null }> | null;
 
 export type ReceptionRequest = {
   id: string;
@@ -71,10 +82,14 @@ export type ReceptionRequest = {
   insurance_name: string | null;
   insurance_card_number: string | null;
   workflow_status: WorkflowStatus;
+  confirmation_status: ConfirmationStatus;
+  confirmation_communication_id: string | null;
   assigned_to: string | null;
   claimed_at: string | null;
-  assigned:
-    { full_name: string | null } | Array<{ full_name: string | null }> | null;
+  assigned: ProfileRelation;
+  completed_by: string | null;
+  completed_at: string | null;
+  completed: ProfileRelation;
   insurer_reference: string | null;
   authorization_number: string | null;
   authorization_valid_until: string | null;
@@ -115,22 +130,53 @@ const serviceLabels: Record<string, string> = {
   SUS: "SUS",
 };
 const documentLabels: Record<string, string> = {
-  photo_id: "Ver documento",
-  medical_request: "Ver pedido médico",
-  sus_authorization: "Ver autorização",
-  sus_card: "Ver cartão SUS",
-  insurance_card_front: "Ver carteirinha",
-  insurance_card_back: "Ver verso da carteirinha",
-  insurance_authorization: "Ver autorização",
-  other: "Ver documento complementar",
+  photo_id: "Documento com foto",
+  medical_request: "Pedido médico",
+  sus_authorization: "Autorização",
+  sus_card: "Cartão SUS",
+  insurance_card_front: "Carteirinha",
+  insurance_card_back: "Verso da carteirinha",
+  insurance_authorization: "Autorização",
+  other: "Documento complementar",
 };
 
-function assignedName(request: ReceptionRequest) {
+function relationName(relation: ProfileRelation, fallback: string) {
   return (
-    (Array.isArray(request.assigned)
-      ? request.assigned[0]?.full_name
-      : request.assigned?.full_name) || "Não atribuído"
+    (Array.isArray(relation) ? relation[0]?.full_name : relation?.full_name) ||
+    fallback
   );
+}
+
+function displayDate(value: string | null) {
+  if (!value) return "—";
+  const includesTime = value.includes("T");
+  return new Date(
+    includesTime ? value : `${value}T12:00:00`,
+  ).toLocaleDateString(
+    "pt-BR",
+    includesTime ? { dateStyle: "short", timeStyle: "short" } : undefined,
+  );
+}
+
+function effectiveStatus(request: ReceptionRequest) {
+  if (
+    isConfirmationPending(request.workflow_status, request.confirmation_status)
+  )
+    return "Confirmação pendente";
+  return workflowLabels[request.workflow_status];
+}
+
+function statusColor(request: ReceptionRequest) {
+  if (
+    isConfirmationPending(request.workflow_status, request.confirmation_status)
+  )
+    return "bg-rose-100 text-rose-800";
+  if (request.workflow_status === "AUTORIZADO")
+    return "bg-emerald-100 text-emerald-800";
+  if (["PENDENCIA", "RECUSADO"].includes(request.workflow_status))
+    return "bg-amber-100 text-amber-900";
+  if (request.workflow_status === "NOVO") return "bg-sky-100 text-sky-800";
+  return "bg-slate-100 text-slate-700";
 }
 
 function ModalShell({
@@ -176,13 +222,16 @@ export function ReceptionCenter({
 }) {
   const router = useRouter();
   const searchRef = useRef<HTMLInputElement>(null);
+  const [view, setView] = useState<"active" | "attended">("active");
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
-  const [selectedId, setSelectedId] = useState(requests[0]?.id ?? "");
+  const [selectedId, setSelectedId] = useState("");
+  const [hiddenActiveIds, setHiddenActiveIds] = useState<string[]>([]);
   const [modal, setModal] = useState<Modal>(null);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [showContactCorrection, setShowContactCorrection] = useState(false);
   const [reason, setReason] = useState<string>(quickPendingReasons[0]);
   const [correction, setCorrection] = useState(
     pendingSuggestions[quickPendingReasons[0]].correction,
@@ -200,64 +249,109 @@ export function ReceptionCenter({
   const [messageType, setMessageType] = useState("GUIDANCE");
   const [viewMessage, setViewMessage] = useState<CommunicationRow | null>(null);
 
-  const selected =
-    requests.find((item) => item.id === selectedId) ?? requests[0] ?? null;
+  const activeRequests = useMemo(
+    () =>
+      requests
+        .filter(
+          (item) =>
+            !hiddenActiveIds.includes(item.id) &&
+            isActiveRequest(item.workflow_status, item.confirmation_status),
+        )
+        .sort((a, b) => {
+          const priority = (item: ReceptionRequest) =>
+            item.documents_received_at
+              ? 0
+              : isConfirmationPending(
+                    item.workflow_status,
+                    item.confirmation_status,
+                  )
+                ? 1
+                : item.workflow_status === "NOVO"
+                  ? 2
+                  : 3;
+          return (
+            priority(a) - priority(b) ||
+            Date.parse(a.created_at) - Date.parse(b.created_at)
+          );
+        }),
+    [requests, hiddenActiveIds],
+  );
+  const attendedRequests = useMemo(
+    () =>
+      requests
+        .filter((item) =>
+          isAttendedRequest(item.workflow_status, item.confirmation_status),
+        )
+        .sort(
+          (a, b) =>
+            Date.parse(b.completed_at ?? b.updated_at) -
+            Date.parse(a.completed_at ?? a.updated_at),
+        ),
+    [requests],
+  );
+  const source = view === "active" ? activeRequests : attendedRequests;
   const filtered = useMemo(() => {
     const normalized = query.toLocaleLowerCase("pt-BR").replace(/\s/g, "");
-    return requests.filter((item) => {
-      if (filter === "mine" && item.assigned_to !== currentUser.id)
-        return false;
-      if (filter === "new" && item.workflow_status !== "NOVO") return false;
-      if (
-        filter === "pending" &&
-        !["PENDENCIA", "RECUSADO"].includes(item.workflow_status)
-      )
-        return false;
-      if (filter === "authorized" && item.workflow_status !== "AUTORIZADO")
-        return false;
+    return source.filter((item) => {
+      if (view === "active") {
+        if (filter === "mine" && item.assigned_to !== currentUser.id)
+          return false;
+        if (filter === "new" && item.workflow_status !== "NOVO") return false;
+        if (
+          filter === "pending" &&
+          !["PENDENCIA", "RECUSADO"].includes(item.workflow_status)
+        )
+          return false;
+        if (filter === "authorized" && item.workflow_status !== "AUTORIZADO")
+          return false;
+        if (
+          filter === "confirmation" &&
+          !isConfirmationPending(item.workflow_status, item.confirmation_status)
+        )
+          return false;
+      }
       if (!normalized) return true;
       return `${item.patient_name}${item.cpf ?? ""}${item.phone}${item.protocol}`
         .toLocaleLowerCase("pt-BR")
         .replace(/\s/g, "")
         .includes(normalized);
     });
-  }, [requests, query, filter, currentUser.id]);
-
-  const counts = {
-    NOVOS: requests.filter((r) => r.workflow_status === "NOVO").length,
-    "EM ANÁLISE": requests.filter((r) => r.workflow_status === "EM_ANALISE")
-      .length,
-    CONVÊNIO: requests.filter(
-      (r) => r.workflow_status === "AGUARDANDO_CONVENIO",
-    ).length,
-    PENDÊNCIAS: requests.filter((r) =>
-      ["PENDENCIA", "RECUSADO"].includes(r.workflow_status),
-    ).length,
-    AUTORIZADOS: requests.filter((r) => r.workflow_status === "AUTORIZADO")
-      .length,
-    CONCLUÍDOS: requests.filter((r) => r.workflow_status === "CONCLUIDO")
-      .length,
-  };
+  }, [source, query, filter, view, currentUser.id]);
+  const selected =
+    filtered.find((item) => item.id === selectedId) ?? filtered[0] ?? null;
+  const pendingCount = activeRequests.filter((item) =>
+    ["PENDENCIA", "RECUSADO"].includes(item.workflow_status),
+  ).length;
+  const authorizedCount = activeRequests.filter(
+    (item) => item.workflow_status === "AUTORIZADO",
+  ).length;
+  const confirmationCount = activeRequests.filter((item) =>
+    isConfirmationPending(item.workflow_status, item.confirmation_status),
+  ).length;
+  const whatsAppUrl = selected
+    ? buildAppointmentWhatsAppUrl({
+        phone: selected.phone,
+        patientName: selected.patient_name,
+        protocol: selected.protocol,
+      })
+    : null;
+  const emailIsValid = hasValidSchedulingEmail(selected?.email);
+  const ownedByAnother = Boolean(
+    selected?.assigned_to && selected.assigned_to !== currentUser.id,
+  );
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
-      if (
-        event.key === "/" &&
-        !["INPUT", "TEXTAREA", "SELECT"].includes(
-          (event.target as HTMLElement).tagName,
-        )
-      ) {
+      const editing = ["INPUT", "TEXTAREA", "SELECT"].includes(
+        (event.target as HTMLElement).tagName,
+      );
+      if (event.key === "/" && !editing) {
         event.preventDefault();
         searchRef.current?.focus();
       }
-      if (
-        event.key.toLowerCase() === "n" &&
-        !modal &&
-        !["INPUT", "TEXTAREA", "SELECT"].includes(
-          (event.target as HTMLElement).tagName,
-        )
-      )
-        nextRequest();
+      if (event.key.toLowerCase() === "n" && !modal && !editing) nextRequest();
+      if (event.key.toLowerCase() === "w" && !modal && !editing && whatsAppUrl)
+        window.open(whatsAppUrl, "_blank", "noopener,noreferrer");
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
@@ -269,11 +363,17 @@ export function ReceptionCenter({
     setSelectedId(filtered[(index + 1) % filtered.length].id);
   }
 
+  function chooseReason(value: string) {
+    setReason(value);
+    const suggested = pendingSuggestions[value];
+    if (suggested) {
+      setCorrection(suggested.correction);
+      setGuidance(suggested.guidance);
+    }
+  }
+
   function openPending(kind: "pending" | "rejected") {
-    const suggested = pendingSuggestions[quickPendingReasons[0]];
-    setReason(quickPendingReasons[0]);
-    setCorrection(suggested.correction);
-    setGuidance(suggested.guidance);
+    chooseReason(quickPendingReasons[0]);
     setModal(kind);
   }
 
@@ -286,7 +386,10 @@ export function ReceptionCenter({
         name: exam.exam_name,
         date: exam.scheduled_date ?? "",
         time: exam.scheduled_time?.slice(0, 5) ?? "",
-        preparation: exam.preparation_text ?? exam.automatic_preparation,
+        preparation:
+          exam.preparation_text ||
+          exam.automatic_preparation ||
+          "Sem preparo específico cadastrado.",
         documents: (exam.documents_to_bring?.length
           ? exam.documents_to_bring
           : exam.automatic_documents
@@ -296,8 +399,35 @@ export function ReceptionCenter({
     setModal("complete");
   }
 
+  function openMessage() {
+    if (!selected || !emailIsValid) {
+      setShowContactCorrection(true);
+      setError("Corrija o e-mail do paciente antes de enviar.");
+      return;
+    }
+    setMessageType("GUIDANCE");
+    setMessageSubject("Orientação sobre seu pré-agendamento — INNEURO");
+    setMessageBody(
+      `Olá, ${selected.patient_name}.\n\nPROTOCOLO\n${selected.protocol}\n\n`,
+    );
+    setModal("message");
+  }
+
+  async function copyContact(value: string, label: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      setNotice(`${label} copiado.`);
+      setError("");
+    } catch {
+      setError(
+        `Não foi possível copiar o ${label.toLocaleLowerCase("pt-BR")}.`,
+      );
+    }
+  }
+
   async function act(action: string, extra: Record<string, unknown> = {}) {
     if (!selected || saving) return false;
+    const actedId = selected.id;
     setSaving(true);
     setError("");
     setNotice("");
@@ -306,7 +436,7 @@ export function ReceptionCenter({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          requestId: selected.id,
+          requestId: actedId,
           operationId: crypto.randomUUID(),
           action,
           ...extra,
@@ -316,6 +446,8 @@ export function ReceptionCenter({
       if (!response.ok)
         throw new Error(result.error || "Não foi possível concluir.");
       setNotice(result.message || "Ação concluída.");
+      if (result.removeFromActive)
+        setHiddenActiveIds((ids) => [...ids, actedId]);
       setModal(null);
       router.refresh();
       return true;
@@ -330,472 +462,643 @@ export function ReceptionCenter({
   }
 
   async function updateEmail(form: FormData) {
-    await act("update_contact", { email: String(form.get("email") ?? "") });
+    const updated = await act("update_contact", {
+      email: String(form.get("email") ?? ""),
+    });
+    if (updated) setShowContactCorrection(false);
   }
 
-  function chooseReason(value: string) {
-    setReason(value);
-    const suggested = pendingSuggestions[value];
-    if (suggested) {
-      setCorrection(suggested.correction);
-      setGuidance(suggested.guidance);
-    }
+  function renderNextAction() {
+    if (!selected) return null;
+    if (view === "attended")
+      return (
+        <div className="rounded-2xl bg-emerald-50 p-4 text-emerald-900">
+          <p className="font-bold">Atendimento finalizado</p>
+          <p className="mt-1 text-sm">
+            Por {relationName(selected.completed, "Atendente não identificado")}{" "}
+            em {displayDate(selected.completed_at)}. Confirmação{" "}
+            {selected.confirmation_status === "SENT"
+              ? "enviada"
+              : "não necessária"}
+            .
+          </p>
+        </div>
+      );
+    if (
+      isConfirmationPending(
+        selected.workflow_status,
+        selected.confirmation_status,
+      )
+    )
+      return (
+        <button
+          type="button"
+          disabled={saving || ownedByAnother || !emailIsValid}
+          onClick={() => act("retry_confirmation")}
+          className="min-h-12 w-full rounded-full bg-rose-700 px-5 font-bold text-white disabled:opacity-50"
+        >
+          <RefreshCw className="mr-2 inline" size={17} />
+          {saving ? "Reenviando..." : "Reenviar confirmação"}
+        </button>
+      );
+    if (selected.workflow_status === "NOVO")
+      return (
+        <button
+          type="button"
+          disabled={saving}
+          onClick={() => act("claim")}
+          className="bg-brand min-h-12 w-full rounded-full px-5 font-bold text-white disabled:opacity-50"
+        >
+          <UserCheck className="mr-2 inline" size={17} />
+          {saving ? "Assumindo..." : "Assumir atendimento"}
+        </button>
+      );
+    if (selected.workflow_status === "AUTORIZADO")
+      return (
+        <button
+          type="button"
+          disabled={saving || ownedByAnother || !emailIsValid}
+          onClick={openComplete}
+          className="min-h-12 w-full rounded-full bg-emerald-700 px-5 font-bold text-white disabled:opacity-50"
+        >
+          Confirmar data e horário
+        </button>
+      );
+    if (ownedByAnother)
+      return (
+        <p className="rounded-xl bg-amber-50 p-4 text-sm font-bold text-amber-900">
+          Atendimento em andamento com{" "}
+          {relationName(selected.assigned, "outro atendente")}.
+        </p>
+      );
+    return (
+      <div className="grid gap-2 sm:grid-cols-2">
+        {selected.workflow_status === "EM_ANALISE" ? (
+          <button
+            type="button"
+            onClick={() => setModal("wait")}
+            className="min-h-11 rounded-full bg-slate-800 px-4 font-bold text-white"
+          >
+            Enviar ao convênio
+          </button>
+        ) : null}
+        {selected.workflow_status === "AGUARDANDO_CONVENIO" ? (
+          <button
+            type="button"
+            onClick={() => openPending("rejected")}
+            className="min-h-11 rounded-full bg-amber-600 px-4 font-bold text-white"
+          >
+            Convênio recusou
+          </button>
+        ) : null}
+        <button
+          type="button"
+          onClick={() => openPending("pending")}
+          className="min-h-11 rounded-full bg-amber-100 px-4 font-bold text-amber-950"
+        >
+          Registrar pendência
+        </button>
+        <button
+          type="button"
+          onClick={() => setModal("authorize")}
+          className="min-h-11 rounded-full bg-emerald-700 px-4 font-bold text-white"
+        >
+          Autorizar agendamento
+        </button>
+      </div>
+    );
   }
-
-  const statusColor = (status: string) =>
-    status === "AUTORIZADO"
-      ? "bg-emerald-100 text-emerald-800"
-      : status === "PENDENCIA" || status === "RECUSADO"
-        ? "bg-amber-100 text-amber-900"
-        : status === "NOVO"
-          ? "bg-sky-100 text-sky-800"
-          : "bg-slate-100 text-slate-700";
 
   return (
     <div>
       {notice ? (
         <p
           role="status"
-          className="bg-mint text-brand mb-5 flex items-center gap-2 rounded-xl p-4 font-bold"
+          className="bg-mint text-brand mb-4 flex items-center gap-2 rounded-xl p-3 font-bold"
         >
-          <CheckCircle2 aria-hidden="true" size={18} />
-          {notice}
+          <CheckCircle2 aria-hidden="true" size={18} /> {notice}
         </p>
       ) : null}
       {error ? (
         <p
           role="alert"
-          className="bg-error/10 text-error mb-5 flex items-center gap-2 rounded-xl p-4 font-bold"
+          className="bg-error/10 text-error mb-4 flex items-center gap-2 rounded-xl p-3 font-bold"
         >
-          <AlertTriangle aria-hidden="true" size={18} />
-          {error}
+          <AlertTriangle aria-hidden="true" size={18} /> {error}
         </p>
       ) : null}
-      <section className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-        {Object.entries(counts).map(([label, count]) => (
-          <article
-            key={label}
-            className="border-border-light rounded-2xl border bg-white p-4"
+
+      <section className="border-border-light mb-4 rounded-2xl border bg-white p-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div
+            className="flex rounded-xl bg-slate-100 p-1"
+            aria-label="Visualização da central"
           >
-            <p className="text-muted text-[.68rem] font-bold tracking-wide">
-              {label}
-            </p>
-            <p className="font-heading text-brand mt-1 text-3xl font-semibold">
-              {count}
-            </p>
-          </article>
-        ))}
-      </section>
-      <section className="border-border-light mb-5 flex flex-wrap items-center gap-3 rounded-2xl border bg-white p-3">
-        <label className="relative min-w-[16rem] flex-1">
-          <Search
-            className="text-muted absolute top-3.5 left-3"
-            size={18}
-            aria-hidden="true"
-          />
-          <span className="sr-only">Buscar paciente</span>
-          <input
-            ref={searchRef}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Nome, CPF, telefone ou protocolo  /"
-            className="border-border-light min-h-12 w-full rounded-xl border pr-3 pl-10"
-          />
-        </label>
-        <div className="flex flex-wrap gap-2" aria-label="Filtros rápidos">
-          {[
-            ["all", "Todos"],
-            ["mine", "Meus atendimentos"],
-            ["new", "Novos"],
-            ["pending", "Pendências"],
-            ["authorized", "Autorizados"],
-          ].map(([key, label]) => (
             <button
-              key={key}
               type="button"
-              onClick={() => setFilter(key)}
-              className={`min-h-10 rounded-full px-4 text-sm font-bold ${filter === key ? "bg-brand text-white" : "bg-slate-100 text-slate-700"}`}
+              onClick={() => {
+                setView("active");
+                setFilter("all");
+                setShowContactCorrection(false);
+              }}
+              className={`min-h-10 rounded-lg px-4 text-sm font-extrabold ${view === "active" ? "bg-brand text-white shadow-sm" : "text-slate-600"}`}
             >
-              {label}
+              FILA ATIVA · {activeRequests.length}
             </button>
-          ))}
+            <button
+              type="button"
+              onClick={() => {
+                setView("attended");
+                setFilter("all");
+                setShowContactCorrection(false);
+              }}
+              className={`min-h-10 rounded-lg px-4 text-sm font-extrabold ${view === "attended" ? "bg-brand text-white shadow-sm" : "text-slate-600"}`}
+            >
+              ATENDIDOS · {attendedRequests.length}
+            </button>
+          </div>
+          {view === "active" ? (
+            <div className="text-muted flex flex-wrap gap-x-4 gap-y-1 text-xs font-bold">
+              <span>{activeRequests.length} aguardando atendimento</span>
+              <span>{pendingCount} pendências</span>
+              <span>{authorizedCount} autorizados</span>
+              <span>{confirmationCount} confirmações pendentes</span>
+            </div>
+          ) : null}
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <label className="relative min-w-[16rem] flex-1">
+            <Search
+              className="text-muted absolute top-3.5 left-3"
+              size={18}
+              aria-hidden="true"
+            />
+            <span className="sr-only">Buscar paciente</span>
+            <input
+              ref={searchRef}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Nome, CPF, telefone ou protocolo  /"
+              className="border-border-light min-h-12 w-full rounded-xl border pr-3 pl-10"
+            />
+          </label>
+          {view === "active" ? (
+            <div
+              className="flex flex-wrap gap-1.5"
+              aria-label="Filtros rápidos"
+            >
+              {[
+                ["all", "Todos"],
+                ["mine", "Meus"],
+                ["new", "Novos"],
+                ["pending", "Pendências"],
+                ["authorized", "Autorizados"],
+                ["confirmation", "Confirmação"],
+              ].map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setFilter(key)}
+                  className={`min-h-9 rounded-full px-3 text-xs font-bold ${filter === key ? "bg-brand text-white" : "bg-slate-100 text-slate-700"}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
       </section>
-      <div className="grid items-start gap-5 xl:grid-cols-[minmax(21rem,.8fr)_minmax(34rem,1.2fr)]">
-        <section aria-label="Fila de pré-agendamentos" className="min-w-0">
-          <div className="mb-2 flex items-center justify-between">
-            <p className="text-muted text-sm">
-              {filtered.length} atendimento(s) · mais antigos primeiro
+
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(20rem,.75fr)_minmax(36rem,1.25fr)]">
+        <section
+          aria-label={view === "active" ? "Fila ativa" : "Atendidos"}
+          className="min-w-0"
+        >
+          <div className="mb-2 flex items-center justify-between px-1">
+            <p className="text-muted text-xs font-bold tracking-wide uppercase">
+              {filtered.length} registro(s)
             </p>
             <button
               type="button"
               onClick={nextRequest}
-              className="text-brand text-sm font-bold"
+              className="text-brand min-h-9 px-2 text-xs font-bold"
             >
-              Próximo atendimento <ChevronRight className="inline" size={16} />
+              PRÓXIMO <ChevronRight className="inline" size={15} />
             </button>
           </div>
-          <ol className="max-h-[72vh] space-y-2 overflow-y-auto pr-1">
+          <div className="space-y-2 xl:max-h-[72vh] xl:overflow-y-auto xl:pr-1">
             {filtered.map((item) => {
-              const long = isLongWaiting(item.created_at),
-                received = Boolean(item.documents_received_at);
+              const exams = item.appointment_request_exams;
+              const received = Boolean(item.documents_received_at);
               return (
-                <li key={item.id}>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedId(item.id)}
-                    className={`border-border-light w-full rounded-2xl border bg-white p-4 text-left transition ${selected?.id === item.id ? "ring-brand ring-2" : "hover:border-brand/40"} ${received ? "border-emerald-400 bg-emerald-50" : ""}`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <strong className="text-ink line-clamp-1">
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedId(item.id);
+                    setShowContactCorrection(false);
+                  }}
+                  className={`border-border-light w-full rounded-2xl border p-3 text-left transition ${selected?.id === item.id ? "ring-brand bg-sky-50 ring-2" : "bg-white hover:bg-slate-50"}`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-bold text-slate-950">
                         {item.patient_name}
-                      </strong>
-                      <span
-                        className={`shrink-0 rounded-full px-2 py-1 text-[.65rem] font-bold ${statusColor(item.workflow_status)}`}
-                      >
-                        {received
-                          ? "DOCUMENTO RECEBIDO"
-                          : workflowLabels[item.workflow_status]}
-                      </span>
+                      </p>
+                      <p className="text-muted mt-0.5 truncate text-xs">
+                        {exams[0]?.exam_name || "Exame não informado"}
+                        {exams.length > 1
+                          ? ` + ${exams.length - 1}`
+                          : ""} ·{" "}
+                        {item.insurance_name ||
+                          serviceLabels[item.service_type] ||
+                          item.service_type}
+                      </p>
                     </div>
-                    <p className="text-brand mt-2 line-clamp-1 text-sm font-semibold">
-                      {item.appointment_request_exams
-                        .map((exam) => exam.exam_name)
-                        .join(" · ")}
-                    </p>
-                    <p className="text-muted mt-1 line-clamp-1 text-xs">
-                      {item.insurance_name || serviceLabels[item.service_type]}{" "}
-                      · {assignedName(item)}
-                    </p>
-                    <p
-                      className={`mt-2 flex items-center gap-1 text-xs font-bold ${long ? "text-warning" : "text-muted"}`}
+                    <span
+                      className={`shrink-0 rounded-full px-2 py-1 text-[.65rem] font-extrabold ${statusColor(item)}`}
                     >
-                      <Clock3 size={14} aria-hidden="true" />
-                      {formatWaitingTime(item.created_at)}
-                    </p>
-                  </button>
-                </li>
+                      {effectiveStatus(item)}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[.7rem]">
+                    <span
+                      className={
+                        isLongWaiting(item.created_at) && view === "active"
+                          ? "font-bold text-amber-800"
+                          : "text-muted"
+                      }
+                    >
+                      <Clock3 className="mr-1 inline" size={13} />
+                      {view === "active"
+                        ? formatWaitingTime(item.created_at)
+                        : displayDate(item.completed_at)}
+                    </span>
+                    {received ? (
+                      <span className="font-bold text-emerald-800">
+                        DOCUMENTO RECEBIDO
+                      </span>
+                    ) : null}
+                    {item.assigned_to ? (
+                      <span className="text-muted">
+                        Responsável: {relationName(item.assigned, "Atendente")}
+                      </span>
+                    ) : null}
+                  </div>
+                </button>
               );
             })}
-          </ol>
+            {!filtered.length ? (
+              <div className="border-border-light rounded-2xl border bg-white p-8 text-center text-sm text-slate-600">
+                Nenhum registro nesta visualização.
+              </div>
+            ) : null}
+          </div>
         </section>
-        <section className="xl:sticky xl:top-24">
+
+        <section
+          aria-label="Detalhes do atendimento"
+          className="border-border-light min-w-0 rounded-2xl border bg-white"
+        >
           {selected ? (
-            <article className="border-border-light max-h-[78vh] overflow-y-auto rounded-3xl border bg-white">
-              <header className="border-border-light sticky top-0 z-10 border-b bg-white p-5 sm:p-6">
+            <>
+              <header className="border-border-light border-b p-4 sm:p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="text-brand text-xs font-bold uppercase">
+                    <p className="text-muted text-xs font-bold">
                       {selected.protocol}
                     </p>
-                    <h2 className="font-heading mt-1 text-2xl font-semibold">
+                    <h2 className="font-heading text-brand mt-1 text-2xl font-semibold">
                       {selected.patient_name}
                     </h2>
                     <p className="text-muted mt-1 text-sm">
-                      {selected.phone} ·{" "}
-                      {selected.email || "E-mail não informado"}
+                      Responsável:{" "}
+                      {relationName(selected.assigned, "Não atribuído")}
                     </p>
                   </div>
                   <span
-                    className={`rounded-full px-3 py-1 text-xs font-bold ${statusColor(selected.workflow_status)}`}
+                    className={`rounded-full px-3 py-1 text-xs font-bold ${statusColor(selected)}`}
                   >
-                    {workflowLabels[selected.workflow_status]}
+                    {effectiveStatus(selected)}
                   </span>
                 </div>
-                <p className="text-muted mt-3 text-sm">
-                  <UserCheck
-                    className="mr-1 inline"
-                    size={16}
-                    aria-hidden="true"
-                  />
-                  Atendente:{" "}
-                  <strong className="text-ink">{assignedName(selected)}</strong>
-                </p>
+                {ownedByAnother && view === "active" ? (
+                  <p className="mt-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
+                    Esta solicitação está sendo atendida por outra pessoa. As
+                    ações operacionais ficam protegidas.
+                  </p>
+                ) : null}
               </header>
-              <div className="space-y-6 p-5 sm:p-6">
-                {!selected.email ? (
+
+              <div className="border-border-light border-b p-4 sm:p-5">
+                <p className="text-muted mb-2 text-[.68rem] font-extrabold tracking-wide uppercase">
+                  Contato do paciente
+                </p>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="rounded-xl bg-slate-50 p-3">
+                    <p className="text-sm font-bold">
+                      {selected.phone || "Telefone não informado"}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {whatsAppUrl ? (
+                        <a
+                          href={whatsAppUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="min-h-9 rounded-full bg-emerald-700 px-3 py-2 text-xs font-bold text-white"
+                        >
+                          <MessageCircle className="mr-1 inline" size={15} />
+                          WhatsApp <span className="opacity-70">W</span>
+                        </a>
+                      ) : (
+                        <span className="rounded-full bg-slate-200 px-3 py-2 text-xs text-slate-600">
+                          WhatsApp indisponível
+                        </span>
+                      )}
+                      {selected.phone ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            copyContact(selected.phone, "Telefone")
+                          }
+                          className="min-h-9 rounded-full bg-white px-3 text-xs font-bold ring-1 ring-slate-200"
+                        >
+                          <Clipboard className="mr-1 inline" size={14} /> Copiar
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="rounded-xl bg-slate-50 p-3">
+                    <p className="truncate text-sm font-bold">
+                      {emailIsValid ? selected.email : "E-mail não informado"}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {emailIsValid ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={openMessage}
+                            className="min-h-9 rounded-full bg-sky-800 px-3 text-xs font-bold text-white"
+                          >
+                            <Mail className="mr-1 inline" size={14} /> Enviar
+                            e-mail
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              copyContact(selected.email!, "E-mail")
+                            }
+                            className="min-h-9 rounded-full bg-white px-3 text-xs font-bold ring-1 ring-slate-200"
+                          >
+                            <Clipboard className="mr-1 inline" size={14} />{" "}
+                            Copiar
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setShowContactCorrection((value) => !value)
+                          }
+                          className="min-h-9 rounded-full bg-white px-3 text-xs font-bold ring-1 ring-slate-200"
+                        >
+                          Corrigir contato
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                {showContactCorrection ? (
                   <form
                     action={updateEmail}
-                    className="rounded-2xl bg-amber-50 p-4"
+                    className="mt-3 flex flex-col gap-2 rounded-xl bg-amber-50 p-3 sm:flex-row sm:items-end"
                   >
-                    <p className="text-sm font-bold">
-                      Informe o e-mail para enviar orientações
-                    </p>
-                    <div className="mt-2 flex gap-2">
+                    <label className="flex-1 text-xs font-bold">
+                      E-mail correto
                       <input
                         name="email"
                         type="email"
                         required
-                        placeholder="paciente@exemplo.com"
-                        className="border-border-light min-h-11 min-w-0 flex-1 rounded-xl border bg-white px-3"
+                        defaultValue={selected.email ?? ""}
+                        className="mt-1 min-h-11 w-full rounded-lg border border-amber-200 bg-white px-3 font-normal"
                       />
-                      <button
-                        disabled={saving}
-                        className="bg-brand rounded-full px-4 text-sm font-bold text-white disabled:opacity-50"
-                      >
-                        Salvar
-                      </button>
-                    </div>
+                    </label>
+                    <button
+                      type="submit"
+                      disabled={saving}
+                      className="bg-brand min-h-11 rounded-full px-5 text-sm font-bold text-white disabled:opacity-50"
+                    >
+                      Salvar contato
+                    </button>
                   </form>
                 ) : null}
-                <section>
-                  <h3 className="text-brand text-xs font-bold uppercase">
-                    Exames
-                  </h3>
-                  <ul className="mt-2 space-y-2">
+              </div>
+
+              <div className="border-border-light border-b p-4 sm:p-5">
+                <p className="text-muted mb-3 text-[.68rem] font-extrabold tracking-wide uppercase">
+                  Próxima ação
+                </p>
+                {!emailIsValid &&
+                ["AUTORIZADO", "CONCLUIDO"].includes(
+                  selected.workflow_status,
+                ) ? (
+                  <p className="mb-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
+                    Corrija o e-mail antes de concluir ou reenviar a
+                    confirmação.
+                  </p>
+                ) : null}
+                {renderNextAction()}
+              </div>
+
+              <div className="divide-border-light divide-y p-2 sm:p-3">
+                <details open className="group p-2">
+                  <summary className="cursor-pointer list-none py-2 font-bold">
+                    Exames ({selected.appointment_request_exams.length})
+                  </summary>
+                  <div className="space-y-2 pb-2">
                     {selected.appointment_request_exams.map((exam) => (
-                      <li
+                      <div
                         key={exam.id}
-                        className="bg-surface rounded-xl p-3 text-sm"
+                        className="rounded-xl bg-slate-50 p-3 text-sm"
                       >
-                        <strong>{exam.exam_name}</strong>
+                        <p className="font-bold">{exam.exam_name}</p>
                         {exam.scheduled_date ? (
-                          <p className="text-muted mt-1">
-                            {new Date(
-                              `${exam.scheduled_date}T12:00:00`,
-                            ).toLocaleDateString("pt-BR")}{" "}
-                            · {exam.scheduled_time?.slice(0, 5)}
+                          <p className="mt-1 text-emerald-800">
+                            {displayDate(exam.scheduled_date)} ·{" "}
+                            {exam.scheduled_time?.slice(0, 5) ||
+                              "horário pendente"}
                           </p>
                         ) : null}
-                      </li>
+                        <p className="text-muted mt-1">
+                          {exam.modality || "Modalidade não informada"}
+                        </p>
+                      </div>
                     ))}
-                  </ul>
-                </section>
-                <section className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <h3 className="text-brand text-xs font-bold uppercase">
-                      Convênio
-                    </h3>
-                    <p className="mt-2 text-sm">
-                      {selected.insurance_name ||
-                        serviceLabels[selected.service_type]}
-                    </p>
-                    {selected.insurance_card_number ? (
-                      <p className="text-muted mt-1 text-xs">
-                        Carteirinha: ••••
-                        {selected.insurance_card_number.slice(-4)}
+                  </div>
+                </details>
+                <details className="p-2">
+                  <summary className="cursor-pointer list-none py-2 font-bold">
+                    Convênio e atendimento
+                  </summary>
+                  <dl className="grid gap-2 pb-2 text-sm sm:grid-cols-2">
+                    <div>
+                      <dt className="text-muted">Tipo</dt>
+                      <dd className="font-bold">
+                        {serviceLabels[selected.service_type] ||
+                          selected.service_type}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted">Convênio</dt>
+                      <dd className="font-bold">
+                        {selected.insurance_name || "Não se aplica"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted">Unidade</dt>
+                      <dd className="font-bold">{selected.unit_name}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted">Referência</dt>
+                      <dd className="font-bold">
+                        {selected.insurer_reference || "—"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted">Autorização</dt>
+                      <dd className="font-bold">
+                        {selected.authorization_number || "—"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted">Validade</dt>
+                      <dd className="font-bold">
+                        {displayDate(selected.authorization_valid_until)}
+                      </dd>
+                    </div>
+                  </dl>
+                </details>
+                <details className="p-2">
+                  <summary className="cursor-pointer list-none py-2 font-bold">
+                    Documentos ({selected.appointment_request_documents.length})
+                  </summary>
+                  <div className="flex flex-wrap gap-2 pb-2">
+                    {selected.appointment_request_documents.map((document) => (
+                      <a
+                        key={document.id}
+                        href={`/api/admin/solicitacoes/documentos/${document.id}`}
+                        className="rounded-full bg-slate-100 px-3 py-2 text-xs font-bold"
+                      >
+                        <FileDown className="mr-1 inline" size={14} />{" "}
+                        {documentLabels[document.document_type] ||
+                          document.file_name}
+                      </a>
+                    ))}
+                    {!selected.appointment_request_documents.length ? (
+                      <p className="text-muted text-sm">
+                        Nenhum documento enviado.
                       </p>
                     ) : null}
                   </div>
-                  <div>
-                    <h3 className="text-brand text-xs font-bold uppercase">
-                      Documentos
-                    </h3>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {selected.appointment_request_documents.map((doc) => (
-                        <a
-                          key={doc.id}
-                          href={`/api/admin/solicitacoes/documentos/${doc.id}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={`border-brand text-brand inline-flex min-h-10 items-center gap-2 rounded-full border px-3 text-xs font-bold ${doc.source === "PATIENT_CORRECTION" ? "bg-emerald-50" : ""}`}
-                        >
-                          <FileDown size={15} aria-hidden="true" />
-                          {documentLabels[doc.document_type] || "Ver documento"}
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                </section>
-                <section className="border-border-light sticky bottom-0 z-10 rounded-2xl border bg-white p-3 shadow-lg">
-                  <div className="flex flex-wrap gap-2">
-                    {selected.workflow_status === "NOVO" ? (
-                      <button
-                        disabled={saving}
-                        onClick={() => act("claim")}
-                        className="bg-brand min-h-12 flex-1 rounded-full px-5 font-bold text-white disabled:opacity-50"
-                      >
-                        {saving ? "Salvando..." : "Assumir atendimento"}
-                      </button>
-                    ) : null}
-                    {selected.workflow_status === "EM_ANALISE" ? (
-                      <>
-                        <button
-                          onClick={() => setModal("wait")}
-                          className="bg-brand min-h-11 rounded-full px-4 text-sm font-bold text-white"
-                        >
-                          Aguardar convênio
-                        </button>
-                        <button
-                          onClick={() => openPending("pending")}
-                          className="min-h-11 rounded-full bg-amber-500 px-4 text-sm font-bold text-white"
-                        >
-                          Pendência
-                        </button>
-                        <button
-                          onClick={() => setModal("authorize")}
-                          className="min-h-11 rounded-full bg-emerald-600 px-4 text-sm font-bold text-white"
-                        >
-                          Autorizado
-                        </button>
-                      </>
-                    ) : null}
-                    {selected.workflow_status === "AGUARDANDO_CONVENIO" ? (
-                      <>
-                        <button
-                          onClick={() => openPending("pending")}
-                          className="min-h-11 rounded-full bg-amber-500 px-4 text-sm font-bold text-white"
-                        >
-                          Pendência
-                        </button>
-                        <button
-                          onClick={() => openPending("rejected")}
-                          className="bg-error min-h-11 rounded-full px-4 text-sm font-bold text-white"
-                        >
-                          Recusado
-                        </button>
-                        <button
-                          onClick={() => setModal("authorize")}
-                          className="min-h-11 rounded-full bg-emerald-600 px-4 text-sm font-bold text-white"
-                        >
-                          Autorizado
-                        </button>
-                      </>
-                    ) : null}
-                    {["PENDENCIA", "RECUSADO"].includes(
-                      selected.workflow_status,
-                    ) ? (
-                      <>
-                        <button
-                          onClick={() => openPending("pending")}
-                          className="min-h-11 rounded-full bg-amber-500 px-4 text-sm font-bold text-white"
-                        >
-                          Atualizar pendência
-                        </button>
-                        <button
-                          onClick={() => setModal("authorize")}
-                          className="min-h-11 rounded-full bg-emerald-600 px-4 text-sm font-bold text-white"
-                        >
-                          Autorizado
-                        </button>
-                      </>
-                    ) : null}
-                    {selected.workflow_status === "AUTORIZADO" ? (
-                      <button
-                        onClick={openComplete}
-                        className="bg-brand min-h-12 flex-1 rounded-full px-5 font-bold text-white"
-                      >
-                        Concluir agendamento
-                      </button>
-                    ) : null}
-                    <button
-                      onClick={() => {
-                        setMessageSubject(
-                          "Orientação sobre seu pré-agendamento — INNEURO",
-                        );
-                        setMessageType("GUIDANCE");
-                        setMessageBody(
-                          `Olá, ${selected.patient_name}.\n\nPROTOCOLO\n${selected.protocol}\n\n`,
-                        );
-                        setModal("message");
-                      }}
-                      className="border-brand text-brand min-h-11 rounded-full border px-4 text-sm font-bold"
-                    >
-                      <Mail className="mr-1 inline" size={16} />
-                      Enviar mensagem
-                    </button>
-                    {selected.workflow_status === "CONCLUIDO" ? (
-                      <button
-                        onClick={nextRequest}
-                        className="bg-brand min-h-11 rounded-full px-5 text-sm font-bold text-white"
-                      >
-                        Próximo atendimento
-                      </button>
-                    ) : null}
-                  </div>
-                </section>
-                <section>
-                  <h3 className="font-heading text-lg font-semibold">
-                    Comunicações
-                  </h3>
-                  <ul className="mt-3 space-y-2">
+                </details>
+                <details className="p-2">
+                  <summary className="cursor-pointer list-none py-2 font-bold">
+                    Comunicações (
+                    {selected.appointment_request_communications.length})
+                  </summary>
+                  <div className="space-y-2 pb-2">
                     {[...selected.appointment_request_communications]
-                      .sort((a, b) => b.created_at.localeCompare(a.created_at))
+                      .sort(
+                        (a, b) =>
+                          Date.parse(b.created_at) - Date.parse(a.created_at),
+                      )
                       .map((message) => (
-                        <li
+                        <div
                           key={message.id}
-                          className="bg-surface flex flex-wrap items-center gap-3 rounded-xl p-3 text-sm"
+                          className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 p-3 text-sm"
                         >
-                          <div className="min-w-0 flex-1">
-                            <strong className="block truncate">
-                              {message.subject}
-                            </strong>
-                            <span className="text-muted text-xs">
-                              {new Date(message.created_at).toLocaleString(
-                                "pt-BR",
-                              )}{" "}
-                              ·{" "}
-                              {message.status === "SENT"
-                                ? "Enviado"
-                                : message.status === "FAILED"
-                                  ? "Falhou"
-                                  : "Processando"}
-                            </span>
-                          </div>
                           <button
                             type="button"
                             onClick={() => {
                               setViewMessage(message);
                               setModal("view-message");
                             }}
-                            className="text-brand text-xs font-bold"
+                            className="min-w-0 flex-1 text-left"
                           >
-                            Ver mensagem
+                            <span className="block truncate font-bold">
+                              {message.subject}
+                            </span>
+                            <span className="text-muted text-xs">
+                              {message.status === "SENT"
+                                ? "Enviado"
+                                : message.status === "FAILED"
+                                  ? "Falhou"
+                                  : "Pendente"}{" "}
+                              · {displayDate(message.created_at)}
+                            </span>
                           </button>
                           {message.status === "FAILED" ? (
                             <button
+                              type="button"
                               disabled={saving}
                               onClick={() =>
                                 act("retry", { communicationId: message.id })
                               }
-                              className="text-error text-xs font-bold"
+                              className="rounded-full bg-white px-3 py-2 text-xs font-bold ring-1 ring-slate-200"
                             >
-                              <RefreshCw className="mr-1 inline" size={14} />
+                              <RefreshCw className="mr-1 inline" size={13} />{" "}
                               Reenviar
                             </button>
                           ) : null}
-                        </li>
+                        </div>
                       ))}
-                  </ul>
-                </section>
-                <section>
-                  <h3 className="font-heading text-lg font-semibold">
-                    Histórico
-                  </h3>
-                  <ol className="border-brand/20 mt-3 space-y-4 border-l pl-4">
+                    {!selected.appointment_request_communications.length ? (
+                      <p className="text-muted text-sm">
+                        Nenhuma comunicação enviada.
+                      </p>
+                    ) : null}
+                  </div>
+                </details>
+                <details className="p-2">
+                  <summary className="cursor-pointer list-none py-2 font-bold">
+                    Histórico ({selected.appointment_request_history.length})
+                  </summary>
+                  <ol className="space-y-2 pb-2">
                     {[...selected.appointment_request_history]
-                      .sort((a, b) => b.created_at.localeCompare(a.created_at))
-                      .map((item) => (
+                      .sort(
+                        (a, b) =>
+                          Date.parse(b.created_at) - Date.parse(a.created_at),
+                      )
+                      .map((entry) => (
                         <li
-                          key={item.id}
-                          className="before:bg-brand relative text-sm before:absolute before:top-1.5 before:-left-[1.3rem] before:size-2 before:rounded-full"
+                          key={entry.id}
+                          className="border-l-2 border-slate-200 pl-3 text-sm"
                         >
-                          <strong>{item.action}</strong>
-                          <time className="text-muted mt-1 block text-xs">
-                            {new Date(item.created_at).toLocaleString("pt-BR")}
-                          </time>
+                          <p className="font-bold">{entry.action}</p>
+                          <p className="text-muted text-xs">
+                            {displayDate(entry.created_at)}
+                          </p>
                         </li>
                       ))}
                   </ol>
-                </section>
+                </details>
               </div>
-            </article>
+            </>
           ) : (
-            <div className="border-border-light text-muted rounded-3xl border bg-white p-8 text-center">
-              Nenhuma solicitação na fila.
+            <div className="p-10 text-center text-slate-600">
+              Selecione um atendimento na fila.
             </div>
           )}
         </section>
       </div>
 
       {modal === "wait" && selected ? (
-        <ModalShell title="Enviado ao convênio" onClose={() => setModal(null)}>
+        <ModalShell title="Enviar ao convênio" onClose={() => setModal(null)}>
           <label className="mt-5 block text-sm font-bold">
-            Número da solicitação ou autorização (opcional)
+            Referência ou protocolo do convênio (opcional)
             <input
               value={reference}
-              onChange={(e) => setReference(e.target.value)}
-              maxLength={120}
+              onChange={(event) => setReference(event.target.value)}
               className="border-border-light mt-2 min-h-12 w-full rounded-xl border px-3 font-normal"
             />
           </label>
@@ -822,7 +1125,7 @@ export function ReceptionCenter({
               Motivo
               <select
                 value={reason}
-                onChange={(e) => chooseReason(e.target.value)}
+                onChange={(event) => chooseReason(event.target.value)}
                 className="border-border-light mt-2 min-h-12 w-full rounded-xl border px-3 font-normal"
               >
                 {quickPendingReasons.map((item) => (
@@ -834,7 +1137,7 @@ export function ReceptionCenter({
               O que precisa ser corrigido
               <textarea
                 value={correction}
-                onChange={(e) => setCorrection(e.target.value)}
+                onChange={(event) => setCorrection(event.target.value)}
                 rows={3}
                 className="border-border-light mt-2 w-full rounded-xl border p-3 font-normal"
               />
@@ -843,17 +1146,13 @@ export function ReceptionCenter({
               Orientação ao paciente
               <textarea
                 value={guidance}
-                onChange={(e) => setGuidance(e.target.value)}
+                onChange={(event) => setGuidance(event.target.value)}
                 rows={4}
                 className="border-border-light mt-2 w-full rounded-xl border p-3 font-normal"
               />
             </label>
-            <p className="bg-surface rounded-xl p-3 text-xs">
-              O sistema salvará a pendência, registrará o histórico e enviará o
-              link seguro de correção em uma única ação.
-            </p>
             <button
-              disabled={saving}
+              disabled={saving || !emailIsValid}
               onClick={() =>
                 act(modal === "rejected" ? "rejected" : "pending", {
                   reason,
@@ -880,7 +1179,7 @@ export function ReceptionCenter({
                 value={
                   authorizationNumber || selected.authorization_number || ""
                 }
-                onChange={(e) => setAuthorizationNumber(e.target.value)}
+                onChange={(event) => setAuthorizationNumber(event.target.value)}
                 className="border-border-light mt-2 min-h-12 w-full rounded-xl border px-3 font-normal"
               />
             </label>
@@ -889,7 +1188,7 @@ export function ReceptionCenter({
               <input
                 type="date"
                 value={validUntil || selected.authorization_valid_until || ""}
-                onChange={(e) => setValidUntil(e.target.value)}
+                onChange={(event) => setValidUntil(event.target.value)}
                 className="border-border-light mt-2 min-h-12 w-full rounded-xl border px-3 font-normal"
               />
             </label>
@@ -904,41 +1203,47 @@ export function ReceptionCenter({
                   validUntil || selected.authorization_valid_until || "",
               })
             }
-            className="mt-6 min-h-12 w-full rounded-full bg-emerald-600 font-bold text-white disabled:opacity-50"
+            className="mt-6 min-h-12 w-full rounded-full bg-emerald-700 font-bold text-white disabled:opacity-50"
           >
             {saving ? "Salvando..." : "Confirmar autorização"}
           </button>
         </ModalShell>
       ) : null}
       {modal === "complete" && selected ? (
-        <ModalShell title="Concluir agendamento" onClose={() => setModal(null)}>
-          <p className="text-muted mt-2 text-sm">
-            {selected.patient_name} ·{" "}
-            {selected.insurance_name || serviceLabels[selected.service_type]} ·{" "}
-            {selected.unit_name}
-          </p>
-          <label className="mt-5 block text-sm font-bold">
-            Usar a mesma data em todos os exames
-            <input
-              type="date"
-              value={sharedDate}
-              onChange={(e) => {
-                setSharedDate(e.target.value);
-                setSchedules((rows) =>
-                  rows.map((row) => ({ ...row, date: e.target.value })),
-                );
-              }}
-              className="border-border-light mt-2 min-h-12 w-full rounded-xl border px-3 font-normal"
-            />
-          </label>
-          <div className="mt-5 space-y-5">
+        <ModalShell
+          title="Confirmar agendamento"
+          onClose={() => setModal(null)}
+        >
+          <div className="mt-2 rounded-xl bg-slate-50 p-3 text-sm">
+            <strong>{selected.patient_name}</strong>
+            <br />
+            {selected.email} · {selected.unit_name}
+          </div>
+          {schedules.length > 1 ? (
+            <label className="mt-5 block text-sm font-bold">
+              Usar a mesma data em todos os exames
+              <input
+                type="date"
+                value={sharedDate}
+                onChange={(event) => {
+                  setSharedDate(event.target.value);
+                  setSchedules((rows) =>
+                    rows.map((row) => ({ ...row, date: event.target.value })),
+                  );
+                }}
+                className="border-border-light mt-2 min-h-12 w-full rounded-xl border px-3 font-normal"
+              />
+            </label>
+          ) : null}
+          <div className="mt-5 space-y-4">
             {schedules.map((schedule, index) => (
               <fieldset
                 key={schedule.examId}
                 className="border-border-light rounded-2xl border p-4"
               >
                 <legend className="px-2 font-bold">
-                  Exame {index + 1} — {schedule.name}
+                  {schedules.length > 1 ? `Exame ${index + 1} — ` : ""}
+                  {schedule.name}
                 </legend>
                 <div className="mt-2 grid gap-3 sm:grid-cols-2">
                   <label className="text-sm font-bold">
@@ -946,11 +1251,11 @@ export function ReceptionCenter({
                     <input
                       type="date"
                       value={schedule.date}
-                      onChange={(e) =>
+                      onChange={(event) =>
                         setSchedules((rows) =>
                           rows.map((row) =>
                             row.examId === schedule.examId
-                              ? { ...row, date: e.target.value }
+                              ? { ...row, date: event.target.value }
                               : row,
                           ),
                         )
@@ -963,11 +1268,11 @@ export function ReceptionCenter({
                     <input
                       type="time"
                       value={schedule.time}
-                      onChange={(e) =>
+                      onChange={(event) =>
                         setSchedules((rows) =>
                           rows.map((row) =>
                             row.examId === schedule.examId
-                              ? { ...row, time: e.target.value }
+                              ? { ...row, time: event.target.value }
                               : row,
                           ),
                         )
@@ -977,31 +1282,31 @@ export function ReceptionCenter({
                   </label>
                 </div>
                 <label className="mt-3 block text-sm font-bold">
-                  Preparo oficial — revise se necessário
+                  Preparo automático — revise se necessário
                   <textarea
                     value={schedule.preparation}
-                    onChange={(e) =>
+                    onChange={(event) =>
                       setSchedules((rows) =>
                         rows.map((row) =>
                           row.examId === schedule.examId
-                            ? { ...row, preparation: e.target.value }
+                            ? { ...row, preparation: event.target.value }
                             : row,
                         ),
                       )
                     }
-                    rows={4}
+                    rows={3}
                     className="border-border-light mt-1 w-full rounded-xl border p-3 font-normal"
                   />
                 </label>
                 <label className="mt-3 block text-sm font-bold">
-                  Documentos a levar — um por linha
+                  Documentos automáticos — um por linha
                   <textarea
                     value={schedule.documents}
-                    onChange={(e) =>
+                    onChange={(event) =>
                       setSchedules((rows) =>
                         rows.map((row) =>
                           row.examId === schedule.examId
-                            ? { ...row, documents: e.target.value }
+                            ? { ...row, documents: event.target.value }
                             : row,
                         ),
                       )
@@ -1014,18 +1319,22 @@ export function ReceptionCenter({
             ))}
           </div>
           <div className="bg-surface mt-5 rounded-2xl p-4 text-sm">
-            <strong>O paciente receberá:</strong>
+            <p className="font-bold">Prévia da confirmação</p>
+            <p className="mt-1">
+              Para: {selected.email} · Unidade: {selected.unit_name}
+            </p>
             {schedules.map((item) => (
-              <p key={item.examId} className="mt-2">
-                {item.name} ·{" "}
-                {item.date
-                  ? new Date(`${item.date}T12:00:00`).toLocaleDateString(
-                      "pt-BR",
-                    )
-                  : "data pendente"}{" "}
-                · {item.time || "horário pendente"} · preparo e documentos
-                acima.
-              </p>
+              <div key={item.examId} className="mt-3">
+                <strong>{item.name}</strong> ·{" "}
+                {item.date ? displayDate(item.date) : "data pendente"} ·{" "}
+                {item.time || "horário pendente"}
+                <p className="text-muted mt-1 whitespace-pre-line">
+                  Preparo:{" "}
+                  {item.preparation || "Sem preparo específico cadastrado."}
+                  <br />
+                  Documentos: {item.documents || "Nenhum documento adicional."}
+                </p>
+              </div>
             ))}
           </div>
           <button
@@ -1048,28 +1357,34 @@ export function ReceptionCenter({
             }
             className="bg-brand mt-6 min-h-12 w-full rounded-full font-bold text-white disabled:opacity-50"
           >
-            {saving ? "Salvando..." : "Confirmar agendamento e enviar"}
+            {saving ? "Salvando..." : "Confirmar agendamento e avisar paciente"}
           </button>
         </ModalShell>
       ) : null}
       {modal === "message" && selected ? (
-        <ModalShell title="Enviar mensagem" onClose={() => setModal(null)}>
-          <label className="mt-5 block text-sm font-bold">
+        <ModalShell title="Enviar e-mail" onClose={() => setModal(null)}>
+          <p className="mt-4 rounded-xl bg-slate-50 p-3 text-sm">
+            <strong>PARA</strong>
+            <br />
+            {selected.email}
+          </p>
+          <label className="mt-4 block text-sm font-bold">
             Modelo
             <select
               value={messageType}
-              onChange={(e) => {
-                const value = e.target.value;
+              onChange={(event) => {
+                const value = event.target.value;
                 setMessageType(value);
-                const title =
-                  value === "DOCUMENT_RECEIVED"
-                    ? "Documentação recebida — INNEURO"
-                    : value === "AUTHORIZED"
-                      ? "Autorização do pré-agendamento — INNEURO"
-                      : value === "SCHEDULE_CONFIRMED"
-                        ? "Agendamento — INNEURO"
-                        : "Orientação sobre seu pré-agendamento — INNEURO";
-                setMessageSubject(title);
+                const titles: Record<string, string> = {
+                  GUIDANCE: "Orientação sobre seu pré-agendamento — INNEURO",
+                  PENDING: "Pendência no pré-agendamento — INNEURO",
+                  INSURANCE_REJECTED: "Retorno do convênio — INNEURO",
+                  AUTHORIZED: "Autorização do pré-agendamento — INNEURO",
+                  DOCUMENT_RECEIVED: "Documentação recebida — INNEURO",
+                  SCHEDULE_CONFIRMED: "Agendamento — INNEURO",
+                  CUSTOM: "Mensagem da INNEURO",
+                };
+                setMessageSubject(titles[value]);
                 setMessageBody(
                   `Olá, ${selected.patient_name}.\n\nPROTOCOLO\n${selected.protocol}\n\n`,
                 );
@@ -1077,8 +1392,9 @@ export function ReceptionCenter({
               className="border-border-light mt-2 min-h-12 w-full rounded-xl border px-3 font-normal"
             >
               <option value="GUIDANCE">Orientação</option>
-              <option value="DOCUMENT_RECEIVED">Documentação recebida</option>
-              <option value="AUTHORIZED">Autorização</option>
+              <option value="PENDING">Pendência</option>
+              <option value="INSURANCE_REJECTED">Convênio</option>
+              <option value="DOCUMENT_RECEIVED">Documentação</option>
               <option value="SCHEDULE_CONFIRMED">Agendamento</option>
               <option value="CUSTOM">Mensagem personalizada</option>
             </select>
@@ -1087,7 +1403,7 @@ export function ReceptionCenter({
             Assunto
             <input
               value={messageSubject}
-              onChange={(e) => setMessageSubject(e.target.value)}
+              onChange={(event) => setMessageSubject(event.target.value)}
               className="border-border-light mt-2 min-h-12 w-full rounded-xl border px-3 font-normal"
             />
           </label>
@@ -1095,13 +1411,13 @@ export function ReceptionCenter({
             Mensagem
             <textarea
               value={messageBody}
-              onChange={(e) => setMessageBody(e.target.value)}
-              rows={9}
+              onChange={(event) => setMessageBody(event.target.value)}
+              rows={8}
               className="border-border-light mt-2 w-full rounded-xl border p-3 font-normal"
             />
           </label>
           <button
-            disabled={saving}
+            disabled={saving || !messageSubject.trim() || !messageBody.trim()}
             onClick={() =>
               act("manual", {
                 subject: messageSubject,
@@ -1112,7 +1428,7 @@ export function ReceptionCenter({
             className="bg-brand mt-5 min-h-12 w-full rounded-full font-bold text-white disabled:opacity-50"
           >
             <Send className="mr-2 inline" size={17} />
-            {saving ? "Enviando..." : "Enviar"}
+            {saving ? "Enviando..." : "Enviar e-mail"}
           </button>
         </ModalShell>
       ) : null}

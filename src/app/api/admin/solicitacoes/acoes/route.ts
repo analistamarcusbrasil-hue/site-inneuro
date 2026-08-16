@@ -3,6 +3,7 @@ import { getAdminSession } from "@/lib/cms/auth";
 import { hasAdminPermission } from "@/lib/admin/permissions";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { sanitizeSchedulingText } from "@/lib/scheduling/shared";
+import { hasValidSchedulingEmail } from "@/lib/scheduling/operations";
 import {
   buildConfirmationMessage,
   buildManualMessage,
@@ -72,8 +73,22 @@ export async function POST(request: Request) {
     .select("id")
     .eq("appointment_request_id", requestId)
     .contains("details", { operation_id: operationId })
+    .limit(1)
     .maybeSingle();
-  if (duplicate.data) return Response.json({ ok: true, duplicate: true });
+  if (duplicate.data && action !== "complete") {
+    const { data: current } = await admin
+      .from("appointment_requests")
+      .select("workflow_status,confirmation_status")
+      .eq("id", requestId)
+      .maybeSingle();
+    return Response.json({
+      ok: true,
+      duplicate: true,
+      removeFromActive:
+        current?.workflow_status === "CONCLUIDO" &&
+        !["PENDING", "FAILED"].includes(current?.confirmation_status ?? ""),
+    });
+  }
   const { data: appointment } = await admin
     .from("appointment_requests")
     .select("*,appointment_request_exams(*)")
@@ -112,6 +127,53 @@ export async function POST(request: Request) {
       })
       .eq("id", requestId);
     if (error) throw new Error("save_failed");
+  };
+  const formatDate = (value: string) =>
+    new Date(`${value}T12:00:00`).toLocaleDateString("pt-BR");
+  const confirmationMessage = (
+    schedules: Array<{
+      examId: string;
+      date: string;
+      time: string;
+      preparation: string;
+      documents: string[];
+    }>,
+  ) =>
+    buildConfirmationMessage({
+      name: appointment.patient_name,
+      protocol: appointment.protocol,
+      unit: appointment.unit_name,
+      exams: schedules.map((schedule) => ({
+        name:
+          appointment.appointment_request_exams.find(
+            (exam: { id: string }) => exam.id === schedule.examId,
+          )?.exam_name || "Exame",
+        date: formatDate(schedule.date),
+        time: schedule.time,
+        preparation: schedule.preparation,
+      })),
+      documents: [
+        ...new Set(schedules.flatMap((schedule) => schedule.documents)),
+      ],
+    });
+  const markConfirmation = async (
+    communication: { id: string; status: string } | null,
+  ) => {
+    const sent = communication?.status === "SENT";
+    const { error } = await admin
+      .from("appointment_requests")
+      .update({
+        confirmation_status: sent ? "SENT" : "FAILED",
+        confirmation_communication_id: communication?.id ?? null,
+        status: sent ? "COMPLETED" : "SCHEDULED",
+      })
+      .eq("id", requestId);
+    if (error) throw new Error("confirmation_status_save_failed");
+    await history(
+      sent ? "Confirmação enviada ao paciente" : "Falha ao enviar confirmação",
+      { communication_id: communication?.id ?? null },
+    );
+    return sent;
   };
   try {
     if (action === "claim") {
@@ -161,11 +223,8 @@ export async function POST(request: Request) {
       const guidance = sanitizeSchedulingText(body.guidance, 1200);
       if (!reason || !correction || !guidance)
         return response("Preencha a orientação ao paciente.", 400);
-      if (!appointment.email)
-        return response(
-          "Cadastre o e-mail do paciente antes de avisá-lo.",
-          400,
-        );
+      if (!hasValidSchedulingEmail(appointment.email))
+        return response("Corrija o e-mail do paciente antes de avisá-lo.", 400);
       const token = await createCorrectionToken(admin, requestId);
       const siteUrl =
         process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://inneuroap.com.br";
@@ -262,96 +321,123 @@ export async function POST(request: Request) {
         schedules.data.length !== appointment.appointment_request_exams.length
       )
         return response("Preencha data e horário de todos os exames.", 400);
-      if (!appointment.email)
-        return response(
-          "Cadastre o e-mail do paciente antes de concluir.",
-          400,
-        );
-      for (const schedule of schedules.data) {
-        const belongs = appointment.appointment_request_exams.some(
-          (exam: { id: string }) => exam.id === schedule.examId,
-        );
-        if (!belongs) return response("Exame inválido.", 400);
-        const { error } = await admin
-          .from("appointment_request_exams")
-          .update({
-            status: "SCHEDULED",
-            scheduled_date: schedule.date,
-            scheduled_time: `${schedule.time}:00`,
-            scheduled_period: null,
-            preparation_text: schedule.preparation,
-            documents_to_bring: schedule.documents,
-          })
-          .eq("id", schedule.examId)
-          .eq("appointment_request_id", requestId);
-        if (error) throw new Error("save_failed");
-      }
-      await setWorkflow("CONCLUIDO", {
-        completed_at: new Date().toISOString(),
-        documents_received_at: null,
-      });
-      await history("Agendamento concluído", {
-        exams: schedules.data.map(({ examId, date, time }) => ({
-          exam_id: examId,
-          date,
-          time,
-        })),
-      });
-      const formatDate = (value: string) =>
-        new Date(`${value}T12:00:00`).toLocaleDateString("pt-BR");
-      const message = buildConfirmationMessage({
-        name: appointment.patient_name,
-        protocol: appointment.protocol,
-        unit: appointment.unit_name,
-        exams: schedules.data.map((schedule) => ({
-          name:
-            appointment.appointment_request_exams.find(
-              (exam: { id: string }) => exam.id === schedule.examId,
-            )?.exam_name || "Exame",
-          date: formatDate(schedule.date),
-          time: schedule.time,
-          preparation: schedule.preparation,
-        })),
-        documents: [
-          ...new Set(schedules.data.flatMap((schedule) => schedule.documents)),
-        ],
-      });
-      const communication = await queueAndSendSchedulingCommunication({
-        admin,
-        requestId,
-        actorId: user.id,
-        type: "SCHEDULE_CONFIRMED",
-        recipient: appointment.email,
-        message,
-        idempotencyKey: `${requestId}:complete:${operationId}`,
-      });
-      await history(
-        communication?.status === "SENT"
-          ? "Confirmação enviada ao paciente"
-          : "Falha ao enviar confirmação",
+      if (!hasValidSchedulingEmail(appointment.email))
+        return response("Corrija o e-mail do paciente antes de concluir.", 400);
+      const { error: completionError } = await admin.rpc(
+        "prepare_appointment_completion",
+        {
+          p_request_id: requestId,
+          p_actor_id: user.id,
+          p_operation_id: operationId,
+          p_schedules: schedules.data,
+        },
       );
+      if (completionError) {
+        if (completionError.message.includes("another_attendant"))
+          return response("Esta solicitação está com outro atendente.", 409);
+        if (completionError.message.includes("not_authorized"))
+          return response("A solicitação não está autorizada.", 409);
+        throw completionError;
+      }
+      let communication: { id: string; status: string } | null = null;
+      try {
+        communication = await queueAndSendSchedulingCommunication({
+          admin,
+          requestId,
+          actorId: user.id,
+          type: "SCHEDULE_CONFIRMED",
+          recipient: appointment.email,
+          message: confirmationMessage(schedules.data),
+          idempotencyKey: `${requestId}:schedule-confirmation`,
+        });
+      } catch {
+        communication = null;
+      }
+      const sent = await markConfirmation(communication);
       return Response.json({
         ok: true,
-        message:
-          communication?.status === "SENT"
-            ? "Agendamento concluído e paciente avisado."
-            : "Agendamento concluído. O e-mail precisa ser reenviado.",
+        removeFromActive: sent,
+        message: sent
+          ? "Agendamento concluído e paciente avisado."
+          : "Agendamento salvo. A confirmação está pendente de reenvio.",
+      });
+    }
+    if (action === "retry_confirmation") {
+      if (!hasValidSchedulingEmail(appointment.email))
+        return response("Corrija o e-mail do paciente antes de reenviar.", 400);
+      if (appointment.workflow_status !== "CONCLUIDO")
+        return response("O agendamento ainda não foi concluído.", 409);
+      const savedSchedules = appointment.appointment_request_exams.map(
+        (exam: {
+          id: string;
+          scheduled_date: string | null;
+          scheduled_time: string | null;
+          preparation_text: string | null;
+          documents_to_bring: string[] | null;
+        }) => ({
+          examId: exam.id,
+          date: exam.scheduled_date ?? "",
+          time: exam.scheduled_time?.slice(0, 5) ?? "",
+          preparation: exam.preparation_text ?? "",
+          documents: exam.documents_to_bring ?? [],
+        }),
+      );
+      if (
+        savedSchedules.some(
+          (schedule: { date: string; time: string }) =>
+            !schedule.date || !schedule.time,
+        )
+      )
+        return response("Revise a data e o horário dos exames.", 409);
+      let communication: { id: string; status: string } | null = null;
+      try {
+        communication = await queueAndSendSchedulingCommunication({
+          admin,
+          requestId,
+          actorId: user.id,
+          type: "SCHEDULE_CONFIRMED",
+          recipient: appointment.email,
+          message: confirmationMessage(savedSchedules),
+          idempotencyKey: `${requestId}:schedule-confirmation`,
+        });
+      } catch {
+        communication = null;
+      }
+      const sent = await markConfirmation(communication);
+      return Response.json({
+        ok: true,
+        removeFromActive: sent,
+        message: sent
+          ? "Confirmação reenviada. Atendimento finalizado."
+          : "A confirmação continua pendente. Tente novamente.",
       });
     }
     if (action === "manual") {
-      if (!appointment.email)
-        return response("Cadastre o e-mail do paciente antes de enviar.", 400);
+      if (!hasValidSchedulingEmail(appointment.email))
+        return response("Corrija o e-mail do paciente antes de enviar.", 400);
       const subject = sanitizeSchedulingText(body.subject, 160),
         messageBody = String(body.message ?? "")
           .trim()
           .slice(0, 5000);
+      const type = z
+        .enum([
+          "PENDING",
+          "INSURANCE_REJECTED",
+          "AUTHORIZED",
+          "DOCUMENT_RECEIVED",
+          "SCHEDULE_CONFIRMED",
+          "GUIDANCE",
+          "CUSTOM",
+        ])
+        .safeParse(body.type);
       if (!subject || !messageBody)
         return response("Preencha assunto e mensagem.", 400);
+      if (!type.success) return response("Modelo de mensagem inválido.", 400);
       const communication = await queueAndSendSchedulingCommunication({
         admin,
         requestId,
         actorId: user.id,
-        type: sanitizeSchedulingText(body.type, 40) || "CUSTOM",
+        type: type.data,
         recipient: appointment.email,
         message: buildManualMessage({ subject, body: messageBody }),
         idempotencyKey: `${requestId}:manual:${operationId}`,
@@ -373,11 +459,30 @@ export async function POST(request: Request) {
     if (action === "retry") {
       const communicationId = z.string().uuid().safeParse(body.communicationId);
       if (!communicationId.success) return response("Mensagem inválida.", 400);
-      await retrySchedulingCommunication(communicationId.data);
+      const { data: communication } = await admin
+        .from("appointment_request_communications")
+        .select("id,communication_type")
+        .eq("id", communicationId.data)
+        .eq("appointment_request_id", requestId)
+        .maybeSingle();
+      if (!communication) return response("Mensagem inválida.", 404);
+      const retried = await retrySchedulingCommunication(communicationId.data);
+      if (communication.communication_type === "SCHEDULE_CONFIRMED") {
+        await markConfirmation(retried);
+      }
       await history("Reenvio de mensagem solicitado", {
         communication_id: communicationId.data,
       });
-      return Response.json({ ok: true, message: "Reenvio processado." });
+      return Response.json({
+        ok: true,
+        removeFromActive:
+          communication.communication_type === "SCHEDULE_CONFIRMED" &&
+          retried?.status === "SENT",
+        message:
+          retried?.status === "SENT"
+            ? "Reenvio concluído."
+            : "O reenvio continua pendente.",
+      });
     }
     return response("Ação inválida.", 400);
   } catch {
