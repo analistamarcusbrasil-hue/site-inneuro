@@ -11,7 +11,12 @@ import {
   candidateExperienceSchema,
   candidateSkillSchema,
 } from "@/lib/careers/profile-validation";
-import { resumeExtractionRecordSchema } from "@/lib/careers/resume-extraction";
+import {
+  isCompleteResumeCertification,
+  isCompleteResumeEducation,
+  isCompleteResumeExperience,
+  resumeExtractionRecordSchema,
+} from "@/lib/careers/resume-extraction";
 
 const reviewPath = "/carreiras/perfil/revisar-curriculo";
 const extractionIdSchema = z.string().uuid();
@@ -101,6 +106,16 @@ export async function applyResumeExtractionAction(formData: FormData) {
     {
       candidate_id: user.id,
     };
+  const applyAll = value(formData, "apply_all") === "true";
+  const extractedPersonalValues: Record<string, string | null> = {
+    full_name: extraction.extracted_data.fullName,
+    email: extraction.extracted_data.email,
+    whatsapp: extraction.extracted_data.whatsapp,
+    city: extraction.extracted_data.city,
+    state: extraction.extracted_data.state,
+    professional_objective: extraction.extracted_data.professionalObjective,
+    about: extraction.extracted_data.about,
+  };
   let selectedCount = 0;
 
   const personalFields = [
@@ -173,14 +188,25 @@ export async function applyResumeExtractionAction(formData: FormData) {
   let validatedSelectionCount = 0;
 
   for (const [field, schema] of personalFields) {
-    if (!checked(formData, `accept_${field}`)) continue;
+    if (
+      applyAll
+        ? !extractedPersonalValues[field]
+        : !checked(formData, `accept_${field}`)
+    )
+      continue;
     if (!schema.safeParse(value(formData, field)).success) {
       fail(extractionId, "validation");
     }
     validatedSelectionCount += 1;
   }
   for (let index = 0; index < experienceCount; index += 1) {
-    if (!checked(formData, `experience_${index}_enabled`)) continue;
+    if (!applyAll && !checked(formData, `experience_${index}_enabled`))
+      continue;
+    if (
+      applyAll &&
+      !isCompleteResumeExperience(extraction.extracted_data.experiences[index])
+    )
+      continue;
     const parsed = candidateExperienceSchema.safeParse({
       company: value(formData, `experience_${index}_company`),
       jobTitle: value(formData, `experience_${index}_job_title`),
@@ -193,7 +219,12 @@ export async function applyResumeExtractionAction(formData: FormData) {
     validatedSelectionCount += 1;
   }
   for (let index = 0; index < educationCount; index += 1) {
-    if (!checked(formData, `education_${index}_enabled`)) continue;
+    if (!applyAll && !checked(formData, `education_${index}_enabled`)) continue;
+    if (
+      applyAll &&
+      !isCompleteResumeEducation(extraction.extracted_data.education[index])
+    )
+      continue;
     const parsed = candidateEducationSchema.safeParse({
       educationLevel: value(formData, `education_${index}_level`),
       course: value(formData, `education_${index}_course`),
@@ -206,7 +237,15 @@ export async function applyResumeExtractionAction(formData: FormData) {
     validatedSelectionCount += 1;
   }
   for (let index = 0; index < certificationCount; index += 1) {
-    if (!checked(formData, `certification_${index}_enabled`)) continue;
+    if (!applyAll && !checked(formData, `certification_${index}_enabled`))
+      continue;
+    if (
+      applyAll &&
+      !isCompleteResumeCertification(
+        extraction.extracted_data.certifications[index],
+      )
+    )
+      continue;
     const parsed = candidateCertificationSchema.safeParse({
       name: value(formData, `certification_${index}_name`),
       institution: value(formData, `certification_${index}_institution`),
@@ -217,7 +256,7 @@ export async function applyResumeExtractionAction(formData: FormData) {
     validatedSelectionCount += 1;
   }
   for (let index = 0; index < skillCount; index += 1) {
-    if (!checked(formData, `skill_${index}_enabled`)) continue;
+    if (!applyAll && !checked(formData, `skill_${index}_enabled`)) continue;
     if (
       !candidateSkillSchema.safeParse({
         name: value(formData, `skill_${index}_name`),
@@ -230,7 +269,12 @@ export async function applyResumeExtractionAction(formData: FormData) {
   if (!validatedSelectionCount) fail(extractionId, "nothing-selected");
 
   for (const [field, schema] of personalFields) {
-    if (!checked(formData, `accept_${field}`)) continue;
+    if (
+      applyAll
+        ? !extractedPersonalValues[field]
+        : !checked(formData, `accept_${field}`)
+    )
+      continue;
     const parsed = schema.safeParse(value(formData, field));
     if (!parsed.success) fail(extractionId, "validation");
     selectedCount += 1;
@@ -271,7 +315,13 @@ export async function applyResumeExtractionAction(formData: FormData) {
     .select("id", { count: "exact", head: true })
     .eq("candidate_id", user.id);
   for (let index = 0; index < experienceCount; index += 1) {
-    if (!checked(formData, `experience_${index}_enabled`)) continue;
+    if (!applyAll && !checked(formData, `experience_${index}_enabled`))
+      continue;
+    if (
+      applyAll &&
+      !isCompleteResumeExperience(extraction.extracted_data.experiences[index])
+    )
+      continue;
     const parsed = candidateExperienceSchema.safeParse({
       company: value(formData, `experience_${index}_company`),
       jobTitle: value(formData, `experience_${index}_job_title`),
@@ -308,7 +358,12 @@ export async function applyResumeExtractionAction(formData: FormData) {
     .select("id", { count: "exact", head: true })
     .eq("candidate_id", user.id);
   for (let index = 0; index < educationCount; index += 1) {
-    if (!checked(formData, `education_${index}_enabled`)) continue;
+    if (!applyAll && !checked(formData, `education_${index}_enabled`)) continue;
+    if (
+      applyAll &&
+      !isCompleteResumeEducation(extraction.extracted_data.education[index])
+    )
+      continue;
     const parsed = candidateEducationSchema.safeParse({
       educationLevel: value(formData, `education_${index}_level`),
       course: value(formData, `education_${index}_course`),
@@ -345,7 +400,15 @@ export async function applyResumeExtractionAction(formData: FormData) {
     .select("id", { count: "exact", head: true })
     .eq("candidate_id", user.id);
   for (let index = 0; index < certificationCount; index += 1) {
-    if (!checked(formData, `certification_${index}_enabled`)) continue;
+    if (!applyAll && !checked(formData, `certification_${index}_enabled`))
+      continue;
+    if (
+      applyAll &&
+      !isCompleteResumeCertification(
+        extraction.extracted_data.certifications[index],
+      )
+    )
+      continue;
     const parsed = candidateCertificationSchema.safeParse({
       name: value(formData, `certification_${index}_name`),
       institution: value(formData, `certification_${index}_institution`),
@@ -385,7 +448,7 @@ export async function applyResumeExtractionAction(formData: FormData) {
     .select("id", { count: "exact", head: true })
     .eq("candidate_id", user.id);
   for (let index = 0; index < skillCount; index += 1) {
-    if (!checked(formData, `skill_${index}_enabled`)) continue;
+    if (!applyAll && !checked(formData, `skill_${index}_enabled`)) continue;
     const parsed = candidateSkillSchema.safeParse({
       name: value(formData, `skill_${index}_name`),
     });

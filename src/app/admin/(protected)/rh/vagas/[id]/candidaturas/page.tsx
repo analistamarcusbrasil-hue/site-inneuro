@@ -5,26 +5,17 @@ import { AdminPageHeading } from "@/components/admin/admin-page-heading";
 import { HrNavigation } from "@/components/admin/hr-navigation";
 import {
   applicationStatusLabels,
-  formatApplicationDate,
+  candidateStageLabels,
   type ApplicationStatus,
+  type CareerJobApplication,
 } from "@/lib/careers/applications";
 import { requireHrAccess } from "@/lib/careers/hr-auth";
-
-type ApplicationListRow = {
-  id: string;
-  status: ApplicationStatus;
-  process_label: string | null;
-  submitted_at: string;
-  candidate: { id: string; full_name: string } | null;
-};
-
-type MatchRunRow = {
-  application_id: string;
-  overall_score: number;
-  hard_skills_score: number;
-  matrix_version: number;
-  calculated_at: string;
-};
+import {
+  buildJobCandidateReportRows,
+  filterAndSortJobCandidateReport,
+  summarizeJobCandidateReport,
+  type JobCandidateReportFilters,
+} from "@/lib/careers/job-candidate-report";
 
 const statusClasses: Record<ApplicationStatus, string> = {
   submitted: "bg-sky-100 text-sky-800",
@@ -34,62 +25,100 @@ const statusClasses: Record<ApplicationStatus, string> = {
   withdrawn: "bg-rose-100 text-rose-800",
 };
 
+const bandClasses = {
+  high: "bg-emerald-100 text-emerald-800",
+  intermediate: "bg-amber-100 text-amber-800",
+  review: "bg-slate-100 text-slate-700",
+};
+
+const selectClass =
+  "border-border-light min-h-11 rounded-xl border bg-white px-3 text-sm";
+
 export default async function CareerJobApplicationsPage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; ordem?: string }>;
+  searchParams: Promise<{
+    erro?: string;
+    ordem?: string;
+    escolaridade?: string;
+    atendimento?: string;
+    funcao?: string;
+    etapa?: string;
+  }>;
 }) {
   const { id } = await params;
   if (!z.string().uuid().safeParse(id).success) notFound();
+  const query = await searchParams;
   const { supabase } = await requireHrAccess("jobs:manage");
   const [jobResult, applicationsResult] = await Promise.all([
     supabase.from("career_jobs").select("id, title").eq("id", id).maybeSingle(),
     supabase
       .from("career_job_applications")
       .select(
-        "id, status, process_label, submitted_at, candidate:candidate_accounts(id, full_name)",
+        "id, candidate_id, status, candidate_stage, profile_snapshot, submitted_at",
       )
       .eq("job_id", id)
       .order("submitted_at", { ascending: false }),
   ]);
   if (jobResult.error || !jobResult.data) notFound();
   const applications =
-    (applicationsResult.data as unknown as ApplicationListRow[] | null) ?? [];
-  const query = await searchParams;
-  const matchRunsResult = applications.length
-    ? await supabase
-        .from("career_application_match_runs")
-        .select(
-          "application_id, overall_score, hard_skills_score, matrix_version, calculated_at",
-        )
-        .in(
-          "application_id",
-          applications.map((application) => application.id),
-        )
-        .order("calculated_at", { ascending: false })
-    : { data: [] as MatchRunRow[], error: null };
-  const latestMatchByApplication = new Map<string, MatchRunRow>();
-  for (const run of (matchRunsResult.data as MatchRunRow[] | null) ?? []) {
-    if (!latestMatchByApplication.has(run.application_id)) {
-      latestMatchByApplication.set(run.application_id, run);
-    }
-  }
-  const orderedApplications = [...applications].sort((a, b) => {
-    if (query.ordem !== "aderencia") return 0;
-    return (
-      (latestMatchByApplication.get(b.id)?.overall_score ?? -1) -
-      (latestMatchByApplication.get(a.id)?.overall_score ?? -1)
-    );
+    (applicationsResult.data as CareerJobApplication[] | null) ?? [];
+  const candidateIds = [
+    ...new Set(applications.map((item) => item.candidate_id)),
+  ];
+  const applicationIds = applications.map((item) => item.id);
+  const [matchRunsResult, resumesResult] = await Promise.all([
+    applicationIds.length
+      ? supabase
+          .from("career_application_match_runs")
+          .select("application_id, overall_score, result, calculated_at")
+          .in("application_id", applicationIds)
+          .order("calculated_at", { ascending: false })
+      : Promise.resolve({ data: [], error: null }),
+    candidateIds.length
+      ? supabase
+          .from("candidate_resumes")
+          .select("id, candidate_id, version")
+          .in("candidate_id", candidateIds)
+          .order("version", { ascending: false })
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  const reportRows = buildJobCandidateReportRows({
+    applications,
+    matchRuns: matchRunsResult.data ?? [],
+    resumes: resumesResult.data ?? [],
+    jobTitle: jobResult.data.title,
   });
+  const summary = summarizeJobCandidateReport(reportRows);
+  const filters: JobCandidateReportFilters = {
+    sort: ["match", "date", "name"].includes(query.ordem ?? "")
+      ? (query.ordem as JobCandidateReportFilters["sort"])
+      : "date",
+    education: ["informed", "not_identified"].includes(query.escolaridade ?? "")
+      ? (query.escolaridade as JobCandidateReportFilters["education"])
+      : undefined,
+    customerService: ["yes", "not_identified"].includes(query.atendimento ?? "")
+      ? (query.atendimento as JobCandidateReportFilters["customerService"])
+      : undefined,
+    similarRole: ["yes", "not_identified"].includes(query.funcao ?? "")
+      ? (query.funcao as JobCandidateReportFilters["similarRole"])
+      : undefined,
+    stage: Object.hasOwn(candidateStageLabels, query.etapa ?? "")
+      ? (query.etapa as JobCandidateReportFilters["stage"])
+      : undefined,
+  };
+  const rows = filterAndSortJobCandidateReport(reportRows, filters);
+  const hasError =
+    applicationsResult.error || matchRunsResult.error || resumesResult.error;
 
   return (
     <>
       <AdminPageHeading
         eyebrow="RH / Vagas / Candidaturas"
-        title={jobResult.data.title}
-        description="Consulte os inscritos e abra o snapshot profissional enviado em cada candidatura."
+        title={`Perfis dos candidatos — ${jobResult.data.title}`}
+        description="Compare informações profissionais confirmadas no perfil e consulte a aderência explicável aos requisitos desta vaga."
       />
       <HrNavigation current="jobs" canManageJobs canManageCandidates />
 
@@ -104,97 +133,226 @@ export default async function CareerJobApplicationsPage({
           className="border-brand/30 text-brand-dark inline-flex min-h-11 items-center rounded-full border px-5 text-sm font-bold"
           href={`/admin/rh/vagas/${id}/aderencia`}
         >
-          Configurar matriz
-        </Link>
-        <Link
-          className="border-brand/30 text-brand-dark inline-flex min-h-11 items-center rounded-full border px-5 text-sm font-bold"
-          href={
-            query.ordem === "aderencia"
-              ? `/admin/rh/vagas/${id}/candidaturas`
-              : `/admin/rh/vagas/${id}/candidaturas?ordem=aderencia`
-          }
-        >
-          {query.ordem === "aderencia"
-            ? "Ordenar por data"
-            : "Ordenar por aderência"}
+          Configurar critérios da vaga
         </Link>
       </div>
 
+      <section
+        aria-label="Resumo das candidaturas"
+        className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+      >
+        {[
+          ["Candidatos", summary.total],
+          ["Alta aderência", summary.high],
+          ["Aderência intermediária", summary.intermediate],
+          ["Requer análise", summary.review],
+        ].map(([label, count]) => (
+          <article
+            key={String(label)}
+            className="border-border-light rounded-2xl border bg-white p-5"
+          >
+            <p className="text-muted text-xs font-bold tracking-wide uppercase">
+              {label}
+            </p>
+            <p className="font-heading text-brand-dark mt-2 text-3xl font-semibold">
+              {count}
+            </p>
+          </article>
+        ))}
+      </section>
+
       <aside className="border-brand/20 bg-mint/60 text-brand-dark mb-6 rounded-2xl border p-4 text-sm">
-        Indicador de apoio à triagem. A decisão final é responsabilidade do RH.
+        <strong>Indicador de apoio à triagem:</strong> usa somente requisitos
+        profissionais da vaga e informações confirmadas pelo candidato. “Não
+        identificado” não significa “não atende” e não gera decisão automática.
       </aside>
 
-      {query.error || applicationsResult.error || matchRunsResult.error ? (
+      <form className="border-border-light mb-6 grid gap-4 rounded-2xl border bg-white p-5 md:grid-cols-3 xl:grid-cols-6">
+        <label className="text-ink grid gap-2 text-xs font-bold">
+          Ordenar por
+          <select
+            className={selectClass}
+            name="ordem"
+            defaultValue={filters.sort}
+          >
+            <option value="date">Data da candidatura</option>
+            <option value="match">Aderência</option>
+            <option value="name">Nome</option>
+          </select>
+        </label>
+        <label className="text-ink grid gap-2 text-xs font-bold">
+          Escolaridade
+          <select
+            className={selectClass}
+            name="escolaridade"
+            defaultValue={filters.education ?? ""}
+          >
+            <option value="">Todas</option>
+            <option value="informed">Informada</option>
+            <option value="not_identified">Não identificada</option>
+          </select>
+        </label>
+        <label className="text-ink grid gap-2 text-xs font-bold">
+          Atendimento
+          <select
+            className={selectClass}
+            name="atendimento"
+            defaultValue={filters.customerService ?? ""}
+          >
+            <option value="">Todos</option>
+            <option value="yes">Experiência identificada</option>
+            <option value="not_identified">Não identificada</option>
+          </select>
+        </label>
+        <label className="text-ink grid gap-2 text-xs font-bold">
+          Função semelhante
+          <select
+            className={selectClass}
+            name="funcao"
+            defaultValue={filters.similarRole ?? ""}
+          >
+            <option value="">Todas</option>
+            <option value="yes">Experiência identificada</option>
+            <option value="not_identified">Não identificada</option>
+          </select>
+        </label>
+        <label className="text-ink grid gap-2 text-xs font-bold">
+          Etapa da seleção
+          <select
+            className={selectClass}
+            name="etapa"
+            defaultValue={filters.stage ?? ""}
+          >
+            <option value="">Todas</option>
+            {Object.entries(candidateStageLabels).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button className="bg-brand hover:bg-brand-dark min-h-11 self-end rounded-full px-5 text-sm font-bold text-white">
+          Aplicar filtros
+        </button>
+      </form>
+
+      {hasError ? (
         <p
           role="alert"
           className="bg-error/10 text-error rounded-2xl p-5 font-bold"
         >
-          Não foi possível carregar as candidaturas.
+          Não foi possível carregar todos os dados das candidaturas.
         </p>
-      ) : applications.length ? (
-        <ul className="grid gap-4">
-          {orderedApplications.map((application) => {
-            const match = latestMatchByApplication.get(application.id);
-            return (
-              <li key={application.id}>
-                <Link
-                  href={`/admin/rh/vagas/${id}/candidaturas/${application.id}`}
-                  className="border-border-light hover:border-brand group block rounded-3xl border bg-white p-5 transition-colors sm:p-6"
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div>
-                      <h2 className="font-heading text-brand-dark text-xl font-semibold">
-                        {application.candidate?.full_name ??
-                          "Candidato indisponível"}
-                      </h2>
-                      <p className="text-muted mt-2 text-sm">
-                        Enviada em{" "}
-                        {formatApplicationDate(application.submitted_at)}
-                      </p>
-                      {application.process_label ? (
-                        <p className="text-muted mt-1 text-sm">
-                          Processo: {application.process_label}
-                        </p>
-                      ) : null}
-                    </div>
-                    <span
-                      className={`rounded-full px-3 py-1 text-xs font-bold ${statusClasses[application.status]}`}
+      ) : rows.length ? (
+        <div className="border-border-light overflow-x-auto rounded-3xl border bg-white">
+          <table className="w-full min-w-[1380px] text-left text-sm">
+            <thead className="bg-surface text-brand-dark text-xs uppercase">
+              <tr>
+                {[
+                  "Nome",
+                  "Escolaridade",
+                  "Experiência relevante",
+                  "Experiência em atendimento",
+                  "Experiência em função semelhante",
+                  "Disponibilidade",
+                  "Principais competências",
+                  "Status",
+                  "Currículo PDF",
+                  "Aderência aos requisitos da vaga",
+                ].map((heading) => (
+                  <th key={heading} className="px-4 py-4 font-bold">
+                    {heading}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-border-light divide-y">
+              {rows.map((row) => (
+                <tr key={row.applicationId} className="align-top">
+                  <td className="px-4 py-4">
+                    <Link
+                      className="text-brand font-bold hover:underline"
+                      href={`/admin/rh/vagas/${id}/candidaturas/${row.applicationId}`}
                     >
-                      {applicationStatusLabels[application.status]}
+                      {row.name}
+                    </Link>
+                    <span className="text-muted mt-1 block text-xs">
+                      {candidateStageLabels[row.stage]}
                     </span>
-                  </div>
-                  {match ? (
-                    <div className="border-border-light mt-5 flex flex-wrap gap-3 border-t pt-4 text-xs">
-                      <span className="bg-mint text-brand-dark rounded-full px-3 py-1 font-bold">
-                        Aderência à vaga: {match.overall_score}%
+                  </td>
+                  <td className="px-4 py-4">{row.education}</td>
+                  <td className="max-w-64 px-4 py-4">
+                    {row.relevantExperience}
+                  </td>
+                  <td className="px-4 py-4">
+                    {row.hasCustomerServiceExperience
+                      ? "Identificada"
+                      : "Não identificado"}
+                  </td>
+                  <td className="px-4 py-4">
+                    {row.hasSimilarRoleExperience
+                      ? "Identificada"
+                      : "Não identificado"}
+                  </td>
+                  <td className="max-w-56 px-4 py-4">{row.availability}</td>
+                  <td className="max-w-56 px-4 py-4">
+                    {row.skills.length
+                      ? row.skills.join(", ")
+                      : "Não identificado"}
+                  </td>
+                  <td className="px-4 py-4">
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-bold ${statusClasses[row.status]}`}
+                    >
+                      {applicationStatusLabels[row.status]}
+                    </span>
+                  </td>
+                  <td className="px-4 py-4">
+                    {row.resumeId ? (
+                      <a
+                        className="text-brand font-bold hover:underline"
+                        href={`/api/admin/rh/curriculos/${row.resumeId}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Visualizar original
+                      </a>
+                    ) : (
+                      "Não enviado"
+                    )}
+                  </td>
+                  <td className="px-4 py-4">
+                    <span
+                      className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${bandClasses[row.band]}`}
+                    >
+                      {row.matchScore === null
+                        ? "Não calculada"
+                        : `${row.matchScore}%`}
+                    </span>
+                    {row.match ? (
+                      <span className="text-muted mt-2 block text-xs">
+                        Cobertura das informações: {row.informationCoverage}% ·{" "}
+                        {
+                          row.match.items.filter(
+                            (item) => item.status === "not_informed",
+                          ).length
+                        }{" "}
+                        requisito(s) não identificado(s)
                       </span>
-                      <span className="bg-surface text-muted rounded-full px-3 py-1 font-bold">
-                        Hard skills: {match.hard_skills_score}%
-                      </span>
-                      <span className="text-muted self-center">
-                        Matriz v{match.matrix_version}
-                      </span>
-                    </div>
-                  ) : (
-                    <p className="text-muted mt-5 text-xs">
-                      Aderência ainda não calculada.
-                    </p>
-                  )}
-                  <p className="text-brand mt-5 text-sm font-bold group-hover:underline">
-                    Abrir candidatura
-                  </p>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+                    ) : null}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : (
         <section className="border-border-light rounded-3xl border bg-white p-8 text-center">
           <h2 className="font-heading text-brand-dark text-xl font-semibold">
-            Nenhuma candidatura
+            Nenhum perfil encontrado
           </h2>
           <p className="text-muted mt-2 text-sm">
-            Os inscritos nesta vaga aparecerão aqui.
+            Ajuste os filtros ou aguarde novas candidaturas.
           </p>
         </section>
       )}

@@ -100,7 +100,13 @@ export const matchResultItemSchema = z.object({
   key: z.enum(matchCriterionKeys),
   label: z.string().max(120),
   weight: z.number().int().min(0).max(100),
-  status: z.enum(["attended", "not_informed", "requires_validation"]),
+  status: z.enum([
+    "attended",
+    "differential",
+    "not_attended",
+    "not_informed",
+    "requires_validation",
+  ]),
   score: z.number().int().min(0).max(100),
   weightedScore: z.number().min(0).max(100),
   evidence: z.array(matchEvidenceSchema).max(5),
@@ -110,6 +116,7 @@ export const matchResultItemSchema = z.object({
 export const matchResultSchema = z.object({
   overallScore: z.number().int().min(0).max(100),
   hardSkillsScore: z.number().int().min(0).max(100),
+  informationCoverage: z.number().int().min(0).max(100).default(100),
   items: z
     .array(matchResultItemSchema)
     .min(matchCriterionKeys.length - 1)
@@ -121,10 +128,40 @@ export type ExplainableMatchResult = z.infer<typeof matchResultSchema>;
 export type MatchResultItem = z.infer<typeof matchResultItemSchema>;
 
 export const matchStatusLabels: Record<MatchResultItem["status"], string> = {
-  attended: "Atendido",
-  not_informed: "Não informado",
-  requires_validation: "Requer validação",
+  attended: "ATENDE",
+  differential: "DIFERENCIAL IDENTIFICADO",
+  not_attended: "NÃO ATENDE",
+  not_informed: "NÃO IDENTIFICADO",
+  requires_validation: "INFORMADA — REQUER VALIDAÇÃO",
 };
+
+export type MatchAdherenceBand = "high" | "intermediate" | "review";
+
+export const matchAdherenceBandLabels: Record<MatchAdherenceBand, string> = {
+  high: "Alta aderência",
+  intermediate: "Aderência intermediária",
+  review: "Requer análise",
+};
+
+export function getMatchAdherenceBand(
+  score: number | null | undefined,
+  informationCoverage = 100,
+) {
+  if (score === null || score === undefined || informationCoverage < 40)
+    return "review";
+  if (score >= 75 && informationCoverage >= 70) return "high";
+  if (score >= 50) return "intermediate";
+  return "review";
+}
+
+export function calculateMatchInformationCoverage(items: MatchResultItem[]) {
+  const totalWeight = items.reduce((total, item) => total + item.weight, 0);
+  if (!totalWeight) return 0;
+  const informedWeight = items
+    .filter((item) => item.status !== "not_informed")
+    .reduce((total, item) => total + item.weight, 0);
+  return Math.round((informedWeight / totalWeight) * 100);
+}
 
 const stopWords = new Set([
   "a",
@@ -380,7 +417,9 @@ export function calculateExplainableMatch({
       ? "not_informed"
       : requiresOfficialValidation || score < 60
         ? "requires_validation"
-        : "attended";
+        : criterion.key === "related_experience"
+          ? "differential"
+          : "attended";
     const pointsToVerify: string[] = [];
     if (!sources.length) {
       pointsToVerify.push(
@@ -404,12 +443,23 @@ export function calculateExplainableMatch({
       pointsToVerify,
     };
   });
-  const overallScore = Math.round(
-    items.reduce((total, item) => total + item.weightedScore, 0),
+  const informedItems = items.filter((item) => item.status !== "not_informed");
+  const informedWeight = informedItems.reduce(
+    (total, item) => total + item.weight,
+    0,
   );
+  const overallScore = informedWeight
+    ? Math.round(
+        (informedItems.reduce((total, item) => total + item.weightedScore, 0) /
+          informedWeight) *
+          100,
+      )
+    : 0;
+  const informationCoverage = calculateMatchInformationCoverage(items);
   return matchResultSchema.parse({
     overallScore,
     hardSkillsScore,
+    informationCoverage,
     items,
     sourcePolicy: "confirmed_application_snapshot",
   });

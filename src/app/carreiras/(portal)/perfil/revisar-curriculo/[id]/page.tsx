@@ -14,6 +14,9 @@ import {
 } from "@/lib/careers/profile-validation";
 import {
   buildResumeFieldConflicts,
+  isCompleteResumeCertification,
+  isCompleteResumeEducation,
+  isCompleteResumeExperience,
   resumeExtractionRecordSchema,
 } from "@/lib/careers/resume-extraction";
 
@@ -65,7 +68,7 @@ function ChoiceCard({
           className="accent-brand mt-0.5 size-4 shrink-0"
           type="checkbox"
           name={`accept_${name}`}
-          defaultChecked
+          defaultChecked={!conflict}
         />
         <span>
           Usar {label.toLocaleLowerCase("pt-BR")}
@@ -78,11 +81,11 @@ function ChoiceCard({
       </label>
       {current ? (
         <p className="bg-surface text-muted mt-3 rounded-xl p-3 text-xs">
-          <strong className="text-ink">Informado atualmente:</strong> {current}
+          <strong className="text-ink">Valor atual:</strong> {current}
         </p>
       ) : null}
       <label className="text-ink mt-3 block text-sm font-bold">
-        {label}
+        Identificado no currículo — {label}
         {children}
       </label>
     </fieldset>
@@ -352,7 +355,7 @@ export default async function ResumeReviewPage({
                       className="accent-brand size-4"
                       type="checkbox"
                       name={`experience_${index}_enabled`}
-                      defaultChecked
+                      defaultChecked={isCompleteResumeExperience(item)}
                     />
                     Adicionar esta experiência
                   </label>
@@ -439,7 +442,7 @@ export default async function ResumeReviewPage({
                       className="accent-brand size-4"
                       type="checkbox"
                       name={`education_${index}_enabled`}
-                      defaultChecked
+                      defaultChecked={isCompleteResumeEducation(item)}
                     />
                     Adicionar esta formação
                   </label>
@@ -530,7 +533,7 @@ export default async function ResumeReviewPage({
                       className="accent-brand size-4"
                       type="checkbox"
                       name={`certification_${index}_enabled`}
-                      defaultChecked
+                      defaultChecked={isCompleteResumeCertification(item)}
                     />
                     Adicionar este curso ou certificação
                   </label>
@@ -612,6 +615,14 @@ export default async function ResumeReviewPage({
           <div className="flex flex-col gap-3 sm:flex-row">
             <button className="bg-brand hover:bg-brand-dark focus-visible:ring-tech min-h-12 rounded-full px-7 font-bold text-white focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none">
               Confirmar informações selecionadas
+            </button>
+            <button
+              className="border-brand/30 text-brand-dark hover:bg-mint min-h-12 rounded-full border px-7 font-bold"
+              type="submit"
+              name="apply_all"
+              value="true"
+            >
+              Aplicar todas as informações identificadas
             </button>
             <a
               className="border-brand/30 text-brand-dark hover:bg-mint inline-flex min-h-12 items-center justify-center rounded-full border px-7 font-bold"

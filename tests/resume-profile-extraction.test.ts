@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { extractText, getDocumentProxy } from "unpdf";
 import {
+  assessResumeText,
   buildResumeFieldConflicts,
   countExtractedResumeFields,
   parseResumeText,
@@ -121,6 +122,67 @@ test("conflitos mostram diferenças sem alterar o perfil", () => {
   );
 });
 
+test("aceita títulos alternativos, colunas e períodos em formatos brasileiros", () => {
+  const result = parseResumeText(`
+Ana Paula Ribeiro                         ana.ribeiro@example.com
+(96) 99123-4567                          Macapá/AP
+SÍNTESE PROFISSIONAL
+Profissional organizada com experiência em atendimento ao público.
+HISTÓRICO PROFISSIONAL
+Recepcionista | Clínica Horizonte | mar/2022 - atual
+Recepção de pacientes, orientação e organização do fluxo de atendimento.
+Assistente administrativa | Empresa Norte | 2019 a 2021
+Atendimento presencial e apoio a documentos.
+FORMAÇÃO ESCOLAR
+Ensino Médio Completo | Escola Estadual Central | 2018
+CURSOS COMPLEMENTARES
+Excel Avançado | SENAC | 2023
+Atendimento ao Cliente | SENAI | 2022
+PRINCIPAIS COMPETÊNCIAS
+Comunicação • Organização • Cordialidade • Atendimento
+`);
+  assert.equal(result.fullName, "Ana Paula Ribeiro");
+  assert.equal(result.email, "ana.ribeiro@example.com");
+  assert.equal(result.state, "AP");
+  assert.equal(result.experiences.length, 2);
+  assert.equal(result.experiences[0].jobTitle, "Recepcionista");
+  assert.equal(result.experiences[0].startMonth, "2022-03");
+  assert.equal(result.education[0].educationLevel, "Ensino médio");
+  assert.equal(result.education[0].institution, "Escola Estadual Central");
+  assert.equal(result.certifications.length, 2);
+  assert.deepEqual(result.skills, [
+    "Comunicação",
+    "Organização",
+    "Cordialidade",
+    "Atendimento",
+  ]);
+});
+
+test("remove informações repetidas sem perder a primeira grafia", () => {
+  const result = parseResumeText(`
+Marina Lopes
+marina@example.com
+Habilidades
+Atendimento, atendimento, Organização, organização
+Cursos
+Excel | SENAC | 2024
+Excel | SENAC | 2024
+`);
+  assert.deepEqual(result.skills, ["Atendimento", "Organização"]);
+  assert.equal(result.certifications.length, 1);
+});
+
+test("diferencia PDF escaneado, texto insuficiente e currículo textual", () => {
+  assert.equal(assessResumeText("").quality, "image_only");
+  assert.equal(assessResumeText("Maria Silva").quality, "insufficient");
+  assert.equal(
+    assessResumeText(
+      "Maria Silva possui experiência profissional em atendimento ao público, organização de documentos e rotinas administrativas desde 2020.",
+    ).quality,
+    "native_text",
+  );
+});
+
 test("PDF inválido é rejeitado pelo leitor", async () => {
   await assert.rejects(() =>
     getDocumentProxy(new TextEncoder().encode("arquivo inválido")),
@@ -147,4 +209,23 @@ test("migração protege extrações e registra origem confirmada", () => {
   );
   assert.doesNotMatch(migration, /create policy[^;]+to anon/i);
   assert.doesNotMatch(migration, /raw_text|pdf_content|resume_text/i);
+});
+
+test("revisão protege valores manuais e oferece aplicação em lote auditável", () => {
+  const page = readFileSync(
+    new URL(
+      "../src/app/carreiras/(portal)/perfil/revisar-curriculo/[id]/page.tsx",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  const action = readFileSync(
+    new URL("../src/app/carreiras/resume-review-actions.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(page, /defaultChecked=\{!conflict\}/);
+  assert.match(page, /Aplicar todas as informações identificadas/);
+  assert.match(action, /const applyAll = value\(formData, "apply_all"\)/);
+  assert.match(action, /data_source: "resume"/);
+  assert.match(action, /source_extraction_id: extractionId/);
 });
