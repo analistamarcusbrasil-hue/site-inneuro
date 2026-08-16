@@ -5,11 +5,13 @@ import { ConfirmCommandForm } from "@/components/admin/confirm-command-form";
 import { Container } from "@/components/layout/container";
 import {
   applicationStatusLabels,
+  candidateStageLabels,
   canWithdrawApplication,
   formatApplicationDate,
   type ApplicationStatus,
 } from "@/lib/careers/applications";
 import { requireCandidateSession } from "@/lib/careers/auth";
+import type { SelectionStage } from "@/lib/careers/selection-processes";
 
 export const metadata: Metadata = {
   title: "Minhas candidaturas | Carreiras INNEURO",
@@ -19,6 +21,8 @@ type ApplicationRow = {
   id: string;
   status: ApplicationStatus;
   process_label: string | null;
+  candidate_stage: SelectionStage;
+  stage_updated_at: string;
   submitted_at: string;
   job: {
     id: string;
@@ -47,7 +51,7 @@ export default async function CandidateApplicationsPage({
   const { data, error } = await supabase
     .from("career_job_applications")
     .select(
-      "id, status, process_label, submitted_at, job:career_jobs(id, slug, title, location, area:career_job_areas(name))",
+      "id, status, process_label, candidate_stage, stage_updated_at, submitted_at, job:career_jobs(id, slug, title, location, area:career_job_areas(name))",
     )
     .eq("candidate_id", user.id)
     .order("submitted_at", { ascending: false });
@@ -144,6 +148,16 @@ export default async function CandidateApplicationsPage({
                         <strong>{application.process_label}</strong>
                       </p>
                     ) : null}
+                    <p className="text-ink mt-3 text-sm">
+                      <span className="text-muted">Etapa atual:</span>{" "}
+                      <strong>
+                        {candidateStageLabels[application.candidate_stage]}
+                      </strong>
+                    </p>
+                    <p className="text-muted mt-1 text-xs">
+                      Última atualização em{" "}
+                      {formatApplicationDate(application.stage_updated_at)}
+                    </p>
                   </div>
                   <span
                     className={`rounded-full px-3 py-1 text-xs font-bold ${statusClasses[application.status]}`}

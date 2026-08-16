@@ -67,12 +67,20 @@ export async function submitCareerJobApplicationAction(formData: FormData) {
     redirect(`/carreiras/vagas/${parsed.data.slug}/candidatar?error=save`);
   }
 
+  const { data: profile } = await supabase
+    .from("candidate_profiles")
+    .select("whatsapp")
+    .eq("candidate_id", user.id)
+    .maybeSingle();
+
   await notifyNewCareerApplication({
     applicationId: parsedApplicationId.data,
     jobId: parsed.data.jobId,
     jobTitle: job?.title ?? "Vaga INNEURO",
+    candidateId: user.id,
     candidateName: account.full_name,
     candidateEmail: user.email ?? "",
+    candidatePhone: profile?.whatsapp ?? undefined,
     submittedAt: new Date(),
   });
 

@@ -139,10 +139,8 @@ test("onboarding preserva o perfil existente do candidato", () => {
     new URL("../src/app/carreiras/(portal)/perfil/page.tsx", import.meta.url),
     "utf8",
   );
-  assert.doesNotMatch(
-    callback,
-    /ensureCandidateOnboarding|exchangeCodeForSession/,
-  );
+  assert.doesNotMatch(callback, /ensureCandidateOnboarding/);
+  assert.match(callback, /exchangeCodeForSession/);
   assert.match(onboarding, /ignoreDuplicates: true/);
   assert.match(onboarding, /CANDIDATE_PROFILE_SUFFICIENT_PERCENT/);
   assert.match(profile, /Complete seu perfil profissional/);
@@ -157,15 +155,15 @@ test("callback aceita apenas recuperação de senha", () => {
     new URL("../src/app/carreiras/auth/callback/route.ts", import.meta.url),
     "utf8",
   );
-  assert.match(actions, /resetPasswordForEmail/);
+  assert.match(actions, /auth\.admin\.generateLink/);
+  assert.match(actions, /sendCareerCommunication/);
+  assert.doesNotMatch(actions, /resetPasswordForEmail|auth\.resend/);
   assert.match(callback, /verifyOtp/);
   assert.match(callback, /type: "recovery"/);
   assert.match(callback, /type !== "recovery"/);
   assert.match(callback, /recuperar-senha\?mode=update/);
-  assert.doesNotMatch(
-    callback,
-    /exchangeCodeForSession|safeCareersDestination/,
-  );
+  assert.match(callback, /exchangeCodeForSession/);
+  assert.doesNotMatch(callback, /safeCareersDestination/);
 });
 
 test("cadastro limita abuso sem expor a Service Role no cliente", () => {
@@ -192,11 +190,18 @@ test("cadastro limita abuso sem expor a Service Role no cliente", () => {
   assert.match(adminActions, /inviteUserByEmail/);
 });
 
-test("recuperação de senha mantém template com retorno SSR do Carreiras", () => {
+test("recuperação de senha usa template próprio e não o mailer do Supabase", () => {
   const recovery = readFileSync(
-    new URL("../supabase/templates/recovery.html", import.meta.url),
+    new URL(
+      "../src/lib/careers/communications/templates/password-recovery.ts",
+      import.meta.url,
+    ),
     "utf8",
   );
   assert.match(recovery, /Redefina sua senha/);
-  assert.match(recovery, /type=recovery/);
+  assert.match(recovery, /recoveryUrl/);
+  assert.equal(
+    existsSync(new URL("../supabase/templates/recovery.html", import.meta.url)),
+    false,
+  );
 });

@@ -11,6 +11,7 @@ import {
 } from "@/lib/careers/auth-validation";
 import { requireCareersPortalEnabled } from "@/lib/careers/guards";
 import { ensureCandidateOnboarding } from "@/lib/careers/candidate-onboarding";
+import { sendCareerCommunication } from "@/lib/careers/communications/service";
 import { consumeCandidateRegistrationRateLimit } from "@/lib/careers/registration-rate-limit";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -19,11 +20,11 @@ function formValue(formData: FormData, name: string) {
   return String(formData.get(name) ?? "");
 }
 
-function careersCallbackUrl(next: string) {
+function careersRecoveryCallbackUrl() {
   const baseUrl =
     process.env.NEXT_PUBLIC_SITE_URL?.trim() || siteConfig.url.trim();
   const callback = new URL("/carreiras/auth/callback", baseUrl);
-  callback.searchParams.set("next", next);
+  callback.searchParams.set("type", "recovery");
   return callback.toString();
 }
 
@@ -156,11 +157,37 @@ export async function candidateRequestPasswordAction(formData: FormData) {
     redirect("/carreiras/recuperar-senha?error=invalid");
   }
 
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) redirect("/carreiras/recuperar-senha?error=config");
-  await supabase.auth.resetPasswordForEmail(parsed.data.email, {
-    redirectTo: careersCallbackUrl("/carreiras/recuperar-senha?mode=update"),
+  const admin = createSupabaseAdminClient();
+  if (!admin) redirect("/carreiras/recuperar-senha?error=config");
+  const { data: targets } = await admin.rpc("get_candidate_recovery_target", {
+    p_email: parsed.data.email,
   });
+  const target = Array.isArray(targets) ? targets[0] : targets;
+  if (!target) redirect("/carreiras/recuperar-senha?status=check-email");
+
+  const { data, error } = await admin.auth.admin.generateLink({
+    type: "recovery",
+    email: target.recipient_email,
+    options: { redirectTo: careersRecoveryCallbackUrl() },
+  });
+  if (!error && data.properties.action_link) {
+    const bucket = Math.floor(Date.now() / (15 * 60 * 1000));
+    await sendCareerCommunication(
+      {
+        candidateId: target.candidate_id,
+        template: "PASSWORD_RECOVERY",
+        recipientKind: "candidate",
+        recipient: target.recipient_email,
+        variables: {
+          candidateName: target.candidate_name,
+          recoveryUrl: data.properties.action_link,
+        },
+        triggeredBy: "candidate",
+        idempotencyKey: `candidate:${target.candidate_id}:recovery:${bucket}`,
+      },
+      { recoveryUrl: data.properties.action_link },
+    ).catch(() => undefined);
+  }
   redirect("/carreiras/recuperar-senha?status=check-email");
 }
 

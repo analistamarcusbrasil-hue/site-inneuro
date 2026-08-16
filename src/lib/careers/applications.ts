@@ -18,6 +18,20 @@ export const applicationStatusLabels: Record<ApplicationStatus, string> = {
   withdrawn: "Retirada",
 };
 
+export const candidateStageLabels: Record<
+  CareerJobApplication["candidate_stage"],
+  string
+> = {
+  registered: "Candidatura recebida",
+  screening: "Em análise",
+  interview: "Entrevista",
+  evaluation: "Próxima etapa",
+  finalists: "Finalista",
+  selected: "Aprovado",
+  talent_pool: "Banco de talentos",
+  not_selected: "Não selecionado",
+};
+
 const optionalText = z.string().nullable();
 
 export const careerApplicationSnapshotSchema = z.object({
@@ -88,6 +102,16 @@ export type CareerJobApplication = {
   source?: string;
   profile_snapshot: unknown;
   process_label: string | null;
+  candidate_stage:
+    | "registered"
+    | "screening"
+    | "interview"
+    | "evaluation"
+    | "finalists"
+    | "selected"
+    | "talent_pool"
+    | "not_selected";
+  stage_updated_at: string;
   submitted_at: string;
   withdrawn_at: string | null;
   created_at: string;
