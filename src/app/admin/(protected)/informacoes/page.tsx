@@ -1,7 +1,7 @@
 import { saveInstitutionalSettingsAction } from "@/app/admin/actions";
 import { AdminPageHeading } from "@/components/admin/admin-page-heading";
 import { siteConfig } from "@/config/site";
-import { requireAdmin } from "@/lib/cms/auth";
+import { requireAdminPermission } from "@/lib/cms/auth";
 
 const groups = [
   {
@@ -129,7 +129,7 @@ export default async function InstitutionalPage({
   searchParams: Promise<{ success?: string; error?: string }>;
 }) {
   const query = await searchParams;
-  const { supabase, profile } = await requireAdmin();
+  const { supabase } = await requireAdminPermission("settings.manage");
   const { data } = await supabase
     .from("site_settings")
     .select("value")
@@ -141,7 +141,7 @@ export default async function InstitutionalPage({
       ? data.value
       : {}) as Record<string, string>),
   };
-  const canSave = profile.role !== "editor";
+  const canSave = true;
 
   return (
     <>

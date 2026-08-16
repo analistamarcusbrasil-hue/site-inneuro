@@ -1,4 +1,5 @@
 import type { AdminProfile, HrAccessRole } from "@/types/cms";
+import { hasAdminPermission } from "@/lib/admin/permissions";
 
 export type HrPermission =
   | "dashboard:view"
@@ -39,6 +40,12 @@ export function resolveHrAccessRole(
   profile: HrProfile | null | undefined,
 ): HrAccessRole | null {
   if (!profile) return null;
+  if ("permissions" in profile) {
+    const adminProfile = profile as AdminProfile;
+    if (hasAdminPermission(adminProfile, "hr.manage")) return "administrator";
+    if (hasAdminPermission(adminProfile, "hr.view")) return "reviewer";
+    return null;
+  }
   if (profile.role === "super_admin" || profile.role === "admin") {
     return "administrator";
   }
@@ -54,5 +61,7 @@ export function hasHrPermission(
 }
 
 export function canAccessHr(profile: HrProfile | null | undefined) {
+  if (profile && "permissions" in profile)
+    return hasAdminPermission(profile as AdminProfile, "hr.view");
   return hasHrPermission(resolveHrAccessRole(profile), "dashboard:view");
 }

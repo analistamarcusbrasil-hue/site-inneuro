@@ -3,7 +3,7 @@ import {
   ReceptionCenter,
   type ReceptionRequest,
 } from "@/components/admin/reception-center";
-import { requireAdmin } from "@/lib/cms/auth";
+import { requireAdminPermission } from "@/lib/cms/auth";
 import { defaultDocumentsToBring } from "@/lib/scheduling/operations";
 
 function preparationText(value: unknown) {
@@ -31,11 +31,8 @@ function preparationText(value: unknown) {
 }
 
 export default async function AppointmentRequestsPage() {
-  const { supabase, user, profile } = await requireAdmin([
-    "reception",
-    "admin",
-    "super_admin",
-  ]);
+  const { supabase, user, profile } =
+    await requireAdminPermission("scheduling.view");
   const [{ data, error }, { data: exams }, { data: preparations }] =
     await Promise.all([
       supabase

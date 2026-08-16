@@ -12,17 +12,27 @@ import {
   Users,
   ScrollText,
   LogOut,
-  Building2,
   CalendarClock,
   ClipboardList,
   BriefcaseBusiness,
+  MessageSquareText,
+  Settings,
 } from "lucide-react";
 import { cmsModules } from "@/lib/cms/modules";
 import { canAccessHr } from "@/lib/careers/hr-permissions";
 import type { AdminProfile } from "@/types/cms";
 import { logoutAction } from "@/app/admin/actions";
+import {
+  accessProfileLabels,
+  hasAdminPermission,
+} from "@/lib/admin/permissions";
 
 const extraLinks = [
+  {
+    href: "/admin/fale-conosco",
+    label: "Fale Conosco",
+    icon: MessageSquareText,
+  },
   {
     href: "/admin/solicitacoes",
     label: "Solicitações de agendamento",
@@ -33,20 +43,15 @@ const extraLinks = [
     label: "Horários dos exames",
     icon: CalendarClock,
   },
-  {
-    href: "/admin/informacoes",
-    label: "Informações institucionais",
-    icon: Building2,
-  },
   { href: "/admin/midias", label: "Mídias", icon: Image },
   { href: "/admin/lixeira", label: "Lixeira", icon: Trash2 },
-  { href: "/admin/usuarios", label: "Usuários", icon: Users, superOnly: true },
+  { href: "/admin/usuarios", label: "Usuários e acessos", icon: Users },
   {
     href: "/admin/auditoria",
     label: "Auditoria",
     icon: ScrollText,
-    superOnly: true,
   },
+  { href: "/admin/informacoes", label: "Configurações", icon: Settings },
 ];
 
 export function AdminShell({
@@ -58,20 +63,28 @@ export function AdminShell({
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
-  const isReception = profile.role === "reception";
-  const contentLinks = (isReception ? [] : cmsModules).map((item) => ({
+  const contentLinks = (
+    hasAdminPermission(profile, "publications.view") ? cmsModules : []
+  ).map((item) => ({
     href: `/admin/${item.key}`,
     label: item.label,
     icon: item.icon,
   }));
-  const receptionLink = extraLinks[0];
-  const managementLinks = extraLinks.filter((item) =>
-    isReception
-      ? false
-      : !item.superOnly ||
-        profile.role === "super_admin" ||
-        (item.href === "/admin/usuarios" && profile.role === "admin"),
-  );
+  const managementLinks = extraLinks.filter((item) => {
+    if (item.href === "/admin/solicitacoes")
+      return hasAdminPermission(profile, "scheduling.view");
+    if (item.href === "/admin/fale-conosco")
+      return hasAdminPermission(profile, "contact.view");
+    if (["/admin/midias", "/admin/lixeira"].includes(item.href))
+      return hasAdminPermission(profile, "publications.view");
+    if (["/admin/horarios", "/admin/informacoes"].includes(item.href))
+      return hasAdminPermission(profile, "settings.manage");
+    if (item.href === "/admin/usuarios")
+      return hasAdminPermission(profile, "users.manage");
+    if (item.href === "/admin/auditoria")
+      return hasAdminPermission(profile, "audit.view");
+    return false;
+  });
   const hrLinks = canAccessHr(profile)
     ? [
         {
@@ -82,9 +95,7 @@ export function AdminShell({
       ]
     : [];
   const links = [
-    ...(isReception
-      ? [receptionLink]
-      : [{ href: "/admin", label: "Visão geral", icon: LayoutDashboard }]),
+    { href: "/admin", label: "Visão geral", icon: LayoutDashboard },
     ...contentLinks,
     ...hrLinks,
     ...managementLinks,
@@ -124,10 +135,7 @@ export function AdminShell({
               href="/admin"
               className="font-heading text-xl font-bold tracking-wide"
             >
-              INNEURO{" "}
-              <span className="text-tech">
-                {isReception ? "Recepção" : "CMS"}
-              </span>
+              INNEURO <span className="text-tech">Admin</span>
             </Link>
             <button
               type="button"
@@ -142,7 +150,9 @@ export function AdminShell({
             {profile.full_name || "Usuário administrativo"}
           </p>
           <p className="text-tech mt-1 text-[0.65rem] font-bold tracking-widest uppercase">
-            {isReception ? "Recepção" : profile.role.replace("_", " ")}
+            {profile.access_profile
+              ? accessProfileLabels[profile.access_profile]
+              : profile.role.replace("_", " ")}
           </p>
         </div>
         <nav aria-label="Administração" className="flex-1 overflow-y-auto p-3">
@@ -165,7 +175,7 @@ export function AdminShell({
                 </Link>
               </li>
             ))}
-            {!isReception ? (
+            {contentLinks.length ? (
               <li>
                 <p className="px-3 pt-5 pb-1 text-[0.65rem] font-bold tracking-widest text-white/45 uppercase">
                   Conteúdo do site
@@ -205,7 +215,7 @@ export function AdminShell({
                 </Link>
               </li>
             ))}
-            {!isReception ? (
+            {managementLinks.length ? (
               <li>
                 <p className="px-3 pt-5 pb-1 text-[0.65rem] font-bold tracking-widest text-white/45 uppercase">
                   Organização e segurança

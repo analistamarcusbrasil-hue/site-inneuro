@@ -11,8 +11,9 @@ export default async function AdminLoginPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   if (!isCmsConfigured) return <ConfigurationPending />;
-  const { user } = await getAdminSession();
-  if (user) redirect("/admin");
+  const { user, profile } = await getAdminSession();
+  if (user && profile?.must_change_password) redirect("/admin/definir-senha");
+  if (user && profile?.active) redirect("/admin");
   const query = await searchParams;
   return (
     <main
@@ -30,7 +31,7 @@ export default async function AdminLoginPage({
           Painel administrativo
         </h1>
         <p className="text-muted mt-3 text-sm leading-relaxed">
-          Use somente a conta convidada pela administração da INNEURO.
+          Use a conta criada pela administração da INNEURO.
         </p>
         {query.error ? (
           <p

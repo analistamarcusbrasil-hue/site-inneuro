@@ -129,10 +129,12 @@ test("migration preserva tabelas e limita RECEPCAO ao agendamento", () => {
 
 test("endpoint administrativo registra autoria, idempotência e falha de e-mail", () => {
   const route = read("../src/app/api/admin/solicitacoes/acoes/route.ts");
+  assert.match(route, /hasAdminPermission\(profile, "scheduling\.manage"\)/);
   assert.match(
     route,
-    /requireAdmin\(\[[\s\S]*"reception"[\s\S]*"admin"[\s\S]*"super_admin"[\s\S]*\]\)/,
+    /status: 401|response\("Autenticação necessária\.", 401\)/,
   );
+  assert.match(route, /response\("Acesso negado\.", 403\)/);
   assert.match(route, /operation_id: operationId/);
   assert.match(route, /queueAndSendSchedulingCommunication/);
   assert.match(route, /O e-mail precisa ser reenviado/);
@@ -168,5 +170,7 @@ test("tela única oferece fila, atalhos e ações conforme status", () => {
   assert.match(component, /DOCUMENTO RECEBIDO/);
   assert.match(component, /Registrar e avisar paciente/);
   assert.match(component, /Confirmar agendamento e enviar/);
-  assert.match(layout, /"reception"/);
+  assert.match(layout, /requireAdmin\(\)/);
+  const page = read("../src/app/admin/(protected)/solicitacoes/page.tsx");
+  assert.match(page, /requireAdminPermission\([\s\S]*"scheduling\.view"/);
 });

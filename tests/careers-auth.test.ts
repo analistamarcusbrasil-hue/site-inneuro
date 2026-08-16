@@ -187,7 +187,8 @@ test("cadastro limita abuso sem expor a Service Role no cliente", () => {
   assert.match(limiter, /createHmac\("sha256"/);
   assert.match(adminClient, /^import "server-only";/);
   assert.doesNotMatch(registrationPage, /SUPABASE_SERVICE_ROLE_KEY/);
-  assert.match(adminActions, /inviteUserByEmail/);
+  assert.match(adminActions, /auth\.admin\.createUser/);
+  assert.doesNotMatch(adminActions, /inviteUserByEmail/);
 });
 
 test("recuperação de senha usa template próprio e não o mailer do Supabase", () => {
