@@ -187,6 +187,17 @@ export function formatWaitingTime(createdAt: string, now = Date.now()) {
   return `há ${days} dia${days === 1 ? "" : "s"}`;
 }
 
+export function formatReceptionDate(value: string | null) {
+  if (!value) return "—";
+  if (value.includes("T")) {
+    return new Date(value).toLocaleString("pt-BR", {
+      dateStyle: "short",
+      timeStyle: "short",
+    });
+  }
+  return new Date(`${value}T12:00:00`).toLocaleDateString("pt-BR");
+}
+
 export function isLongWaiting(createdAt: string, now = Date.now()) {
   return now - Date.parse(createdAt) >= 60 * 60 * 1000;
 }
