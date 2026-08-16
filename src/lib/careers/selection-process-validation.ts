@@ -35,6 +35,11 @@ export const selectionCandidateMoveSchema = z.object({
   processCandidateId: z.string().uuid(),
   stage: z.enum(selectionStages),
   view: z.enum(["kanban", "list"]).catch("kanban"),
+  sendCommunication: z.boolean().default(false),
+  interviewDate: z.string().trim().max(10).optional(),
+  interviewTime: z.string().trim().max(5).optional(),
+  location: z.string().trim().max(240).optional(),
+  instructions: z.string().trim().max(2000).optional(),
 });
 
 export const selectionCandidateNoteSchema = z.object({

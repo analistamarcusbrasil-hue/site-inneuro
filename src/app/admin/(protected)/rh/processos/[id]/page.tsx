@@ -80,6 +80,8 @@ const errorMessages: Record<string, string> = {
   candidate: "Não foi possível adicionar esta candidatura ao processo.",
   duplicate: "Este candidato já participa do processo.",
   movement: "Não foi possível movimentar o candidato.",
+  "interview-data":
+    "Informe data, horário e local antes de enviar um convite de entrevista.",
   note: "Não foi possível salvar a observação interna.",
 };
 
@@ -124,6 +126,52 @@ function CandidateControls({
                 ))}
             </select>
           </label>
+          <label className="text-ink flex items-center gap-2 text-xs font-bold">
+            <input
+              type="checkbox"
+              name="send_communication"
+              className="size-4"
+            />
+            Enviar comunicação ao candidato
+          </label>
+          <details className="border-border-light rounded-xl border p-3">
+            <summary className="text-brand cursor-pointer text-xs font-bold">
+              Dados de entrevista ou orientações
+            </summary>
+            <div className="mt-3 grid gap-3">
+              <p className="text-muted text-xs">
+                Data, horário e local são obrigatórios quando a etapa escolhida
+                for Entrevista.
+              </p>
+              <input
+                name="interview_date"
+                type="date"
+                aria-label="Data da entrevista"
+                className="border-border-light min-h-10 rounded-xl border px-3"
+              />
+              <input
+                name="interview_time"
+                type="time"
+                aria-label="Horário da entrevista"
+                className="border-border-light min-h-10 rounded-xl border px-3"
+              />
+              <input
+                name="location"
+                maxLength={240}
+                placeholder="Local da entrevista"
+                aria-label="Local da entrevista"
+                className="border-border-light min-h-10 rounded-xl border px-3"
+              />
+              <textarea
+                name="instructions"
+                maxLength={2000}
+                rows={3}
+                placeholder="Orientações ao candidato"
+                aria-label="Orientações ao candidato"
+                className="border-border-light rounded-xl border p-3"
+              />
+            </div>
+          </details>
           <button className="border-brand/30 text-brand-dark hover:bg-mint min-h-10 rounded-full border px-4 text-xs font-bold">
             Confirmar movimentação
           </button>
@@ -214,6 +262,7 @@ export default async function SelectionProcessDetailPage({
     view?: string;
     status?: string;
     error?: string;
+    communication?: string;
   }>;
 }) {
   const { id } = await params;
@@ -288,6 +337,22 @@ export default async function SelectionProcessDetailPage({
           className="bg-mint text-brand-dark mb-6 rounded-2xl p-4 text-sm font-bold"
         >
           {statusMessages[query.status]}
+        </p>
+      ) : null}
+      {query.communication === "sent" ? (
+        <p
+          role="status"
+          className="bg-mint text-brand-dark mb-6 rounded-2xl p-4 text-sm font-bold"
+        >
+          Comunicação registrada e aceita pelo servidor SMTP.
+        </p>
+      ) : query.communication === "failed" ? (
+        <p
+          role="status"
+          className="bg-warning/10 text-warning mb-6 rounded-2xl p-4 text-sm font-bold"
+        >
+          A etapa foi atualizada, mas o envio falhou e ficou registrado para
+          reenvio.
         </p>
       ) : null}
       {query.error && errorMessages[query.error] ? (
@@ -366,6 +431,14 @@ export default async function SelectionProcessDetailPage({
             >
               <input type="hidden" name="process_id" value={process.id} />
               <input type="hidden" name="status" value="closed" />
+              <label className="text-ink flex items-center gap-2 text-sm font-bold">
+                <input
+                  type="checkbox"
+                  name="send_communication"
+                  className="size-4"
+                />
+                Comunicar encerramento aos participantes
+              </label>
               <button className="border-brand text-brand min-h-11 rounded-full border px-5 text-sm font-bold">
                 Encerrar
               </button>

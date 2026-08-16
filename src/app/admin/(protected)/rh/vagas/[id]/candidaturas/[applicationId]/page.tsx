@@ -1,17 +1,25 @@
+import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 import { AdminPageHeading } from "@/components/admin/admin-page-heading";
 import { ConfirmCommandForm } from "@/components/admin/confirm-command-form";
+import { CareerCommunicationForm } from "@/components/admin/career-communication-form";
 import { HrNavigation } from "@/components/admin/hr-navigation";
 import {
   adminApplicationTransitions,
   applicationStatusLabels,
+  candidateStageLabels,
   careerApplicationSnapshotSchema,
   formatApplicationDate,
   type ApplicationStatus,
   type CareerJobApplication,
 } from "@/lib/careers/applications";
+import {
+  careerCommunicationTemplateLabels,
+  type CareerCommunicationStatus,
+  type CareerCommunicationTemplate,
+} from "@/lib/careers/communications/types";
 import { requireHrAccess } from "@/lib/careers/hr-auth";
 import {
   applicationSourceLabels,
@@ -29,7 +37,10 @@ import {
 } from "@/lib/careers/matching";
 import { formatCandidateMonth, formatFileSize } from "@/lib/careers/profile";
 import { recalculateApplicationMatchAction } from "../../aderencia/actions";
-import { updateCareerApplicationStatusAction } from "../actions";
+import {
+  retryCareerApplicationCommunicationAction,
+  updateCareerApplicationStatusAction,
+} from "../actions";
 
 type HistoryRow = {
   id: string;
@@ -46,6 +57,30 @@ type MatchRunRow = {
   hard_skills_score: number;
   result: unknown;
   calculated_at: string;
+};
+
+type CommunicationRow = {
+  id: string;
+  type: CareerCommunicationTemplate;
+  subject: string;
+  recipient_email: string;
+  status: CareerCommunicationStatus;
+  attempt_count: number;
+  last_attempt_at: string | null;
+  sent_at: string | null;
+  failed_at: string | null;
+  last_error_code: string | null;
+  triggered_by: "candidate" | "admin" | "system";
+  created_at: string;
+  creator: { full_name: string | null } | null;
+};
+
+const communicationStatusLabels: Record<CareerCommunicationStatus, string> = {
+  PENDING: "Pendente",
+  PROCESSING: "Processando",
+  SENT: "Enviado — aceito pelo SMTP",
+  FAILED: "Falha no envio",
+  CANCELLED: "Cancelado",
 };
 
 function SnapshotSection({
@@ -70,7 +105,11 @@ export default async function CareerApplicationDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string; applicationId: string }>;
-  searchParams: Promise<{ status?: string; error?: string }>;
+  searchParams: Promise<{
+    status?: string;
+    error?: string;
+    communication?: string;
+  }>;
 }) {
   const { id, applicationId } = await params;
   if (
@@ -86,6 +125,7 @@ export default async function CareerApplicationDetailPage({
     matchRunsResult,
     matrixResult,
     logisticsResult,
+    communicationsResult,
   ] = await Promise.all([
     supabase.from("career_jobs").select("id, title").eq("id", id).maybeSingle(),
     supabase
@@ -118,6 +158,13 @@ export default async function CareerApplicationDetailPage({
       .select("*")
       .eq("application_id", applicationId)
       .maybeSingle(),
+    supabase
+      .from("career_communications")
+      .select(
+        "id, type, subject, recipient_email, status, attempt_count, last_attempt_at, sent_at, failed_at, last_error_code, triggered_by, created_at, creator:profiles!career_communications_created_by_fkey(full_name)",
+      )
+      .eq("application_id", applicationId)
+      .order("created_at", { ascending: false }),
   ]);
   if (
     jobResult.error ||
@@ -141,7 +188,10 @@ export default async function CareerApplicationDetailPage({
   const transitions = adminApplicationTransitions[application.status];
   const logistics =
     (logisticsResult.data as ApplicationLogistics | null) ?? null;
+  const communications =
+    (communicationsResult.data as unknown as CommunicationRow[] | null) ?? [];
   const query = await searchParams;
+  const detailPath = `/admin/rh/vagas/${id}/candidaturas/${applicationId}`;
 
   return (
     <>
@@ -189,6 +239,22 @@ export default async function CareerApplicationDetailPage({
           Indicador recalculado e nova entrada adicionada ao histórico.
         </p>
       ) : null}
+      {query.status === "communication-sent" ? (
+        <p
+          role="status"
+          className="bg-mint text-brand-dark mb-6 rounded-2xl p-4 text-sm font-bold"
+        >
+          Comunicação enviada. O servidor SMTP aceitou o envio.
+        </p>
+      ) : query.status === "communication-failed" ? (
+        <p
+          role="status"
+          className="bg-warning/10 text-warning mb-6 rounded-2xl p-4 text-sm font-bold"
+        >
+          A comunicação foi registrada, mas o SMTP não aceitou o envio. Ela pode
+          ser reenviada pelo histórico.
+        </p>
+      ) : null}
       {query.error ? (
         <p
           role="alert"
@@ -226,7 +292,7 @@ export default async function CareerApplicationDetailPage({
             action={updateCareerApplicationStatusAction}
             message="Confirma a atualização do status desta candidatura?"
           >
-            <div className="border-border-light mt-6 grid gap-4 border-t pt-6 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+            <div className="border-border-light mt-6 grid gap-4 border-t pt-6 sm:grid-cols-2 sm:items-end">
               <input
                 type="hidden"
                 name="application_id"
@@ -257,12 +323,67 @@ export default async function CareerApplicationDetailPage({
                   className="border-border-light mt-2 min-h-11 w-full rounded-xl border px-4 font-normal"
                 />
               </label>
+              <label className="text-ink flex min-h-11 items-center gap-3 text-sm font-bold sm:col-span-2">
+                <input
+                  type="checkbox"
+                  name="send_communication"
+                  className="size-5"
+                />
+                Enviar comunicação correspondente ao candidato
+              </label>
+              <label className="text-ink text-sm font-bold sm:col-span-2">
+                Orientações da próxima etapa, quando aplicável
+                <textarea
+                  name="communication_instructions"
+                  maxLength={2000}
+                  rows={3}
+                  className="border-border-light mt-2 w-full rounded-xl border p-4 font-normal"
+                />
+              </label>
               <button className="bg-brand hover:bg-brand-dark min-h-11 rounded-full px-5 text-sm font-bold text-white">
                 Atualizar
               </button>
             </div>
           </ConfirmCommandForm>
         ) : null}
+      </section>
+
+      <section className="border-border-light mt-6 rounded-3xl border bg-white p-5 sm:p-7">
+        <p className="text-muted text-xs font-bold tracking-wide uppercase">
+          Comunicação com o candidato
+        </p>
+        <h2 className="font-heading text-brand-dark mt-1 text-2xl font-semibold">
+          Enviar comunicação
+        </h2>
+        <dl className="border-border-light my-5 grid gap-4 border-y py-5 sm:grid-cols-2">
+          <div>
+            <dt className="text-muted text-xs">Nome</dt>
+            <dd className="font-bold">
+              {snapshot?.candidate.full_name ?? "Não informado"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted text-xs">E-mail</dt>
+            <dd className="font-bold">
+              {snapshot?.candidate.email ?? "Não informado"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted text-xs">Vaga</dt>
+            <dd className="font-bold">{jobResult.data.title}</dd>
+          </div>
+          <div>
+            <dt className="text-muted text-xs">Etapa atual</dt>
+            <dd className="font-bold">
+              {candidateStageLabels[application.candidate_stage]}
+            </dd>
+          </div>
+        </dl>
+        <CareerCommunicationForm
+          applicationId={applicationId}
+          returnPath={detailPath}
+          idempotencyKey={`admin:${applicationId}:${randomUUID()}`}
+        />
       </section>
 
       <SnapshotSection title="Logística da vaga">
@@ -614,37 +735,132 @@ export default async function CareerApplicationDetailPage({
         </div>
       )}
 
-      <SnapshotSection title="Histórico de status">
-        {historyResult.error ? (
-          <p className="text-error">Não foi possível carregar o histórico.</p>
-        ) : history.length ? (
-          <ol className="grid gap-3">
-            {history.map((entry) => (
+      <section className="border-border-light mt-6 rounded-3xl border bg-white p-5 sm:p-6">
+        <h2 className="font-heading text-brand-dark text-xl font-semibold">
+          Histórico de comunicações
+        </h2>
+        {communicationsResult.error ? (
+          <p className="text-error mt-5 text-sm">
+            Não foi possível carregar o histórico de comunicações.
+          </p>
+        ) : communications.length ? (
+          <ol className="mt-5 grid gap-4">
+            {communications.map((item) => (
               <li
-                key={entry.id}
-                className="border-border-light flex flex-wrap justify-between gap-3 border-b pb-3 last:border-0 last:pb-0"
+                key={item.id}
+                className="border-border-light rounded-2xl border p-4 text-sm"
               >
-                <span>
-                  <strong>{applicationStatusLabels[entry.to_status]}</strong>
-                  {entry.from_status
-                    ? ` — anteriormente ${applicationStatusLabels[entry.from_status]}`
-                    : " — candidatura criada"}
-                </span>
-                <span className="text-muted text-xs">
-                  {formatApplicationDate(entry.changed_at)} ·{" "}
-                  {entry.actor_kind === "candidate"
-                    ? "Candidato"
-                    : entry.actor_kind === "admin"
-                      ? "RH"
-                      : "Sistema"}
-                </span>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="font-bold">
+                      {careerCommunicationTemplateLabels[item.type]}
+                    </p>
+                    <p className="text-muted mt-1">{item.subject}</p>
+                  </div>
+                  <span className="bg-surface text-brand-dark rounded-full px-3 py-1 text-xs font-bold">
+                    {communicationStatusLabels[item.status]}
+                  </span>
+                </div>
+                <dl className="text-muted mt-4 grid gap-2 text-xs sm:grid-cols-2">
+                  <div>
+                    <dt className="inline font-bold">Destinatário: </dt>
+                    <dd className="inline">{item.recipient_email}</dd>
+                  </div>
+                  <div>
+                    <dt className="inline font-bold">Criada em: </dt>
+                    <dd className="inline">
+                      {formatApplicationDate(item.created_at)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="inline font-bold">Responsável: </dt>
+                    <dd className="inline">
+                      {item.creator?.full_name ??
+                        (item.triggered_by === "candidate"
+                          ? "Candidato / automação"
+                          : "Sistema")}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="inline font-bold">Tentativas: </dt>
+                    <dd className="inline">{item.attempt_count} de 3</dd>
+                  </div>
+                  {item.sent_at ? (
+                    <div>
+                      <dt className="inline font-bold">Enviada em: </dt>
+                      <dd className="inline">
+                        {formatApplicationDate(item.sent_at)}
+                      </dd>
+                    </div>
+                  ) : null}
+                </dl>
+                {["PENDING", "FAILED"].includes(item.status) &&
+                item.attempt_count < 3 &&
+                item.type !== "PASSWORD_RECOVERY" ? (
+                  <form
+                    action={retryCareerApplicationCommunicationAction}
+                    className="mt-4"
+                  >
+                    <input
+                      type="hidden"
+                      name="communication_id"
+                      value={item.id}
+                    />
+                    <input
+                      type="hidden"
+                      name="return_path"
+                      value={detailPath}
+                    />
+                    <button className="border-brand/30 text-brand-dark min-h-9 rounded-full border px-4 text-xs font-bold">
+                      {item.status === "PENDING"
+                        ? "Processar envio"
+                        : "Reenviar"}
+                    </button>
+                  </form>
+                ) : null}
               </li>
             ))}
           </ol>
         ) : (
-          <p className="text-muted">Nenhuma alteração registrada.</p>
+          <p className="text-muted mt-5 text-sm">
+            Nenhuma comunicação registrada para esta candidatura.
+          </p>
         )}
-      </SnapshotSection>
+      </section>
+
+      <div className="mt-6">
+        <SnapshotSection title="Histórico de status">
+          {historyResult.error ? (
+            <p className="text-error">Não foi possível carregar o histórico.</p>
+          ) : history.length ? (
+            <ol className="grid gap-3">
+              {history.map((entry) => (
+                <li
+                  key={entry.id}
+                  className="border-border-light flex flex-wrap justify-between gap-3 border-b pb-3 last:border-0 last:pb-0"
+                >
+                  <span>
+                    <strong>{applicationStatusLabels[entry.to_status]}</strong>
+                    {entry.from_status
+                      ? ` — anteriormente ${applicationStatusLabels[entry.from_status]}`
+                      : " — candidatura criada"}
+                  </span>
+                  <span className="text-muted text-xs">
+                    {formatApplicationDate(entry.changed_at)} ·{" "}
+                    {entry.actor_kind === "candidate"
+                      ? "Candidato"
+                      : entry.actor_kind === "admin"
+                        ? "RH"
+                        : "Sistema"}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="text-muted">Nenhuma alteração registrada.</p>
+          )}
+        </SnapshotSection>
+      </div>
     </>
   );
 }

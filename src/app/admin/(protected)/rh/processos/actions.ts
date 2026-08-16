@@ -3,10 +3,15 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { ApplicationStatus } from "@/lib/careers/applications";
+import {
+  communicationForSelectionStage,
+  sendApplicationCommunication,
+} from "@/lib/careers/communications/application-service";
 import { requireHrAccess } from "@/lib/careers/hr-auth";
 import {
   canManageSelectionCandidates,
   canTransitionSelectionProcess,
+  selectionStageLabels,
   type CareerSelectionCandidate,
   type CareerSelectionProcess,
   type SelectionProcessStatus,
@@ -146,8 +151,37 @@ export async function transitionSelectionProcessAction(formData: FormData) {
     { status: process.status },
     { status: parsed.data.status },
   );
+  let communicationSummary = "";
+  if (
+    parsed.data.status === "closed" &&
+    formData.get("send_communication") === "on"
+  ) {
+    const { data: participants } = await supabase
+      .from("career_selection_process_candidates")
+      .select("application_id")
+      .eq("process_id", process.id);
+    const results = await Promise.allSettled(
+      (participants ?? []).map((participant) =>
+        sendApplicationCommunication({
+          applicationId: participant.application_id,
+          template: "PROCESS_CLOSED",
+          triggeredBy: "admin",
+          createdBy: user.id,
+          idempotencyKey: `process:${process.id}:closed:${participant.application_id}`,
+        }),
+      ),
+    );
+    communicationSummary = results.every(
+      (result) =>
+        result.status === "fulfilled" && result.value.status === "SENT",
+    )
+      ? "sent"
+      : "failed";
+  }
   revalidateProcess(process.id);
-  redirect(`${path}?status=${encodeURIComponent(parsed.data.status)}`);
+  redirect(
+    `${path}?status=${encodeURIComponent(parsed.data.status)}${communicationSummary ? `&communication=${communicationSummary}` : ""}`,
+  );
 }
 
 export async function addCandidateToSelectionProcessAction(formData: FormData) {
@@ -223,6 +257,11 @@ export async function moveSelectionCandidateAction(formData: FormData) {
     processCandidateId: field(formData, "process_candidate_id"),
     stage: field(formData, "stage"),
     view: field(formData, "view"),
+    sendCommunication: formData.get("send_communication") === "on",
+    interviewDate: field(formData, "interview_date"),
+    interviewTime: field(formData, "interview_time"),
+    location: field(formData, "location"),
+    instructions: field(formData, "instructions"),
   });
   if (!parsed.success) fail(processesPath, "movement");
   const path = `${processesPath}/${parsed.data.processId}`;
@@ -253,6 +292,18 @@ export async function moveSelectionCandidateAction(formData: FormData) {
     fail(`${path}?view=${parsed.data.view}`, "movement");
   }
 
+  const communicationTemplate = parsed.data.sendCommunication
+    ? communicationForSelectionStage(parsed.data.stage)
+    : null;
+  if (
+    communicationTemplate === "INTERVIEW_INVITE" &&
+    (!/^\d{4}-\d{2}-\d{2}$/.test(parsed.data.interviewDate ?? "") ||
+      !/^([01]\d|2[0-3]):[0-5]\d$/.test(parsed.data.interviewTime ?? "") ||
+      !parsed.data.location)
+  ) {
+    fail(`${path}?view=${parsed.data.view}`, "interview-data");
+  }
+
   const { error } = await supabase
     .from("career_selection_process_candidates")
     .update({ stage: parsed.data.stage })
@@ -275,8 +326,39 @@ export async function moveSelectionCandidateAction(formData: FormData) {
       stage: parsed.data.stage,
     },
   );
+  let communication = "";
+  if (communicationTemplate) {
+    try {
+      const result = await sendApplicationCommunication({
+        applicationId: candidate.application_id,
+        template: communicationTemplate,
+        fields:
+          communicationTemplate === "INTERVIEW_INVITE"
+            ? {
+                interviewDate: parsed.data.interviewDate,
+                interviewTime: parsed.data.interviewTime,
+                location: parsed.data.location,
+                instructions: parsed.data.instructions,
+              }
+            : communicationTemplate === "NEXT_STAGE"
+              ? {
+                  nextStage: selectionStageLabels[parsed.data.stage],
+                  instructions: parsed.data.instructions,
+                }
+              : undefined,
+        triggeredBy: "admin",
+        createdBy: user.id,
+        idempotencyKey: `process-candidate:${candidate.id}:stage:${parsed.data.stage}:${candidate.updated_at}`,
+      });
+      communication = result.status === "SENT" ? "sent" : "failed";
+    } catch {
+      communication = "failed";
+    }
+  }
   revalidateProcess(process.id, parsed.data.view);
-  redirect(`${path}?view=${parsed.data.view}&status=moved`);
+  redirect(
+    `${path}?view=${parsed.data.view}&status=moved${communication ? `&communication=${communication}` : ""}`,
+  );
 }
 
 export async function saveSelectionCandidateNoteAction(formData: FormData) {
