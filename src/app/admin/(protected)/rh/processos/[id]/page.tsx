@@ -16,7 +16,9 @@ import {
   formatSelectionPeriodDate,
   mainSelectionStages,
   selectionProcessStatusLabels,
+  selectionStageApprovalLabels,
   selectionStageLabels,
+  selectionStageNext,
   selectionStages,
   type CareerSelectionCandidate,
   type CareerSelectionProcess,
@@ -70,7 +72,7 @@ const statusMessages: Record<string, string> = {
   in_progress: "Processo iniciado.",
   closed: "Processo encerrado.",
   cancelled: "Processo cancelado.",
-  "candidate-added": "Candidato adicionado em Inscritos.",
+  "candidate-added": "Candidato adicionado à etapa Currículo.",
   moved: "Candidato movimentado e histórico registrado.",
   "note-saved": "Observação interna salva.",
 };
@@ -97,85 +99,45 @@ function CandidateControls({
   const manageable = canManageSelectionCandidates(process.status);
   return (
     <div className="mt-4 grid gap-3">
-      {manageable ? (
-        <form action={moveSelectionCandidateAction} className="grid gap-2">
-          <input type="hidden" name="process_id" value={process.id} />
-          <input
-            type="hidden"
-            name="process_candidate_id"
-            value={participant.id}
-          />
-          <input type="hidden" name="view" value={view} />
-          <label className="text-muted text-xs font-bold">
-            Mover manualmente para
-            <select
-              name="stage"
-              required
-              defaultValue=""
-              className="border-border-light text-ink mt-1 min-h-10 w-full rounded-xl border bg-white px-3 font-normal"
-            >
-              <option value="" disabled>
-                Escolha a etapa
-              </option>
-              {selectionStages
-                .filter((stage) => stage !== participant.stage)
-                .map((stage) => (
-                  <option key={stage} value={stage}>
-                    {selectionStageLabels[stage]}
-                  </option>
-                ))}
-            </select>
-          </label>
-          <label className="text-ink flex items-center gap-2 text-xs font-bold">
+      {manageable && selectionStageNext[participant.stage] ? (
+        <div className="grid gap-2">
+          <ConfirmCommandForm
+            action={moveSelectionCandidateAction}
+            message="Confirma a aprovação e o avanço desta candidatura?"
+          >
+            <input type="hidden" name="process_id" value={process.id} />
             <input
-              type="checkbox"
-              name="send_communication"
-              className="size-4"
+              type="hidden"
+              name="process_candidate_id"
+              value={participant.id}
             />
-            Enviar comunicação ao candidato
-          </label>
-          <details className="border-border-light rounded-xl border p-3">
-            <summary className="text-brand cursor-pointer text-xs font-bold">
-              Dados de entrevista ou orientações
-            </summary>
-            <div className="mt-3 grid gap-3">
-              <p className="text-muted text-xs">
-                Data, horário e local são obrigatórios quando a etapa escolhida
-                for Entrevista.
-              </p>
-              <input
-                name="interview_date"
-                type="date"
-                aria-label="Data da entrevista"
-                className="border-border-light min-h-10 rounded-xl border px-3"
-              />
-              <input
-                name="interview_time"
-                type="time"
-                aria-label="Horário da entrevista"
-                className="border-border-light min-h-10 rounded-xl border px-3"
-              />
-              <input
-                name="location"
-                maxLength={240}
-                placeholder="Local da entrevista"
-                aria-label="Local da entrevista"
-                className="border-border-light min-h-10 rounded-xl border px-3"
-              />
-              <textarea
-                name="instructions"
-                maxLength={2000}
-                rows={3}
-                placeholder="Orientações ao candidato"
-                aria-label="Orientações ao candidato"
-                className="border-border-light rounded-xl border p-3"
-              />
-            </div>
-          </details>
-          <button className="border-brand/30 text-brand-dark hover:bg-mint min-h-10 rounded-full border px-4 text-xs font-bold">
-            Confirmar movimentação
-          </button>
-        </form>
+            <input type="hidden" name="view" value={view} />
+            <input
+              type="hidden"
+              name="stage"
+              value={selectionStageNext[participant.stage]}
+            />
+            <button className="bg-brand hover:bg-brand-dark min-h-10 w-full rounded-full px-4 text-xs font-bold text-white">
+              {selectionStageApprovalLabels[participant.stage]}
+            </button>
+          </ConfirmCommandForm>
+          <ConfirmCommandForm
+            action={moveSelectionCandidateAction}
+            message="Confirma que esta candidatura não foi aprovada nesta etapa?"
+          >
+            <input type="hidden" name="process_id" value={process.id} />
+            <input
+              type="hidden"
+              name="process_candidate_id"
+              value={participant.id}
+            />
+            <input type="hidden" name="view" value={view} />
+            <input type="hidden" name="stage" value="not_approved" />
+            <button className="border-error/40 text-error min-h-10 w-full rounded-full border px-4 text-xs font-bold">
+              NÃO APROVAR
+            </button>
+          </ConfirmCommandForm>
+        </div>
       ) : null}
 
       <details className="border-border-light rounded-2xl border p-3">

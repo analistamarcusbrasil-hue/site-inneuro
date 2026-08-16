@@ -11,9 +11,10 @@ import { requireHrAccess } from "@/lib/careers/hr-auth";
 import {
   canManageSelectionCandidates,
   canTransitionSelectionProcess,
-  selectionStageLabels,
+  selectionStageNext,
   type CareerSelectionCandidate,
   type CareerSelectionProcess,
+  type SelectionStage,
   type SelectionProcessStatus,
 } from "@/lib/careers/selection-processes";
 import {
@@ -201,7 +202,7 @@ export async function addCandidateToSelectionProcessAction(formData: FormData) {
       .maybeSingle(),
     supabase
       .from("career_job_applications")
-      .select("id, job_id, candidate_id, status")
+      .select("id, job_id, candidate_id, status, candidate_stage")
       .eq("id", parsed.data.applicationId)
       .maybeSingle(),
   ]);
@@ -214,6 +215,7 @@ export async function addCandidateToSelectionProcessAction(formData: FormData) {
     job_id: string;
     candidate_id: string;
     status: ApplicationStatus;
+    candidate_stage: SelectionStage;
   };
   if (
     !canManageSelectionCandidates(process.status) ||
@@ -230,7 +232,7 @@ export async function addCandidateToSelectionProcessAction(formData: FormData) {
       process_id: process.id,
       application_id: application.id,
       candidate_id: application.candidate_id,
-      stage: "registered",
+      stage: application.candidate_stage,
     })
     .select("id")
     .single();
@@ -242,7 +244,7 @@ export async function addCandidateToSelectionProcessAction(formData: FormData) {
     process_candidate_id: processCandidate.id,
     candidate_id: application.candidate_id,
     application_id: application.id,
-    stage: "registered",
+    stage: application.candidate_stage,
   });
   revalidateProcess(process.id);
   revalidatePath(`/admin/rh/candidatos/${application.candidate_id}`);
@@ -292,22 +294,16 @@ export async function moveSelectionCandidateAction(formData: FormData) {
     fail(`${path}?view=${parsed.data.view}`, "movement");
   }
 
-  const communicationTemplate = parsed.data.sendCommunication
-    ? communicationForSelectionStage(parsed.data.stage)
-    : null;
-  if (
-    communicationTemplate === "INTERVIEW_INVITE" &&
-    (!/^\d{4}-\d{2}-\d{2}$/.test(parsed.data.interviewDate ?? "") ||
-      !/^([01]\d|2[0-3]):[0-5]\d$/.test(parsed.data.interviewTime ?? "") ||
-      !parsed.data.location)
-  ) {
-    fail(`${path}?view=${parsed.data.view}`, "interview-data");
-  }
-
-  const { error } = await supabase
-    .from("career_selection_process_candidates")
-    .update({ stage: parsed.data.stage })
-    .eq("id", candidate.id);
+  const allowedTarget =
+    parsed.data.stage === selectionStageNext[candidate.stage] ||
+    parsed.data.stage === "not_approved";
+  if (!allowedTarget) fail(`${path}?view=${parsed.data.view}`, "movement");
+  const { error } = await supabase.rpc("decide_career_application_stage", {
+    p_application_id: candidate.application_id,
+    p_decision:
+      parsed.data.stage === "not_approved" ? "not_approve" : "approve",
+    p_expected_stage: candidate.stage,
+  });
   if (error) fail(`${path}?view=${parsed.data.view}`, "movement");
 
   await audit(
@@ -327,28 +323,17 @@ export async function moveSelectionCandidateAction(formData: FormData) {
     },
   );
   let communication = "";
+  const communicationTemplate = communicationForSelectionStage(
+    parsed.data.stage,
+  );
   if (communicationTemplate) {
     try {
       const result = await sendApplicationCommunication({
         applicationId: candidate.application_id,
         template: communicationTemplate,
-        fields:
-          communicationTemplate === "INTERVIEW_INVITE"
-            ? {
-                interviewDate: parsed.data.interviewDate,
-                interviewTime: parsed.data.interviewTime,
-                location: parsed.data.location,
-                instructions: parsed.data.instructions,
-              }
-            : communicationTemplate === "NEXT_STAGE"
-              ? {
-                  nextStage: selectionStageLabels[parsed.data.stage],
-                  instructions: parsed.data.instructions,
-                }
-              : undefined,
         triggeredBy: "admin",
         createdBy: user.id,
-        idempotencyKey: `process-candidate:${candidate.id}:stage:${parsed.data.stage}:${candidate.updated_at}`,
+        idempotencyKey: `application:${candidate.application_id}:stage:${parsed.data.stage}`,
       });
       communication = result.status === "SENT" ? "sent" : "failed";
     } catch {

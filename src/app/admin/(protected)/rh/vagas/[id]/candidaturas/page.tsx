@@ -13,7 +13,6 @@ import { requireHrAccess } from "@/lib/careers/hr-auth";
 import {
   buildJobCandidateReportRows,
   filterAndSortJobCandidateReport,
-  summarizeJobCandidateReport,
   type JobCandidateReportFilters,
 } from "@/lib/careers/job-candidate-report";
 
@@ -91,7 +90,29 @@ export default async function CareerJobApplicationsPage({
     resumes: resumesResult.data ?? [],
     jobTitle: jobResult.data.title,
   });
-  const summary = summarizeJobCandidateReport(reportRows);
+  const activeApplications = applications.filter(
+    (item) => !["finalized", "withdrawn"].includes(item.status),
+  );
+  const funnelSummary = {
+    total: applications.filter((item) => item.status !== "withdrawn").length,
+    resume: activeApplications.filter(
+      (item) => item.candidate_stage === "resume",
+    ).length,
+    interview: activeApplications.filter(
+      (item) => item.candidate_stage === "interview",
+    ).length,
+    practical_test: activeApplications.filter(
+      (item) => item.candidate_stage === "practical_test",
+    ).length,
+    hiring: activeApplications.filter(
+      (item) => item.candidate_stage === "hiring",
+    ).length,
+    not_approved: applications.filter(
+      (item) => item.candidate_stage === "not_approved",
+    ).length,
+    hired: applications.filter((item) => item.candidate_stage === "hired")
+      .length,
+  };
   const filters: JobCandidateReportFilters = {
     sort: ["match", "date", "name"].includes(query.ordem ?? "")
       ? (query.ordem as JobCandidateReportFilters["sort"])
@@ -117,8 +138,8 @@ export default async function CareerJobApplicationsPage({
     <>
       <AdminPageHeading
         eyebrow="RH / Vagas / Candidaturas"
-        title={`Perfis dos candidatos — ${jobResult.data.title}`}
-        description="Compare informações profissionais confirmadas no perfil e consulte a aderência explicável aos requisitos desta vaga."
+        title={`Processo seletivo — ${jobResult.data.title}`}
+        description="Acompanhe as quatro etapas, filtre candidatos e registre decisões exclusivamente humanas."
       />
       <HrNavigation current="jobs" canManageJobs canManageCandidates />
 
@@ -139,17 +160,21 @@ export default async function CareerJobApplicationsPage({
 
       <section
         aria-label="Resumo das candidaturas"
-        className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+        className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7"
       >
         {[
-          ["Candidatos", summary.total],
-          ["Alta aderência", summary.high],
-          ["Aderência intermediária", summary.intermediate],
-          ["Requer análise", summary.review],
-        ].map(([label, count]) => (
-          <article
+          ["Total", funnelSummary.total, ""],
+          ["1. Currículo", funnelSummary.resume, "resume"],
+          ["2. Entrevista", funnelSummary.interview, "interview"],
+          ["3. Teste Prático", funnelSummary.practical_test, "practical_test"],
+          ["4. Contratação", funnelSummary.hiring, "hiring"],
+          ["Não aprovados", funnelSummary.not_approved, "not_approved"],
+          ["Contratados", funnelSummary.hired, "hired"],
+        ].map(([label, count, stage]) => (
+          <Link
             key={String(label)}
-            className="border-border-light rounded-2xl border bg-white p-5"
+            href={stage ? `?etapa=${stage}` : `?`}
+            className={`hover:border-brand/50 rounded-2xl border bg-white p-5 transition ${filters.stage === stage || (!filters.stage && !stage) ? "border-brand ring-brand/10 ring-2" : "border-border-light"}`}
           >
             <p className="text-muted text-xs font-bold tracking-wide uppercase">
               {label}
@@ -157,7 +182,7 @@ export default async function CareerJobApplicationsPage({
             <p className="font-heading text-brand-dark mt-2 text-3xl font-semibold">
               {count}
             </p>
-          </article>
+          </Link>
         ))}
       </section>
 

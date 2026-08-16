@@ -41,11 +41,18 @@ export const careerCommunicationVariablesSchema = z.discriminatedUnion(
       template: z.enum([
         "APPLICATION_RECEIVED",
         "UNDER_REVIEW",
+        "STAGE_1_APPROVED",
+        "STAGE_2_APPROVED",
+        "STAGE_3_APPROVED",
+        "FINAL_APPROVED",
         "APPROVED",
         "TALENT_POOL",
-        "REJECTED",
         "PROCESS_CLOSED",
       ]),
+    }),
+    candidateJobVariables.extend({
+      template: z.literal("REJECTED"),
+      talentPoolAuthorized: z.boolean().optional().default(false),
     }),
     candidateJobVariables.extend({
       template: z.literal("NEXT_STAGE"),
@@ -54,7 +61,11 @@ export const careerCommunicationVariablesSchema = z.discriminatedUnion(
       eventDate: optionalText(80),
     }),
     candidateJobVariables.extend({
-      template: z.enum(["INTERVIEW_INVITE", "INTERVIEW_REMINDER"]),
+      template: z.enum([
+        "INTERVIEW_INVITE",
+        "INTERVIEW_REMINDER",
+        "PRACTICAL_TEST_INVITE",
+      ]),
       interviewDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
       interviewTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
       location: safeLine(240),

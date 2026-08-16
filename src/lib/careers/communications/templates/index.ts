@@ -9,12 +9,19 @@ import { approvedTemplate } from "./approved";
 import { customMessageTemplate } from "./custom-message";
 import { internalNewApplicationTemplate } from "./internal-new-application";
 import { interviewInviteTemplate } from "./interview-invite";
+import { practicalTestInviteTemplate } from "./practical-test-invite";
 import { interviewReminderTemplate } from "./interview-reminder";
 import { nextStageTemplate } from "./next-stage";
 import { passwordRecoveryTemplate } from "./password-recovery";
 import { processClosedTemplate } from "./process-closed";
 import { rejectedTemplate } from "./rejected";
 import { talentPoolTemplate } from "./talent-pool";
+import {
+  finalApprovedTemplate,
+  stageOneApprovedTemplate,
+  stageThreeApprovedTemplate,
+  stageTwoApprovedTemplate,
+} from "./stage-approved";
 
 export function renderCareerCommunication(
   template: CareerCommunicationTemplate,
@@ -28,8 +35,18 @@ export function renderCareerCommunication(
       return applicationUnderReviewTemplate(parsed);
     case "NEXT_STAGE":
       return nextStageTemplate(parsed);
+    case "STAGE_1_APPROVED":
+      return stageOneApprovedTemplate(parsed);
+    case "STAGE_2_APPROVED":
+      return stageTwoApprovedTemplate(parsed);
+    case "STAGE_3_APPROVED":
+      return stageThreeApprovedTemplate(parsed);
+    case "FINAL_APPROVED":
+      return finalApprovedTemplate(parsed);
     case "INTERVIEW_INVITE":
       return interviewInviteTemplate(parsed);
+    case "PRACTICAL_TEST_INVITE":
+      return practicalTestInviteTemplate(parsed);
     case "INTERVIEW_REMINDER":
       return interviewReminderTemplate(parsed);
     case "APPROVED":

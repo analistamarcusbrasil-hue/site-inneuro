@@ -7,7 +7,6 @@ import { ConfirmCommandForm } from "@/components/admin/confirm-command-form";
 import { CareerCommunicationForm } from "@/components/admin/career-communication-form";
 import { HrNavigation } from "@/components/admin/hr-navigation";
 import {
-  adminApplicationTransitions,
   applicationStatusLabels,
   candidateStageLabels,
   careerApplicationSnapshotSchema,
@@ -37,10 +36,16 @@ import {
   type ExplainableMatchResult,
 } from "@/lib/careers/matching";
 import { formatCandidateMonth, formatFileSize } from "@/lib/careers/profile";
+import {
+  selectionStageApprovalLabels,
+  selectionStageNumbers,
+  type SelectionStage,
+} from "@/lib/careers/selection-processes";
 import { recalculateApplicationMatchAction } from "../../aderencia/actions";
 import {
+  decideCareerApplicationStageAction,
   retryCareerApplicationCommunicationAction,
-  updateCareerApplicationStatusAction,
+  scheduleCareerStageEventAction,
 } from "../actions";
 
 type HistoryRow = {
@@ -74,6 +79,25 @@ type CommunicationRow = {
   triggered_by: "candidate" | "admin" | "system";
   created_at: string;
   creator: { full_name: string | null } | null;
+};
+
+type StageHistoryRow = {
+  id: string;
+  from_stage: SelectionStage | null;
+  to_stage: SelectionStage;
+  decision: "submitted" | "approved" | "not_approved" | "hired" | "migrated";
+  created_at: string;
+  admin: { full_name: string | null } | null;
+};
+
+type StageEventRow = {
+  stage: "interview" | "practical_test";
+  scheduled_date: string;
+  scheduled_time: string;
+  location: string;
+  instructions: string | null;
+  internal_notes: string | null;
+  invitation_sent_at: string | null;
 };
 
 const communicationStatusLabels: Record<CareerCommunicationStatus, string> = {
@@ -127,6 +151,8 @@ export default async function CareerApplicationDetailPage({
     matrixResult,
     logisticsResult,
     communicationsResult,
+    stageHistoryResult,
+    stageEventsResult,
   ] = await Promise.all([
     supabase.from("career_jobs").select("id, title").eq("id", id).maybeSingle(),
     supabase
@@ -166,6 +192,19 @@ export default async function CareerApplicationDetailPage({
       )
       .eq("application_id", applicationId)
       .order("created_at", { ascending: false }),
+    supabase
+      .from("career_application_stage_history")
+      .select(
+        "id, from_stage, to_stage, decision, created_at, admin:profiles!career_application_stage_history_admin_id_fkey(full_name)",
+      )
+      .eq("application_id", applicationId)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("career_application_stage_events")
+      .select(
+        "stage, scheduled_date, scheduled_time, location, instructions, internal_notes, invitation_sent_at",
+      )
+      .eq("application_id", applicationId),
   ]);
   if (
     jobResult.error ||
@@ -193,11 +232,17 @@ export default async function CareerApplicationDetailPage({
   const match: ExplainableMatchResult | null = parsedMatch.success
     ? parsedMatch.data
     : null;
-  const transitions = adminApplicationTransitions[application.status];
   const logistics =
     (logisticsResult.data as ApplicationLogistics | null) ?? null;
   const communications =
     (communicationsResult.data as unknown as CommunicationRow[] | null) ?? [];
+  const stageHistory =
+    (stageHistoryResult.data as unknown as StageHistoryRow[] | null) ?? [];
+  const stageEvents =
+    (stageEventsResult.data as unknown as StageEventRow[] | null) ?? [];
+  const currentEvent = stageEvents.find(
+    (item) => item.stage === application.candidate_stage,
+  );
   const query = await searchParams;
   const detailPath = `/admin/rh/vagas/${id}/candidaturas/${applicationId}`;
 
@@ -238,6 +283,20 @@ export default async function CareerApplicationDetailPage({
         >
           Status atualizado e registrado no histórico.
         </p>
+      ) : query.status === "stage-updated" ? (
+        <p
+          role="status"
+          className="bg-mint text-brand-dark mb-6 rounded-2xl p-4 text-sm font-bold"
+        >
+          Decisão registrada e etapa atualizada com sucesso.
+        </p>
+      ) : query.status === "event-saved" ? (
+        <p
+          role="status"
+          className="bg-mint text-brand-dark mb-6 rounded-2xl p-4 text-sm font-bold"
+        >
+          Agendamento salvo e convite processado.
+        </p>
       ) : null}
       {query.status === "match-calculated" ? (
         <p
@@ -247,14 +306,16 @@ export default async function CareerApplicationDetailPage({
           Indicador recalculado e nova entrada adicionada ao histórico.
         </p>
       ) : null}
-      {query.status === "communication-sent" ? (
+      {query.status === "communication-sent" ||
+      query.communication === "sent" ? (
         <p
           role="status"
           className="bg-mint text-brand-dark mb-6 rounded-2xl p-4 text-sm font-bold"
         >
           Comunicação enviada. O servidor SMTP aceitou o envio.
         </p>
-      ) : query.status === "communication-failed" ? (
+      ) : query.status === "communication-failed" ||
+        query.communication === "failed" ? (
         <p
           role="status"
           className="bg-warning/10 text-warning mb-6 rounded-2xl p-4 text-sm font-bold"
@@ -268,11 +329,15 @@ export default async function CareerApplicationDetailPage({
           role="alert"
           className="bg-error/10 text-error mb-6 rounded-2xl p-4 text-sm font-bold"
         >
-          {query.error === "transition"
-            ? "Esta mudança de status não é permitida."
-            : query.error === "calculation"
-              ? "Não foi possível calcular a aderência desta candidatura."
-              : "Não foi possível atualizar a candidatura."}
+          {query.error === "decision"
+            ? "Não foi possível registrar a decisão. Atualize a página e confirme a etapa atual."
+            : query.error?.startsWith("schedule")
+              ? "Não foi possível salvar o agendamento para a etapa atual."
+              : query.error === "transition"
+                ? "Esta mudança de status não é permitida."
+                : query.error === "calculation"
+                  ? "Não foi possível calcular a aderência desta candidatura."
+                  : "Não foi possível atualizar a candidatura."}
         </p>
       ) : null}
 
@@ -295,66 +360,150 @@ export default async function CareerApplicationDetailPage({
             ) : null}
           </div>
         </div>
-        {transitions.length ? (
-          <ConfirmCommandForm
-            action={updateCareerApplicationStatusAction}
-            message="Confirma a atualização do status desta candidatura?"
-          >
-            <div className="border-border-light mt-6 grid gap-4 border-t pt-6 sm:grid-cols-2 sm:items-end">
-              <input
-                type="hidden"
-                name="application_id"
-                value={application.id}
-              />
-              <input type="hidden" name="job_id" value={id} />
-              <label className="text-ink text-sm font-bold">
-                Novo status
-                <select
-                  name="status"
-                  required
-                  className="border-border-light mt-2 min-h-11 w-full rounded-xl border bg-white px-4 font-normal"
-                >
-                  {transitions.map((status) => (
-                    <option key={status} value={status}>
-                      {applicationStatusLabels[status]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="text-ink text-sm font-bold">
-                Processo seletivo (opcional)
+        <div className="border-border-light mt-6 border-t pt-6">
+          <p className="text-muted text-xs font-bold tracking-wide uppercase">
+            Etapa da seleção
+          </p>
+          <p className="font-heading text-brand-dark mt-1 text-2xl font-semibold">
+            {selectionStageNumbers[application.candidate_stage]
+              ? `Etapa ${selectionStageNumbers[application.candidate_stage]} de 4 — ${candidateStageLabels[application.candidate_stage]}`
+              : candidateStageLabels[application.candidate_stage]}
+          </p>
+          {selectionStageApprovalLabels[application.candidate_stage] ? (
+            <div className="mt-5 flex flex-wrap gap-3">
+              <ConfirmCommandForm
+                action={decideCareerApplicationStageAction}
+                message="Confirma a aprovação e o avanço desta candidatura? A decisão será registrada no histórico."
+              >
                 <input
-                  name="process_label"
-                  defaultValue={application.process_label ?? ""}
-                  maxLength={160}
-                  placeholder="Ex.: Processo 2026.2"
-                  className="border-border-light mt-2 min-h-11 w-full rounded-xl border px-4 font-normal"
+                  type="hidden"
+                  name="application_id"
+                  value={application.id}
                 />
-              </label>
-              <label className="text-ink flex min-h-11 items-center gap-3 text-sm font-bold sm:col-span-2">
+                <input type="hidden" name="job_id" value={id} />
                 <input
-                  type="checkbox"
-                  name="send_communication"
-                  className="size-5"
+                  type="hidden"
+                  name="expected_stage"
+                  value={application.candidate_stage}
                 />
-                Enviar comunicação correspondente ao candidato
-              </label>
-              <label className="text-ink text-sm font-bold sm:col-span-2">
-                Orientações da próxima etapa, quando aplicável
-                <textarea
-                  name="communication_instructions"
-                  maxLength={2000}
-                  rows={3}
-                  className="border-border-light mt-2 w-full rounded-xl border p-4 font-normal"
+                <input type="hidden" name="decision" value="approve" />
+                <button className="bg-brand hover:bg-brand-dark min-h-11 rounded-full px-5 text-sm font-bold text-white">
+                  {selectionStageApprovalLabels[application.candidate_stage]}
+                </button>
+              </ConfirmCommandForm>
+              <ConfirmCommandForm
+                action={decideCareerApplicationStageAction}
+                message="Confirma que esta candidatura não foi aprovada nesta etapa? Esta ação encerra a participação neste processo."
+              >
+                <input
+                  type="hidden"
+                  name="application_id"
+                  value={application.id}
                 />
-              </label>
-              <button className="bg-brand hover:bg-brand-dark min-h-11 rounded-full px-5 text-sm font-bold text-white">
-                Atualizar
-              </button>
+                <input type="hidden" name="job_id" value={id} />
+                <input
+                  type="hidden"
+                  name="expected_stage"
+                  value={application.candidate_stage}
+                />
+                <input type="hidden" name="decision" value="not_approve" />
+                <button className="border-error/40 text-error min-h-11 rounded-full border px-5 text-sm font-bold">
+                  NÃO APROVAR
+                </button>
+              </ConfirmCommandForm>
             </div>
-          </ConfirmCommandForm>
-        ) : null}
+          ) : (
+            <p className="text-muted mt-3 text-sm">
+              Esta participação chegou a um resultado final e não aceita novas
+              decisões.
+            </p>
+          )}
+        </div>
       </section>
+
+      {["interview", "practical_test"].includes(application.candidate_stage) ? (
+        <section className="border-border-light mt-6 rounded-3xl border bg-white p-5 sm:p-7">
+          <p className="text-muted text-xs font-bold tracking-wide uppercase">
+            Agendamento
+          </p>
+          <h2 className="font-heading text-brand-dark mt-1 text-2xl font-semibold">
+            {application.candidate_stage === "interview"
+              ? "Entrevista"
+              : "Teste prático"}
+          </h2>
+          <form
+            action={scheduleCareerStageEventAction}
+            className="mt-5 grid gap-4 sm:grid-cols-3"
+          >
+            <input type="hidden" name="application_id" value={application.id} />
+            <input type="hidden" name="job_id" value={id} />
+            <input
+              type="hidden"
+              name="stage"
+              value={application.candidate_stage}
+            />
+            <label className="text-ink text-sm font-bold">
+              Data
+              <input
+                name="scheduled_date"
+                type="date"
+                required
+                defaultValue={currentEvent?.scheduled_date}
+                className="border-border-light mt-2 min-h-11 w-full rounded-xl border px-4 font-normal"
+              />
+            </label>
+            <label className="text-ink text-sm font-bold">
+              Horário
+              <input
+                name="scheduled_time"
+                type="time"
+                required
+                defaultValue={currentEvent?.scheduled_time?.slice(0, 5)}
+                className="border-border-light mt-2 min-h-11 w-full rounded-xl border px-4 font-normal"
+              />
+            </label>
+            <label className="text-ink text-sm font-bold">
+              Local
+              <input
+                name="location"
+                required
+                maxLength={240}
+                defaultValue={currentEvent?.location}
+                className="border-border-light mt-2 min-h-11 w-full rounded-xl border px-4 font-normal"
+              />
+            </label>
+            <label className="text-ink text-sm font-bold sm:col-span-3">
+              Instruções para o candidato
+              <textarea
+                name="instructions"
+                rows={3}
+                maxLength={2000}
+                defaultValue={currentEvent?.instructions ?? ""}
+                className="border-border-light mt-2 w-full rounded-xl border p-4 font-normal"
+              />
+            </label>
+            <label className="text-ink text-sm font-bold sm:col-span-3">
+              Observações internas (não enviadas)
+              <textarea
+                name="internal_notes"
+                rows={3}
+                maxLength={4000}
+                defaultValue={currentEvent?.internal_notes ?? ""}
+                className="border-border-light mt-2 w-full rounded-xl border p-4 font-normal"
+              />
+            </label>
+            <button className="bg-brand hover:bg-brand-dark min-h-11 rounded-full px-5 text-sm font-bold text-white sm:col-span-3">
+              SALVAR E ENVIAR CONVITE
+            </button>
+          </form>
+          {currentEvent?.invitation_sent_at ? (
+            <p className="text-muted mt-3 text-xs">
+              Último convite aceito pelo SMTP em{" "}
+              {formatApplicationDate(currentEvent.invitation_sent_at)}.
+            </p>
+          ) : null}
+        </section>
+      ) : null}
 
       <section className="border-border-light mt-6 rounded-3xl border bg-white p-5 sm:p-7">
         <p className="text-muted text-xs font-bold tracking-wide uppercase">
@@ -849,6 +998,48 @@ export default async function CareerApplicationDetailPage({
           </p>
         )}
       </section>
+
+      <div className="mt-6">
+        <SnapshotSection title="Histórico das etapas">
+          {stageHistoryResult.error ? (
+            <p className="text-error">
+              Não foi possível carregar o histórico das etapas.
+            </p>
+          ) : stageHistory.length ? (
+            <ol className="grid gap-3">
+              {stageHistory.map((entry) => (
+                <li
+                  key={entry.id}
+                  className="border-border-light flex flex-wrap justify-between gap-3 border-b pb-3 last:border-0 last:pb-0"
+                >
+                  <span>
+                    <strong>{candidateStageLabels[entry.to_stage]}</strong>
+                    {entry.from_stage
+                      ? ` — anteriormente ${candidateStageLabels[entry.from_stage]}`
+                      : " — entrada no funil"}
+                    <span className="text-muted mt-1 block text-xs">
+                      Decisão:{" "}
+                      {entry.decision === "not_approved"
+                        ? "Não aprovado"
+                        : entry.decision === "hired"
+                          ? "Contratado"
+                          : entry.decision === "approved"
+                            ? "Aprovado"
+                            : "Registro inicial"}
+                    </span>
+                  </span>
+                  <span className="text-muted text-xs">
+                    {formatApplicationDate(entry.created_at)} ·{" "}
+                    {entry.admin?.full_name ?? "Sistema"}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="text-muted">Nenhuma movimentação registrada.</p>
+          )}
+        </SnapshotSection>
+      </div>
 
       <div className="mt-6">
         <SnapshotSection title="Histórico de status">

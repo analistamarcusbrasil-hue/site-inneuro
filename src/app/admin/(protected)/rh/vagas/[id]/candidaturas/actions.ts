@@ -10,6 +10,7 @@ import {
 } from "@/lib/careers/applications";
 import {
   communicationForApplicationStatus,
+  communicationForSelectionStage,
   sendApplicationCommunication,
 } from "@/lib/careers/communications/application-service";
 import { consumeCareerAdminMailRateLimit } from "@/lib/careers/communications/rate-limit";
@@ -19,10 +20,138 @@ import {
   retryCareerCommunicationSchema,
 } from "@/lib/careers/communications/validation";
 import { requireHrAccess } from "@/lib/careers/hr-auth";
+import {
+  careerStageDecisionSchema,
+  careerStageEventSchema,
+} from "@/lib/careers/selection-process-validation";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 function field(formData: FormData, name: string) {
   return String(formData.get(name) ?? "");
+}
+
+export async function decideCareerApplicationStageAction(formData: FormData) {
+  const { supabase, user } = await requireHrAccess("jobs:manage");
+  const parsed = careerStageDecisionSchema.safeParse({
+    applicationId: field(formData, "application_id"),
+    jobId: field(formData, "job_id"),
+    expectedStage: field(formData, "expected_stage"),
+    decision: field(formData, "decision"),
+  });
+  if (!parsed.success) redirect("/admin/rh/vagas?error=decision");
+  const detailPath = `/admin/rh/vagas/${parsed.data.jobId}/candidaturas/${parsed.data.applicationId}`;
+  const { data: nextStage, error } = await supabase.rpc(
+    "decide_career_application_stage",
+    {
+      p_application_id: parsed.data.applicationId,
+      p_decision: parsed.data.decision,
+      p_expected_stage: parsed.data.expectedStage,
+    },
+  );
+  if (error || typeof nextStage !== "string") {
+    redirect(`${detailPath}?error=decision`);
+  }
+
+  const template = communicationForSelectionStage(nextStage);
+  let communication = "failed";
+  if (template) {
+    try {
+      const result = await sendApplicationCommunication({
+        applicationId: parsed.data.applicationId,
+        template,
+        triggeredBy: "admin",
+        createdBy: user.id,
+        idempotencyKey: `application:${parsed.data.applicationId}:stage:${nextStage}`,
+      });
+      communication = result.status === "SENT" ? "sent" : "failed";
+    } catch {
+      communication = "failed";
+    }
+  }
+
+  revalidatePath(`/admin/rh/vagas/${parsed.data.jobId}/candidaturas`);
+  revalidatePath(detailPath);
+  revalidatePath("/carreiras/candidaturas");
+  redirect(`${detailPath}?status=stage-updated&communication=${communication}`);
+}
+
+export async function scheduleCareerStageEventAction(formData: FormData) {
+  const { supabase, user } = await requireHrAccess("jobs:manage");
+  const parsed = careerStageEventSchema.safeParse({
+    applicationId: field(formData, "application_id"),
+    jobId: field(formData, "job_id"),
+    stage: field(formData, "stage"),
+    scheduledDate: field(formData, "scheduled_date"),
+    scheduledTime: field(formData, "scheduled_time"),
+    location: field(formData, "location"),
+    instructions: field(formData, "instructions"),
+    internalNotes: field(formData, "internal_notes"),
+  });
+  if (!parsed.success) redirect("/admin/rh/vagas?error=schedule");
+  const detailPath = `/admin/rh/vagas/${parsed.data.jobId}/candidaturas/${parsed.data.applicationId}`;
+  const { data: application } = await supabase
+    .from("career_job_applications")
+    .select("candidate_stage")
+    .eq("id", parsed.data.applicationId)
+    .eq("job_id", parsed.data.jobId)
+    .maybeSingle();
+  if (!application || application.candidate_stage !== parsed.data.stage) {
+    redirect(`${detailPath}?error=schedule-stage`);
+  }
+  const { error } = await supabase
+    .from("career_application_stage_events")
+    .upsert(
+      {
+        application_id: parsed.data.applicationId,
+        stage: parsed.data.stage,
+        scheduled_date: parsed.data.scheduledDate,
+        scheduled_time: parsed.data.scheduledTime,
+        location: parsed.data.location,
+        instructions: parsed.data.instructions,
+        internal_notes: parsed.data.internalNotes,
+        created_by: user.id,
+        updated_by: user.id,
+        invitation_sent_at: null,
+      },
+      { onConflict: "application_id,stage" },
+    );
+  if (error) redirect(`${detailPath}?error=schedule`);
+
+  const template =
+    parsed.data.stage === "interview"
+      ? "INTERVIEW_INVITE"
+      : "PRACTICAL_TEST_INVITE";
+  let communication = "failed";
+  try {
+    const result = await sendApplicationCommunication({
+      applicationId: parsed.data.applicationId,
+      template,
+      fields: {
+        interviewDate: parsed.data.scheduledDate,
+        interviewTime: parsed.data.scheduledTime,
+        location: parsed.data.location,
+        instructions: parsed.data.instructions ?? undefined,
+      },
+      triggeredBy: "admin",
+      createdBy: user.id,
+      idempotencyKey: `application:${parsed.data.applicationId}:invite:${parsed.data.stage}:${parsed.data.scheduledDate}:${parsed.data.scheduledTime.replace(":", "")}`,
+    });
+    communication = result.status === "SENT" ? "sent" : "failed";
+    if (communication === "sent") {
+      await supabase
+        .from("career_application_stage_events")
+        .update({
+          invitation_sent_at: new Date().toISOString(),
+          updated_by: user.id,
+        })
+        .eq("application_id", parsed.data.applicationId)
+        .eq("stage", parsed.data.stage);
+    }
+  } catch {
+    communication = "failed";
+  }
+  revalidatePath(detailPath);
+  redirect(`${detailPath}?status=event-saved&communication=${communication}`);
 }
 
 export async function updateCareerApplicationStatusAction(formData: FormData) {

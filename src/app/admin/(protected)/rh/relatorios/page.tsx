@@ -270,7 +270,7 @@ export default async function CareersReportsPage({
           ["Em processos", rows.filter((row) => row.process).length],
           [
             "Selecionados",
-            rows.filter((row) => row.process?.stage === "selected").length,
+            rows.filter((row) => row.process?.stage === "hired").length,
           ],
         ].map(([label, value]) => (
           <article
