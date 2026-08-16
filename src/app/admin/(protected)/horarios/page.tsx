@@ -1,6 +1,6 @@
 import { saveSchedulingSettingsAction } from "@/app/admin/actions";
 import { AdminPageHeading } from "@/components/admin/admin-page-heading";
-import { requireAdmin } from "@/lib/cms/auth";
+import { requireAdminPermission } from "@/lib/cms/auth";
 import {
   parseSchedulingSettings,
   schedulingDayOptions,
@@ -13,14 +13,14 @@ export default async function SchedulingSettingsPage({
   searchParams: Promise<{ success?: string; error?: string }>;
 }) {
   const query = await searchParams;
-  const { supabase, profile } = await requireAdmin();
+  const { supabase } = await requireAdminPermission("settings.manage");
   const { data } = await supabase
     .from("site_settings")
     .select("value,updated_at")
     .eq("key", "scheduling")
     .maybeSingle();
   const settings = parseSchedulingSettings(data?.value);
-  const canSave = profile.role !== "editor";
+  const canSave = true;
   return (
     <>
       <AdminPageHeading

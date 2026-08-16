@@ -3,7 +3,8 @@ import { AdminContentForm } from "@/components/admin/admin-content-form";
 import { AdminPageHeading } from "@/components/admin/admin-page-heading";
 import { ConfirmCommandForm } from "@/components/admin/confirm-command-form";
 import { contentCommandAction } from "@/app/admin/actions";
-import { requireAdmin } from "@/lib/cms/auth";
+import { requireAdminPermission } from "@/lib/cms/auth";
+import { hasAdminPermission } from "@/lib/admin/permissions";
 import type { CmsModule } from "@/lib/cms/modules";
 
 const statusLabels: Record<string, string> = {
@@ -27,7 +28,8 @@ export async function AdminModuleView({
   }>;
 }) {
   const query = await searchParams;
-  const { supabase, profile } = await requireAdmin();
+  const { supabase, profile } =
+    await requireAdminPermission("publications.view");
   const displayField = [
     "convenios",
     "equipamentos",
@@ -62,7 +64,8 @@ export async function AdminModuleView({
     url: supabase.storage.from("site-media").getPublicUrl(item.storage_path)
       .data.publicUrl,
   }));
-  const canPublish = profile.role !== "editor";
+  const canEdit = hasAdminPermission(profile, "publications.edit");
+  const canPublish = hasAdminPermission(profile, "publications.publish");
   const supportsActive = module.fields.some((field) => field.name === "active");
   const { data: newsRows = [] } =
     module.key === "carrossel"
@@ -167,57 +170,65 @@ export async function AdminModuleView({
                           : ""}
                       </p>
                     </div>
-                    <Link
-                      href={`/admin/${module.key}?edit=${item.id}`}
-                      className="text-brand min-h-10 rounded-full px-3 py-2 text-sm font-bold"
-                    >
-                      Editar
-                    </Link>
-                  </div>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {[
-                      "duplicate",
-                      "archive",
-                      ...(canPublish ? ["publish"] : []),
-                      ...(canPublish && supportsActive
-                        ? [item.active ? "deactivate" : "activate"]
-                        : []),
-                    ].map((command) => (
-                      <ConfirmCommandForm
-                        key={command}
-                        action={contentCommandAction}
-                        message={
-                          command === "publish"
-                            ? "Publicar este conteúdo no site agora? Ele ficará visível para o público."
-                            : command === "archive"
-                              ? "Arquivar este conteúdo? Ele deixará de aparecer no site e poderá ser restaurado pela lixeira."
-                              : command === "duplicate"
-                                ? "Criar uma cópia deste conteúdo como rascunho?"
-                                : command === "deactivate"
-                                  ? "Ocultar este conteúdo do site?"
-                                  : "Exibir este conteúdo no site?"
-                        }
+                    {canEdit ? (
+                      <Link
+                        href={`/admin/${module.key}?edit=${item.id}`}
+                        className="text-brand min-h-10 rounded-full px-3 py-2 text-sm font-bold"
                       >
-                        <input type="hidden" name="module" value={module.key} />
-                        <input type="hidden" name="id" value={item.id} />
-                        <button
-                          name="command"
-                          value={command}
-                          className="border-border-light min-h-9 rounded-full border px-3 text-xs font-bold"
-                        >
-                          {
-                            {
-                              duplicate: "Duplicar",
-                              archive: "Arquivar",
-                              publish: "Publicar",
-                              activate: "Ativar",
-                              deactivate: "Desativar",
-                            }[command]
-                          }
-                        </button>
-                      </ConfirmCommandForm>
-                    ))}
+                        Editar
+                      </Link>
+                    ) : null}
                   </div>
+                  {canEdit ? (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {[
+                        "duplicate",
+                        "archive",
+                        ...(canPublish ? ["publish"] : []),
+                        ...(canPublish && supportsActive
+                          ? [item.active ? "deactivate" : "activate"]
+                          : []),
+                      ].map((command) => (
+                        <ConfirmCommandForm
+                          key={command}
+                          action={contentCommandAction}
+                          message={
+                            command === "publish"
+                              ? "Publicar este conteúdo no site agora? Ele ficará visível para o público."
+                              : command === "archive"
+                                ? "Arquivar este conteúdo? Ele deixará de aparecer no site e poderá ser restaurado pela lixeira."
+                                : command === "duplicate"
+                                  ? "Criar uma cópia deste conteúdo como rascunho?"
+                                  : command === "deactivate"
+                                    ? "Ocultar este conteúdo do site?"
+                                    : "Exibir este conteúdo no site?"
+                          }
+                        >
+                          <input
+                            type="hidden"
+                            name="module"
+                            value={module.key}
+                          />
+                          <input type="hidden" name="id" value={item.id} />
+                          <button
+                            name="command"
+                            value={command}
+                            className="border-border-light min-h-9 rounded-full border px-3 text-xs font-bold"
+                          >
+                            {
+                              {
+                                duplicate: "Duplicar",
+                                archive: "Arquivar",
+                                publish: "Publicar",
+                                activate: "Ativar",
+                                deactivate: "Desativar",
+                              }[command]
+                            }
+                          </button>
+                        </ConfirmCommandForm>
+                      ))}
+                    </div>
+                  ) : null}
                 </article>
               ))
             ) : (
@@ -235,12 +246,18 @@ export async function AdminModuleView({
                 : `Novo ${module.singular}`}
             </h2>
           </div>
-          <AdminContentForm
-            module={formModule}
-            initial={selected}
-            media={media}
-            canPublish={canPublish}
-          />
+          {canEdit ? (
+            <AdminContentForm
+              module={formModule}
+              initial={selected}
+              media={media}
+              canPublish={canPublish}
+            />
+          ) : (
+            <p className="border-border-light text-muted rounded-2xl border bg-white p-5">
+              Sua conta possui acesso somente para consulta.
+            </p>
+          )}
         </section>
       </div>
     </>

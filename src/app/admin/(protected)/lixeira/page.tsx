@@ -1,7 +1,7 @@
 import { AdminPageHeading } from "@/components/admin/admin-page-heading";
 import { ConfirmCommandForm } from "@/components/admin/confirm-command-form";
 import { mediaCommandAction, trashCommandAction } from "@/app/admin/actions";
-import { requireAdmin } from "@/lib/cms/auth";
+import { requireAdminPermission } from "@/lib/cms/auth";
 import { cmsModules } from "@/lib/cms/modules";
 
 export default async function TrashPage({
@@ -10,7 +10,8 @@ export default async function TrashPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const query = await searchParams;
-  const { supabase, profile } = await requireAdmin();
+  const { supabase, profile } =
+    await requireAdminPermission("publications.view");
   const groups = await Promise.all(
     cmsModules.map(async (module) => {
       const { data = [] } = await supabase

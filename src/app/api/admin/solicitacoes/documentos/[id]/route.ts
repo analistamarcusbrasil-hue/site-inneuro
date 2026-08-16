@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { requireAdmin } from "@/lib/cms/auth";
+import { getAdminSession } from "@/lib/cms/auth";
+import { hasAdminPermission } from "@/lib/admin/permissions";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { SCHEDULING_BUCKET } from "@/lib/scheduling/shared";
 
@@ -9,7 +10,14 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  await requireAdmin(["reception", "admin", "super_admin"]);
+  const { user, profile } = await getAdminSession();
+  if (!user || !profile)
+    return Response.json(
+      { error: "Autenticação necessária." },
+      { status: 401 },
+    );
+  if (!hasAdminPermission(profile, "scheduling.view"))
+    return Response.json({ error: "Acesso negado." }, { status: 403 });
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(id))
     redirect("/admin/solicitacoes?error=document");

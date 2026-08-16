@@ -9,6 +9,18 @@ export type AdminProfile = {
   hr_role: HrAccessRole | null;
   email: string | null;
   active: boolean;
+  access_profile:
+    | "super_admin"
+    | "manager"
+    | "reception"
+    | "hr"
+    | "publications"
+    | "attendance"
+    | "custom"
+    | null;
+  permissions: import("@/lib/admin/permissions").AdminPermission[] | null;
+  must_change_password: boolean;
+  last_login_at: string | null;
 };
 
 export type CmsCarouselSlide = {

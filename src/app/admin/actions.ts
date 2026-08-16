@@ -4,11 +4,22 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { isCmsConfigured } from "@/lib/cms/config";
-import { getAdminSession, requireAdmin } from "@/lib/cms/auth";
+import {
+  getAdminSession,
+  requireAdmin,
+  requireAdminPermission,
+} from "@/lib/cms/auth";
 import { getCmsModule, type CmsModuleKey } from "@/lib/cms/modules";
 import { moduleSchemas } from "@/lib/cms/schemas";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import {
+  adminPermissions,
+  hasAdminPermission,
+  permissionsForProfile,
+  type AccessProfile,
+  type AdminPermission,
+} from "@/lib/admin/permissions";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -20,8 +31,25 @@ export async function loginAction(formData: FormData) {
   const parsed = loginSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) redirect("/admin/login?error=invalid");
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase!.auth.signInWithPassword(parsed.data);
+  const { data: authData, error } = await supabase!.auth.signInWithPassword(
+    parsed.data,
+  );
   if (error) redirect("/admin/login?error=credentials");
+  const { data: profile } = await supabase!
+    .from("profiles")
+    .select("active, must_change_password")
+    .eq("id", authData.user.id)
+    .maybeSingle();
+  if (!profile?.active) {
+    await supabase!.auth.signOut();
+    redirect("/admin/login?error=inactive");
+  }
+  const admin = createSupabaseAdminClient();
+  await admin
+    ?.from("profiles")
+    .update({ last_login_at: new Date().toISOString() })
+    .eq("id", authData.user.id);
+  if (profile.must_change_password) redirect("/admin/definir-senha");
   redirect("/admin");
 }
 
@@ -106,7 +134,8 @@ export async function saveContentAction(
   const moduleKey = String(formData.get("module")) as CmsModuleKey;
   const cmsModule = getCmsModule(moduleKey);
   if (!cmsModule) throw new Error("Módulo inválido.");
-  const { supabase, user, profile } = await requireAdmin();
+  const { supabase, user, profile } =
+    await requireAdminPermission("publications.edit");
 
   const failure = (
     code: SaveContentErrorCode,
@@ -156,7 +185,10 @@ export async function saveContentAction(
 
   const intent = String(formData.get("intent") || "draft");
   const id = String(formData.get("id") || "");
-  if (["publish", "schedule"].includes(intent) && profile.role === "editor") {
+  if (
+    ["publish", "schedule"].includes(intent) &&
+    !hasAdminPermission(profile, "publications.publish")
+  ) {
     return failure(
       "permission",
       "Sua conta pode salvar rascunhos, mas não tem permissão para publicar.",
@@ -404,12 +436,16 @@ export async function contentCommandAction(formData: FormData) {
   const command = String(formData.get("command") || "");
   if (!cmsModule || !id) throw new Error("Comando inválido.");
 
-  const { supabase, user, profile } = await requireAdmin();
+  const { supabase, user, profile } =
+    await requireAdminPermission("publications.edit");
   const supportsActive = cmsModule.fields.some(
     (field) => field.name === "active",
   );
   const managerOnly = ["publish", "activate", "deactivate"];
-  if (managerOnly.includes(command) && profile.role === "editor") {
+  if (
+    managerOnly.includes(command) &&
+    !hasAdminPermission(profile, "publications.publish")
+  ) {
     redirect(`/admin/${moduleKey}?error=permission`);
   }
 
@@ -512,6 +548,12 @@ export async function uploadMediaAction(
       code: "session",
       message: "Sua sessão expirou. Entre novamente.",
     };
+  if (!hasAdminPermission(session.profile, "publications.edit"))
+    return {
+      ok: false,
+      code: "session",
+      message: "Sua conta não possui permissão para enviar mídias.",
+    };
   const { supabase, user } = session;
   const file = formData.get("file");
   const parsed = mediaSchema.safeParse(Object.fromEntries(formData));
@@ -596,110 +638,283 @@ export async function uploadMediaAction(
   return { ok: true, message: "Imagem enviada com sucesso." };
 }
 
-export async function inviteUserAction(formData: FormData) {
-  const { user, profile } = await requireAdmin(["super_admin", "admin"]);
+const accessProfileSchema = z.enum([
+  "super_admin",
+  "manager",
+  "reception",
+  "hr",
+  "publications",
+  "attendance",
+  "custom",
+]);
+
+function parsePermissions(formData: FormData): AdminPermission[] {
+  const requested = new Set(formData.getAll("permissions").map(String));
+  return adminPermissions.filter((permission) => requested.has(permission));
+}
+
+function legacyRoleForAccessProfile(accessProfile: AccessProfile) {
+  if (accessProfile === "super_admin") return "super_admin" as const;
+  if (accessProfile === "manager") return "admin" as const;
+  if (accessProfile === "reception") return "reception" as const;
+  return "editor" as const;
+}
+
+function allowedPermissionsForAccessProfile(
+  accessProfile: AccessProfile,
+  requested: AdminPermission[],
+) {
+  if (accessProfile === "super_admin") return [...adminPermissions];
+  return requested.filter(
+    (permission) =>
+      !["users.manage", "audit.view", "settings.manage"].includes(permission),
+  );
+}
+
+async function requireSuperAdministrator() {
+  const session = await requireAdmin(["super_admin"]);
+  if (
+    session.profile.access_profile === "super_admin" ||
+    session.profile.role === "super_admin"
+  )
+    return session;
+  redirect("/admin?error=permission");
+}
+
+export async function createAdminUserAction(formData: FormData) {
+  const { user } = await requireSuperAdministrator();
   const parsed = z
     .object({
       full_name: z.string().trim().min(2).max(120),
-      email: z.string().email(),
-      role: z.enum(["super_admin", "admin", "editor", "reception"]),
+      email: z.string().trim().email().max(254),
+      password: z.string().min(8).max(128),
+      password_confirmation: z.string().min(8).max(128),
+      access_profile: accessProfileSchema,
       active: z.boolean(),
+      must_change_password: z.boolean(),
     })
     .safeParse({
       full_name: formData.get("full_name"),
       email: formData.get("email"),
-      role: formData.get("role"),
+      password: formData.get("password"),
+      password_confirmation: formData.get("password_confirmation"),
+      access_profile: formData.get("access_profile"),
       active: formData.get("active") !== "inactive",
+      must_change_password: formData.get("must_change_password") === "on",
     });
-  if (!parsed.success) redirect("/admin/usuarios?error=validation");
-  if (profile.role === "admin" && parsed.data.role !== "reception")
-    redirect("/admin/usuarios?error=permission");
+  if (
+    !parsed.success ||
+    parsed.data.password !== parsed.data.password_confirmation
+  )
+    redirect("/admin/usuarios?error=validation");
   const admin = createSupabaseAdminClient();
   if (!admin) redirect("/admin/usuarios?error=config");
-  const { data, error } = await admin.auth.admin.inviteUserByEmail(
-    parsed.data.email,
-    { data: { full_name: parsed.data.full_name } },
+  const requestedPermissions = formData.has("permissions_customized")
+    ? parsePermissions(formData)
+    : permissionsForProfile(parsed.data.access_profile);
+  const permissions = allowedPermissionsForAccessProfile(
+    parsed.data.access_profile,
+    requestedPermissions,
   );
-  if (error || !data.user) redirect("/admin/usuarios?error=invite");
-  const { error: profileError } = await admin.from("profiles").upsert({
+  const role = legacyRoleForAccessProfile(parsed.data.access_profile);
+  const hrRole = parsed.data.access_profile === "hr" ? "hr_manager" : null;
+  const { data, error } = await admin.auth.admin.createUser({
+    email: parsed.data.email,
+    password: parsed.data.password,
+    email_confirm: true,
+    user_metadata: { full_name: parsed.data.full_name },
+  });
+  if (error || !data.user)
+    redirect(
+      `/admin/usuarios?error=${error?.message.includes("registered") ? "exists" : "create"}`,
+    );
+  const profilePayload = {
     id: data.user.id,
     full_name: parsed.data.full_name,
-    email: parsed.data.email,
-    role: parsed.data.role,
+    email: parsed.data.email.toLowerCase(),
+    role,
+    hr_role: hrRole,
     active: parsed.data.active,
-  });
-  if (profileError) redirect("/admin/usuarios?error=profile");
+    access_profile: parsed.data.access_profile,
+    permissions,
+    must_change_password: parsed.data.must_change_password,
+  };
+  const { error: profileError } = await admin
+    .from("profiles")
+    .upsert(profilePayload);
+  if (profileError) {
+    await admin.auth.admin.deleteUser(data.user.id);
+    redirect("/admin/usuarios?error=profile");
+  }
   await admin.from("audit_logs").insert({
     actor_id: user.id,
-    action: "invite",
+    action: "USER_CREATED",
     entity_type: "profiles",
     entity_id: data.user.id,
     after_data: {
-      role: parsed.data.role,
-      active: parsed.data.active,
       full_name: parsed.data.full_name,
+      email: parsed.data.email.toLowerCase(),
+      access_profile: parsed.data.access_profile,
+      permissions,
+      active: parsed.data.active,
+      must_change_password: parsed.data.must_change_password,
     },
   });
   revalidatePath("/admin/usuarios");
-  redirect("/admin/usuarios?success=invited");
+  redirect("/admin/usuarios?success=created");
 }
 
-export async function updateUserRoleAction(formData: FormData) {
-  const { user, profile } = await requireAdmin(["super_admin", "admin"]);
+export async function updateAdminUserAction(formData: FormData) {
+  const { user } = await requireSuperAdministrator();
   const parsed = z
     .object({
       id: z.string().uuid(),
       full_name: z.string().trim().min(2).max(120),
-      role: z.enum(["super_admin", "admin", "editor", "reception"]),
+      access_profile: accessProfileSchema,
       active: z.boolean(),
     })
     .safeParse({
       id: formData.get("id"),
       full_name: formData.get("full_name"),
-      role: formData.get("role"),
+      access_profile: formData.get("access_profile"),
       active: formData.get("active") !== "inactive",
     });
   if (!parsed.success || parsed.data.id === user.id)
-    redirect("/admin/usuarios?error=validation");
+    redirect("/admin/usuarios?error=self");
   const admin = createSupabaseAdminClient();
   if (!admin) redirect("/admin/usuarios?error=config");
   const { data: current } = await admin
     .from("profiles")
-    .select("role")
+    .select("id, full_name, email, role, access_profile, permissions, active")
     .eq("id", parsed.data.id)
     .single();
-  if (
-    profile.role === "admin" &&
-    (current?.role !== "reception" || parsed.data.role !== "reception")
-  )
-    redirect("/admin/usuarios?error=permission");
+  if (!current) redirect("/admin/usuarios?error=not-found");
+  const currentIsSuper =
+    current.role === "super_admin" || current.access_profile === "super_admin";
+  const nextIsSuper = parsed.data.access_profile === "super_admin";
+  if (currentIsSuper && (!nextIsSuper || !parsed.data.active)) {
+    const { count } = await admin
+      .from("profiles")
+      .select("id", { count: "exact", head: true })
+      .eq("active", true)
+      .or("role.eq.super_admin,access_profile.eq.super_admin");
+    if ((count ?? 0) <= 1) redirect("/admin/usuarios?error=last-super-admin");
+  }
+  const requestedPermissions = formData.has("permissions_customized")
+    ? parsePermissions(formData)
+    : permissionsForProfile(parsed.data.access_profile);
+  const permissions = allowedPermissionsForAccessProfile(
+    parsed.data.access_profile,
+    requestedPermissions,
+  );
+  const next = {
+    full_name: parsed.data.full_name,
+    role: legacyRoleForAccessProfile(parsed.data.access_profile),
+    hr_role: parsed.data.access_profile === "hr" ? "hr_manager" : null,
+    access_profile: parsed.data.access_profile,
+    permissions,
+    active: parsed.data.active,
+  };
   const { error } = await admin
     .from("profiles")
-    .update({
-      full_name: parsed.data.full_name,
-      role: parsed.data.role,
-      active: parsed.data.active,
-      ...(parsed.data.role === "reception" ? { hr_role: null } : {}),
-    })
+    .update(next)
     .eq("id", parsed.data.id);
-  if (error) redirect("/admin/usuarios?error=role");
+  if (error) redirect("/admin/usuarios?error=update");
+  await admin.auth.admin.updateUserById(parsed.data.id, {
+    user_metadata: { full_name: parsed.data.full_name },
+  });
+  const action =
+    current.active !== next.active
+      ? next.active
+        ? "USER_ACTIVATED"
+        : "USER_DEACTIVATED"
+      : JSON.stringify(current.permissions ?? []) !==
+          JSON.stringify(permissions)
+        ? "USER_PERMISSIONS_CHANGED"
+        : "USER_UPDATED";
   await admin.from("audit_logs").insert({
     actor_id: user.id,
-    action: "role_update",
+    action,
     entity_type: "profiles",
     entity_id: parsed.data.id,
-    after_data: {
-      role: parsed.data.role,
-      active: parsed.data.active,
-      full_name: parsed.data.full_name,
+    before_data: {
+      full_name: current.full_name,
+      access_profile: current.access_profile,
+      permissions: current.permissions,
+      active: current.active,
     },
+    after_data: next,
   });
   revalidatePath("/admin/usuarios");
-  redirect("/admin/usuarios?success=role");
+  redirect("/admin/usuarios?success=updated");
+}
+
+export async function resetAdminUserPasswordAction(formData: FormData) {
+  const { user } = await requireSuperAdministrator();
+  const parsed = z
+    .object({
+      id: z.string().uuid(),
+      password: z.string().min(8).max(128),
+      password_confirmation: z.string().min(8).max(128),
+    })
+    .safeParse(Object.fromEntries(formData));
+  if (
+    !parsed.success ||
+    parsed.data.password !== parsed.data.password_confirmation
+  )
+    redirect("/admin/usuarios?error=password");
+  const admin = createSupabaseAdminClient();
+  if (!admin) redirect("/admin/usuarios?error=config");
+  const { error } = await admin.auth.admin.updateUserById(parsed.data.id, {
+    password: parsed.data.password,
+  });
+  if (error) redirect("/admin/usuarios?error=password");
+  await admin
+    .from("profiles")
+    .update({ must_change_password: true })
+    .eq("id", parsed.data.id);
+  await admin.from("audit_logs").insert({
+    actor_id: user.id,
+    action: "USER_PASSWORD_RESET",
+    entity_type: "profiles",
+    entity_id: parsed.data.id,
+    after_data: { must_change_password: true },
+  });
+  revalidatePath("/admin/usuarios");
+  redirect("/admin/usuarios?success=password");
+}
+
+export async function changeRequiredPasswordAction(formData: FormData) {
+  const session = await getAdminSession();
+  if (!session.user || !session.profile || !session.supabase)
+    redirect("/admin/login");
+  if (!session.profile.active) redirect("/admin/login?error=inactive");
+  const parsed = z
+    .object({
+      password: z.string().min(8).max(128),
+      password_confirmation: z.string().min(8).max(128),
+    })
+    .safeParse(Object.fromEntries(formData));
+  if (
+    !parsed.success ||
+    parsed.data.password !== parsed.data.password_confirmation
+  )
+    redirect("/admin/definir-senha?error=validation");
+  const { error } = await session.supabase.auth.updateUser({
+    password: parsed.data.password,
+  });
+  if (error) redirect("/admin/definir-senha?error=save");
+  const admin = createSupabaseAdminClient();
+  await admin
+    ?.from("profiles")
+    .update({ must_change_password: false })
+    .eq("id", session.user.id);
+  redirect("/admin");
 }
 
 export async function mediaCommandAction(formData: FormData) {
-  const { supabase, user, profile } = await requireAdmin();
+  const { supabase, user, profile } =
+    await requireAdminPermission("publications.edit");
   const id = String(formData.get("id") || "");
   const command = String(formData.get("command") || "");
   if (!id || !["archive", "restore", "delete"].includes(command))
@@ -738,7 +953,7 @@ export async function mediaCommandAction(formData: FormData) {
 }
 
 export async function updateMediaMetadataAction(formData: FormData) {
-  const { supabase, user } = await requireAdmin();
+  const { supabase, user } = await requireAdminPermission("publications.edit");
   const parsed = mediaSchema
     .omit({ kind: true })
     .extend({ id: z.string().uuid() })
@@ -798,7 +1013,7 @@ const institutionalSchema = z.object({
 });
 
 export async function saveInstitutionalSettingsAction(formData: FormData) {
-  const { supabase, user } = await requireAdmin(["super_admin", "admin"]);
+  const { supabase, user } = await requireAdminPermission("settings.manage");
   const parsed = institutionalSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) redirect("/admin/informacoes?error=validation");
   const { data: current } = await supabase
@@ -863,7 +1078,7 @@ const schedulingSettingsSchema = z.object({
 });
 
 export async function saveSchedulingSettingsAction(formData: FormData) {
-  const { supabase, user } = await requireAdmin(["super_admin", "admin"]);
+  const { supabase, user } = await requireAdminPermission("settings.manage");
   const parsed = schedulingSettingsSchema.safeParse({
     days: formData.getAll("days"),
     periods: formData.getAll("periods"),
@@ -918,7 +1133,7 @@ const requestStatuses = [
 ] as const;
 
 export async function updateAppointmentRequestAction(formData: FormData) {
-  const { supabase, user } = await requireAdmin();
+  const { supabase, user } = await requireAdminPermission("scheduling.manage");
   const parsed = z
     .object({
       id: z.string().uuid(),
@@ -961,7 +1176,7 @@ export async function updateAppointmentRequestAction(formData: FormData) {
 }
 
 export async function markAppointmentDocumentAction(formData: FormData) {
-  const { supabase, user } = await requireAdmin();
+  const { supabase, user } = await requireAdminPermission("scheduling.manage");
   const parsed = z
     .object({ id: z.string().uuid(), request_id: z.string().uuid() })
     .safeParse(Object.fromEntries(formData));
@@ -993,7 +1208,8 @@ const restorableTables = [
 ] as const;
 
 export async function trashCommandAction(formData: FormData) {
-  const { supabase, user, profile } = await requireAdmin();
+  const { supabase, user, profile } =
+    await requireAdminPermission("publications.edit");
   const table = String(
     formData.get("table"),
   ) as (typeof restorableTables)[number];
@@ -1015,4 +1231,35 @@ export async function trashCommandAction(formData: FormData) {
   }
   await audit(supabase, user.id, command, table, id);
   revalidatePath("/admin/lixeira");
+}
+
+export async function updateContactMessageAction(formData: FormData) {
+  const { supabase, user } = await requireAdminPermission("contact.manage");
+  const parsed = z
+    .object({
+      id: z.string().uuid(),
+      status: z.enum(["NEW", "IN_REVIEW", "ANSWERED", "CLOSED"]),
+    })
+    .safeParse(Object.fromEntries(formData));
+  if (!parsed.success) redirect("/admin/fale-conosco?error=validation");
+  const { data: current } = await supabase
+    .from("contact_messages")
+    .select("status")
+    .eq("id", parsed.data.id)
+    .single();
+  const { error } = await supabase
+    .from("contact_messages")
+    .update({ status: parsed.data.status })
+    .eq("id", parsed.data.id);
+  if (error) redirect("/admin/fale-conosco?error=save");
+  await audit(
+    supabase,
+    user.id,
+    "CONTACT_STATUS_UPDATED",
+    "contact_messages",
+    parsed.data.id,
+    { from: current?.status ?? null, to: parsed.data.status },
+  );
+  revalidatePath("/admin/fale-conosco");
+  redirect(`/admin/fale-conosco?id=${parsed.data.id}&success=updated`);
 }

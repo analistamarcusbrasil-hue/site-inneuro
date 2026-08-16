@@ -1,8 +1,8 @@
 import { AdminPageHeading } from "@/components/admin/admin-page-heading";
-import { requireAdmin } from "@/lib/cms/auth";
+import { requireAdminPermission } from "@/lib/cms/auth";
 
 export default async function AuditPage() {
-  const { supabase } = await requireAdmin(["super_admin"]);
+  const { supabase } = await requireAdminPermission("audit.view");
   const { data = [] } = await supabase
     .from("audit_logs")
     .select("id, action, entity_type, entity_id, actor_id, created_at")

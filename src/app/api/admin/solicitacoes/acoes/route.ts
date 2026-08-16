@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { requireAdmin } from "@/lib/cms/auth";
+import { getAdminSession } from "@/lib/cms/auth";
+import { hasAdminPermission } from "@/lib/admin/permissions";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { sanitizeSchedulingText } from "@/lib/scheduling/shared";
 import {
@@ -51,11 +52,10 @@ const legacyStatus: Record<string, string> = {
 
 export async function POST(request: Request) {
   if (!isSameOrigin(request)) return response("Requisição inválida.", 403);
-  const { user, profile } = await requireAdmin([
-    "reception",
-    "admin",
-    "super_admin",
-  ]);
+  const { user, profile } = await getAdminSession();
+  if (!user || !profile) return response("Autenticação necessária.", 401);
+  if (!hasAdminPermission(profile, "scheduling.manage"))
+    return response("Acesso negado.", 403);
   const admin = createSupabaseAdminClient();
   if (!admin) return response("Serviço indisponível.", 503);
   let body: Record<string, unknown>;

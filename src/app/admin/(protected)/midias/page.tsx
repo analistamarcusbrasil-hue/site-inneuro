@@ -5,7 +5,7 @@ import {
   mediaCommandAction,
   updateMediaMetadataAction,
 } from "@/app/admin/actions";
-import { requireAdmin } from "@/lib/cms/auth";
+import { requireAdminPermission } from "@/lib/cms/auth";
 import { AdminMediaUploadForm } from "@/components/admin/admin-media-upload-form";
 
 export default async function MediaPage({
@@ -19,7 +19,7 @@ export default async function MediaPage({
   }>;
 }) {
   const query = await searchParams;
-  const { supabase } = await requireAdmin();
+  const { supabase } = await requireAdminPermission("publications.view");
   let request = supabase
     .from("media_assets")
     .select("*")

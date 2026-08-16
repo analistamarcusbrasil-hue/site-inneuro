@@ -1,81 +1,119 @@
 import Link from "next/link";
+import {
+  BriefcaseBusiness,
+  ClipboardList,
+  MessageSquareText,
+  Newspaper,
+  Users,
+} from "lucide-react";
 import { AdminPageHeading } from "@/components/admin/admin-page-heading";
-import { cmsModules } from "@/lib/cms/modules";
 import { requireAdmin } from "@/lib/cms/auth";
+import { hasAdminPermission } from "@/lib/admin/permissions";
 
-export default async function AdminDashboardPage() {
+export default async function AdminDashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const query = await searchParams;
   const { supabase, profile } = await requireAdmin();
-  const cards = await Promise.all(
-    cmsModules.map(async (module) => {
-      const [{ count }, { count: published }, { count: drafts }] =
-        await Promise.all([
-          supabase
-            .from(module.table)
-            .select("id", { count: "exact", head: true })
-            .is("deleted_at", null),
-          supabase
-            .from(module.table)
-            .select("id", { count: "exact", head: true })
-            .is("deleted_at", null)
-            .eq("status", "published"),
-          supabase
-            .from(module.table)
-            .select("id", { count: "exact", head: true })
-            .is("deleted_at", null)
-            .eq("status", "draft"),
-        ]);
-      return {
-        ...module,
-        count: count ?? 0,
-        published: published ?? 0,
-        drafts: drafts ?? 0,
-      };
-    }),
-  );
-  const [{ data: recent = [] }, { count: missingAlt }] = await Promise.all([
-    supabase
-      .from("audit_logs")
-      .select("id,action,entity_type,created_at")
-      .order("created_at", { ascending: false })
-      .limit(6),
-    supabase
-      .from("media_assets")
+  const cards: {
+    href: string;
+    label: string;
+    description: string;
+    count?: number;
+    icon: typeof Newspaper;
+  }[] = [];
+
+  if (hasAdminPermission(profile, "publications.view")) {
+    const { count } = await supabase
+      .from("news_posts")
       .select("id", { count: "exact", head: true })
-      .is("deleted_at", null)
-      .eq("alt_text", ""),
-  ]);
+      .is("deleted_at", null);
+    cards.push({
+      href: "/admin/noticias",
+      label: "Publicações",
+      description: "Conteúdo institucional e do site",
+      count: count ?? 0,
+      icon: Newspaper,
+    });
+  }
+  if (hasAdminPermission(profile, "hr.view")) {
+    cards.push({
+      href: "/admin/rh",
+      label: "RH",
+      description: "Recrutamento e gestão de candidatos",
+      icon: BriefcaseBusiness,
+    });
+  }
+  if (hasAdminPermission(profile, "scheduling.view")) {
+    const { count } = await supabase
+      .from("appointment_requests")
+      .select("id", { count: "exact", head: true });
+    cards.push({
+      href: "/admin/solicitacoes",
+      label: "Agendamentos",
+      description: "Fila de solicitações e pendências",
+      count: count ?? 0,
+      icon: ClipboardList,
+    });
+  }
+  if (hasAdminPermission(profile, "contact.view")) {
+    const { count } = await supabase
+      .from("contact_messages")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "NEW");
+    cards.push({
+      href: "/admin/fale-conosco",
+      label: "Fale Conosco",
+      description: "Mensagens novas e em atendimento",
+      count: count ?? 0,
+      icon: MessageSquareText,
+    });
+  }
+  if (hasAdminPermission(profile, "users.manage")) {
+    cards.push({
+      href: "/admin/usuarios",
+      label: "Usuários e acessos",
+      description: "Perfis, permissões e status",
+      icon: Users,
+    });
+  }
+
   return (
     <>
       <AdminPageHeading
         eyebrow="Painel administrativo"
-        title="O que você quer atualizar?"
-        description="Escolha uma área abaixo. Você poderá salvar, visualizar e confirmar antes de publicar no site."
+        title={`Olá, ${profile.full_name?.split(" ")[0] || "equipe"}`}
+        description="Estas são as áreas liberadas para sua conta."
       />
-      {missingAlt ? (
+      {query.error === "permission" ? (
         <p
-          role="status"
-          className="border-warning/30 text-warning mb-6 rounded-2xl border bg-white p-4 text-sm font-bold"
+          role="alert"
+          className="bg-error/10 text-error mb-6 rounded-xl p-4 font-bold"
         >
-          Pendência: {missingAlt} imagem(ns) sem descrição acessível.
+          Sua conta não possui acesso à área solicitada.
         </p>
       ) : null}
       <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {cards.map(({ key, label, count, published, drafts, icon: Icon }) => (
-          <li key={key}>
+        {cards.map(({ href, label, description, count, icon: Icon }) => (
+          <li key={href}>
             <Link
-              href={`/admin/${key}`}
+              href={href}
               className="border-border-light group block rounded-3xl border bg-white p-6 transition hover:-translate-y-0.5 hover:border-[#087a4d]"
             >
               <span className="bg-mint text-brand grid size-11 place-items-center rounded-2xl">
                 <Icon aria-hidden="true" size={21} />
               </span>
-              <p className="text-muted mt-6 text-sm">{label}</p>
-              <p className="font-heading text-brand-dark mt-1 text-3xl font-semibold">
-                {count}
+              <p className="font-heading text-brand-dark mt-5 text-xl font-semibold">
+                {label}
               </p>
-              <p className="text-muted mt-2 text-xs">
-                {published} publicado(s) · {drafts} rascunho(s)
-              </p>
+              {typeof count === "number" ? (
+                <p className="font-heading text-brand mt-2 text-3xl font-semibold">
+                  {count.toLocaleString("pt-BR")}
+                </p>
+              ) : null}
+              <p className="text-muted mt-2 text-sm">{description}</p>
               <span className="text-brand mt-5 inline-flex text-sm font-bold">
                 Abrir módulo
               </span>
@@ -83,40 +121,12 @@ export default async function AdminDashboardPage() {
           </li>
         ))}
       </ul>
-      <section className="mt-9">
-        <div className="flex items-center justify-between gap-4">
-          <h2 className="font-heading text-xl font-semibold">
-            Últimas alterações
-          </h2>
-          {profile.role === "super_admin" ? (
-            <Link
-              href="/admin/auditoria"
-              className="text-brand text-sm font-bold"
-            >
-              Ver auditoria
-            </Link>
-          ) : null}
-        </div>
-        <ol className="border-border-light mt-4 divide-y rounded-3xl border bg-white">
-          {(recent ?? []).length ? (
-            recent?.map((item) => (
-              <li
-                key={item.id}
-                className="flex flex-wrap justify-between gap-3 p-4 text-sm"
-              >
-                <span>
-                  <strong>{item.action}</strong> · {item.entity_type}
-                </span>
-                <time className="text-muted">
-                  {new Date(item.created_at).toLocaleString("pt-BR")}
-                </time>
-              </li>
-            ))
-          ) : (
-            <li className="text-muted p-5">Nenhuma alteração registrada.</li>
-          )}
-        </ol>
-      </section>
+      {!cards.length ? (
+        <p className="border-border-light text-muted rounded-2xl border bg-white p-6">
+          Nenhum módulo foi liberado para esta conta. Procure o
+          superadministrador.
+        </p>
+      ) : null}
     </>
   );
 }
