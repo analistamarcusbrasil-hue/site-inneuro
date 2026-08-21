@@ -51,7 +51,9 @@ export default async function UsersPage({
               ? "Sua própria conta não pode alterar perfil, permissões ou status."
               : query.error === "exists"
                 ? "Já existe uma conta com este e-mail."
-                : "Não foi possível concluir a operação. Revise os dados e tente novamente."}
+                : query.error === "candidate-email"
+                  ? "Este e-mail pertence a uma conta de candidato e não pode ser utilizado como acesso administrativo."
+                  : "Não foi possível concluir a operação. Revise os dados e tente novamente."}
         </p>
       ) : null}
       {!isCmsAdminConfigured ? (

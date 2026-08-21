@@ -21,6 +21,9 @@ import {
   type InterviewType,
 } from "@/lib/careers/evaluations";
 import { requireHrAccess } from "@/lib/careers/hr-auth";
+import { hasAdminPermission } from "@/lib/admin/permissions";
+import { listOperationalEvaluators } from "@/lib/careers/operational-users";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   assignApplicationEvaluatorAction,
   createCandidateInterviewAction,
@@ -79,10 +82,10 @@ export default async function EvaluationDetailPage({
 }) {
   const { applicationId } = await params;
   if (!z.string().uuid().safeParse(applicationId).success) notFound();
-  const { supabase, user, hrRole } = await requireHrAccess(
+  const { supabase, user, profile } = await requireHrAccess(
     "assigned-candidates:evaluate",
   );
-  const canManage = hrRole !== "reviewer";
+  const canManage = hasAdminPermission(profile, "hr.manage");
   const { data: applicationData, error: applicationError } = await supabase
     .from("career_job_applications")
     .select("id, job_id, profile_snapshot, job:career_jobs(id, title)")
@@ -96,7 +99,6 @@ export default async function EvaluationDetailPage({
     evaluationsResult,
     assignmentsResult,
     interviewsResult,
-    evaluatorsResult,
     matchResult,
   ] = await Promise.all([
     supabase
@@ -123,12 +125,6 @@ export default async function EvaluationDetailPage({
       )
       .eq("application_id", applicationId)
       .order("scheduled_at", { ascending: false }),
-    canManage
-      ? supabase
-          .from("profiles")
-          .select("id, full_name, role, hr_role")
-          .order("full_name", { ascending: true })
-      : Promise.resolve({ data: [] as EvaluatorProfile[], error: null }),
     supabase
       .from("career_application_match_runs")
       .select("overall_score, hard_skills_score, matrix_version, calculated_at")
@@ -149,7 +145,10 @@ export default async function EvaluationDetailPage({
     (assignmentsResult.data as unknown as AssignmentRow[] | null) ?? [];
   const interviews =
     (interviewsResult.data as unknown as InterviewRow[] | null) ?? [];
-  const evaluators = (evaluatorsResult.data as EvaluatorProfile[] | null) ?? [];
+  const admin = canManage ? createSupabaseAdminClient() : null;
+  const evaluators = admin
+    ? ((await listOperationalEvaluators(admin)) as EvaluatorProfile[])
+    : [];
   const match = (matchResult.data as MatchRow | null) ?? null;
   const snapshot = careerApplicationSnapshotSchema.safeParse(
     application.profile_snapshot,

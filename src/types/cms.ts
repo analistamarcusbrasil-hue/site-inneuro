@@ -1,5 +1,6 @@
 export type AppRole = "super_admin" | "admin" | "editor" | "reception";
-export type HrAccessRole = "administrator" | "hr_manager" | "reviewer";
+export type HrAccessRole =
+  "administrator" | "hr_manager" | "reviewer" | "viewer";
 export type ContentStatus = "draft" | "scheduled" | "published" | "archived";
 
 export type AdminProfile = {
@@ -14,6 +15,7 @@ export type AdminProfile = {
     | "manager"
     | "reception"
     | "hr"
+    | "evaluator"
     | "publications"
     | "attendance"
     | "custom"

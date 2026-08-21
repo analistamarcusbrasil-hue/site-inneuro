@@ -15,6 +15,9 @@ import {
   interviewFormSchema,
 } from "@/lib/careers/evaluation-validation";
 import { requireHrAccess } from "@/lib/careers/hr-auth";
+import { hasAdminPermission } from "@/lib/admin/permissions";
+import { getOperationalEvaluator } from "@/lib/careers/operational-users";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 const evaluationsPath = "/admin/rh/avaliacoes";
 
@@ -103,28 +106,17 @@ export async function assignApplicationEvaluatorAction(formData: FormData) {
   });
   if (!parsed.success) redirect(`${evaluationsPath}?error=assignment`);
   const path = detailPath(parsed.data.applicationId);
-  const [applicationResult, evaluatorResult] = await Promise.all([
+  const admin = createSupabaseAdminClient();
+  if (!admin) redirect(`${path}?error=assignment`);
+  const [applicationResult, evaluator] = await Promise.all([
     supabase
       .from("career_job_applications")
       .select("id")
       .eq("id", parsed.data.applicationId)
       .maybeSingle(),
-    supabase
-      .from("profiles")
-      .select("id, role, hr_role")
-      .eq("id", parsed.data.evaluatorId)
-      .maybeSingle(),
+    getOperationalEvaluator(admin, parsed.data.evaluatorId),
   ]);
-  const evaluator = evaluatorResult.data as {
-    id: string;
-    role: string;
-    hr_role: string | null;
-  } | null;
-  if (
-    !applicationResult.data ||
-    !evaluator ||
-    (!evaluator.hr_role && !["admin", "super_admin"].includes(evaluator.role))
-  ) {
+  if (!applicationResult.data || !evaluator) {
     redirect(`${path}?error=assignment`);
   }
   const { error } = await supabase
@@ -150,7 +142,7 @@ export async function assignApplicationEvaluatorAction(formData: FormData) {
 }
 
 export async function submitCandidateEvaluationAction(formData: FormData) {
-  const { supabase, user } = await requireHrAccess(
+  const { supabase, user, profile } = await requireHrAccess(
     "assigned-candidates:evaluate",
   );
   const parsed = candidateEvaluationFormSchema.safeParse({
@@ -160,6 +152,13 @@ export async function submitCandidateEvaluationAction(formData: FormData) {
   });
   if (!parsed.success) redirect(`${evaluationsPath}?error=evaluation`);
   const path = detailPath(parsed.data.applicationId);
+  const admin = createSupabaseAdminClient();
+  const evaluator = admin
+    ? await getOperationalEvaluator(admin, user.id)
+    : null;
+  if (!evaluator || !hasAdminPermission(profile, "hr.evaluate")) {
+    redirect(`${path}?error=evaluation`);
+  }
   const [applicationResult, templateResult] = await Promise.all([
     supabase
       .from("career_job_applications")
@@ -178,6 +177,15 @@ export async function submitCandidateEvaluationAction(formData: FormData) {
     applicationResult.data.job_id !== templateResult.data.job_id
   ) {
     redirect(`${path}?error=evaluation`);
+  }
+  if (!hasAdminPermission(profile, "hr.manage")) {
+    const { data: assignment } = await supabase
+      .from("career_application_evaluators")
+      .select("application_id")
+      .eq("application_id", parsed.data.applicationId)
+      .eq("evaluator_id", user.id)
+      .maybeSingle();
+    if (!assignment) redirect(`${path}?error=evaluation`);
   }
   const criteria = evaluationCriteriaSchema.safeParse(
     templateResult.data.criteria,
@@ -254,19 +262,17 @@ export async function createCandidateInterviewAction(formData: FormData) {
   });
   if (!parsed.success) redirect(`${evaluationsPath}?error=interview`);
   const path = detailPath(parsed.data.applicationId);
-  const [applicationResult, responsibleResult] = await Promise.all([
+  const admin = createSupabaseAdminClient();
+  if (!admin) redirect(`${path}?error=interview`);
+  const [applicationResult, responsible] = await Promise.all([
     supabase
       .from("career_job_applications")
       .select("id")
       .eq("id", parsed.data.applicationId)
       .maybeSingle(),
-    supabase
-      .from("profiles")
-      .select("id, role, hr_role")
-      .eq("id", parsed.data.responsibleId)
-      .maybeSingle(),
+    getOperationalEvaluator(admin, parsed.data.responsibleId),
   ]);
-  if (!applicationResult.data || !responsibleResult.data) {
+  if (!applicationResult.data || !responsible) {
     redirect(`${path}?error=interview`);
   }
   const { data, error } = await supabase

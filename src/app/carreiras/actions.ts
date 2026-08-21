@@ -118,6 +118,7 @@ export async function candidateRegistrationAction(formData: FormData) {
       account_type: "candidate",
       terms_accepted_at: termsAcceptedAt,
     },
+    app_metadata: { account_type: "candidate" },
   });
   if (error || !data.user) {
     const reason =

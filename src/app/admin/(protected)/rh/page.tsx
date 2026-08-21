@@ -17,6 +17,7 @@ const roleLabels = {
   administrator: "Administrador",
   hr_manager: "Gestor de RH",
   reviewer: "Avaliador",
+  viewer: "Visualizador",
 } as const;
 
 const stageLabels: Record<string, string> = {

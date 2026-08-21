@@ -34,7 +34,15 @@ test("perfis rápidos liberam somente os módulos previstos", () => {
     "scheduling.view",
     "scheduling.manage",
   ]);
-  assert.deepEqual(permissionsForProfile("hr"), ["hr.view", "hr.manage"]);
+  assert.deepEqual(permissionsForProfile("hr"), [
+    "hr.view",
+    "hr.evaluate",
+    "hr.manage",
+  ]);
+  assert.deepEqual(permissionsForProfile("evaluator"), [
+    "hr.view",
+    "hr.evaluate",
+  ]);
   assert.deepEqual(permissionsForProfile("publications"), [
     "publications.view",
     "publications.edit",
@@ -50,6 +58,7 @@ test("perfis rápidos liberam somente os módulos previstos", () => {
     "publications.edit",
     "publications.publish",
     "hr.view",
+    "hr.evaluate",
     "hr.manage",
     "scheduling.view",
     "scheduling.manage",
@@ -115,6 +124,20 @@ test("usuário inativo não possui permissão e legado permanece compatível", (
         permissions: null,
       }),
       "hr.view",
+    ),
+    true,
+  );
+  assert.equal(
+    hasAdminPermission(
+      profile(["hr.view"], { access_profile: "custom" }),
+      "hr.evaluate",
+    ),
+    false,
+  );
+  assert.equal(
+    hasAdminPermission(
+      profile(["hr.manage"], { access_profile: "custom" }),
+      "hr.evaluate",
     ),
     true,
   );

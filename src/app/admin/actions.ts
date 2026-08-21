@@ -16,6 +16,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   adminPermissions,
   hasAdminPermission,
+  normalizeAdminPermissions,
   permissionsForProfile,
   type AccessProfile,
   type AdminPermission,
@@ -643,6 +644,7 @@ const accessProfileSchema = z.enum([
   "manager",
   "reception",
   "hr",
+  "evaluator",
   "publications",
   "attendance",
   "custom",
@@ -660,14 +662,37 @@ function legacyRoleForAccessProfile(accessProfile: AccessProfile) {
   return "editor" as const;
 }
 
+async function findCandidateAccountByEmail(
+  admin: NonNullable<ReturnType<typeof createSupabaseAdminClient>>,
+  email: string,
+) {
+  const { data, error } = await admin.auth.admin.listUsers({
+    page: 1,
+    perPage: 1000,
+  });
+  if (error) return false;
+  const user = data.users.find(
+    (item) => item.email?.toLowerCase() === email.toLowerCase(),
+  );
+  if (!user) return false;
+  const { data: candidate } = await admin
+    .from("candidate_accounts")
+    .select("id")
+    .eq("id", user.id)
+    .maybeSingle();
+  return Boolean(candidate);
+}
+
 function allowedPermissionsForAccessProfile(
   accessProfile: AccessProfile,
   requested: AdminPermission[],
 ) {
   if (accessProfile === "super_admin") return [...adminPermissions];
-  return requested.filter(
-    (permission) =>
-      !["users.manage", "audit.view", "settings.manage"].includes(permission),
+  return normalizeAdminPermissions(
+    requested.filter(
+      (permission) =>
+        !["users.manage", "audit.view", "settings.manage"].includes(permission),
+    ),
   );
 }
 
@@ -709,6 +734,9 @@ export async function createAdminUserAction(formData: FormData) {
     redirect("/admin/usuarios?error=validation");
   const admin = createSupabaseAdminClient();
   if (!admin) redirect("/admin/usuarios?error=config");
+  if (await findCandidateAccountByEmail(admin, parsed.data.email)) {
+    redirect("/admin/usuarios?error=candidate-email");
+  }
   const requestedPermissions = formData.has("permissions_customized")
     ? parsePermissions(formData)
     : permissionsForProfile(parsed.data.access_profile);
@@ -717,12 +745,21 @@ export async function createAdminUserAction(formData: FormData) {
     requestedPermissions,
   );
   const role = legacyRoleForAccessProfile(parsed.data.access_profile);
-  const hrRole = parsed.data.access_profile === "hr" ? "hr_manager" : null;
+  const hrRole =
+    parsed.data.access_profile === "hr"
+      ? "hr_manager"
+      : parsed.data.access_profile === "evaluator"
+        ? "reviewer"
+        : null;
   const { data, error } = await admin.auth.admin.createUser({
     email: parsed.data.email,
     password: parsed.data.password,
     email_confirm: true,
-    user_metadata: { full_name: parsed.data.full_name },
+    user_metadata: {
+      full_name: parsed.data.full_name,
+      account_type: "staff",
+    },
+    app_metadata: { account_type: "staff" },
   });
   if (error || !data.user)
     redirect(
@@ -789,6 +826,12 @@ export async function updateAdminUserAction(formData: FormData) {
     .eq("id", parsed.data.id)
     .single();
   if (!current) redirect("/admin/usuarios?error=not-found");
+  const { data: candidateAccount } = await admin
+    .from("candidate_accounts")
+    .select("id")
+    .eq("id", parsed.data.id)
+    .maybeSingle();
+  if (candidateAccount) redirect("/admin/usuarios?error=candidate-email");
   const currentIsSuper =
     current.role === "super_admin" || current.access_profile === "super_admin";
   const nextIsSuper = parsed.data.access_profile === "super_admin";
@@ -810,7 +853,12 @@ export async function updateAdminUserAction(formData: FormData) {
   const next = {
     full_name: parsed.data.full_name,
     role: legacyRoleForAccessProfile(parsed.data.access_profile),
-    hr_role: parsed.data.access_profile === "hr" ? "hr_manager" : null,
+    hr_role:
+      parsed.data.access_profile === "hr"
+        ? "hr_manager"
+        : parsed.data.access_profile === "evaluator"
+          ? "reviewer"
+          : null,
     access_profile: parsed.data.access_profile,
     permissions,
     active: parsed.data.active,
@@ -821,7 +869,11 @@ export async function updateAdminUserAction(formData: FormData) {
     .eq("id", parsed.data.id);
   if (error) redirect("/admin/usuarios?error=update");
   await admin.auth.admin.updateUserById(parsed.data.id, {
-    user_metadata: { full_name: parsed.data.full_name },
+    user_metadata: {
+      full_name: parsed.data.full_name,
+      account_type: "staff",
+    },
+    app_metadata: { account_type: "staff" },
   });
   const action =
     current.active !== next.active

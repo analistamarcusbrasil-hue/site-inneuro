@@ -32,6 +32,7 @@ const permissionsByRole: Record<HrAccessRole, ReadonlySet<HrPermission>> = {
     "reports:view",
   ]),
   reviewer: new Set(["dashboard:view", "assigned-candidates:evaluate"]),
+  viewer: new Set(["dashboard:view"]),
 };
 
 type HrProfile = Pick<AdminProfile, "role" | "hr_role">;
@@ -43,7 +44,8 @@ export function resolveHrAccessRole(
   if ("permissions" in profile) {
     const adminProfile = profile as AdminProfile;
     if (hasAdminPermission(adminProfile, "hr.manage")) return "administrator";
-    if (hasAdminPermission(adminProfile, "hr.view")) return "reviewer";
+    if (hasAdminPermission(adminProfile, "hr.evaluate")) return "reviewer";
+    if (hasAdminPermission(adminProfile, "hr.view")) return "viewer";
     return null;
   }
   if (profile.role === "super_admin" || profile.role === "admin") {

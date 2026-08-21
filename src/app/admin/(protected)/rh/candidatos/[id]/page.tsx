@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 import { AdminPageHeading } from "@/components/admin/admin-page-heading";
+import { AdminCandidateProfileEditor } from "@/components/admin/admin-candidate-profile-editor";
+import { ConfirmCommandForm } from "@/components/admin/confirm-command-form";
 import { HrNavigation } from "@/components/admin/hr-navigation";
 import {
   applicationStatusLabels,
@@ -21,6 +23,10 @@ import {
   type CandidateSkill,
 } from "@/lib/careers/profile";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import {
+  deleteCandidateResumeByAdminAction,
+  replaceCandidateResumeByAdminAction,
+} from "../actions";
 
 type CandidateAccountRow = {
   id: string;
@@ -67,8 +73,10 @@ function OriginBadge({ source }: { source?: "manual" | "resume" | null }) {
 
 export default async function HrCandidateDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ status?: string; error?: string }>;
 }) {
   const { id } = await params;
   if (!z.string().uuid().safeParse(id).success) notFound();
@@ -134,6 +142,7 @@ export default async function HrCandidateDetailPage({
     (certificationsResult.data as CandidateCertification[] | null) ?? [];
   const skills = (skillsResult.data as CandidateSkill[] | null) ?? [];
   const resumes = (resumesResult.data as CandidateResume[] | null) ?? [];
+  const currentResume = resumes[0] ?? null;
   const applications =
     (applicationsResult.data as unknown as CandidateApplicationRow[] | null) ??
     [];
@@ -150,6 +159,7 @@ export default async function HrCandidateDetailPage({
     skillCount: skills.length,
     resumeCount: resumes.length,
   });
+  const query = await searchParams;
 
   return (
     <>
@@ -159,6 +169,28 @@ export default async function HrCandidateDetailPage({
         description="Perfil profissional autodeclarado pelo candidato. A completude indica somente preenchimento e não representa score."
       />
       <HrNavigation current="candidates" canManageJobs canManageCandidates />
+
+      {query.status ? (
+        <p
+          role="status"
+          className="bg-mint text-brand-dark mb-6 rounded-2xl p-4 font-bold"
+        >
+          {query.status === "resume-replaced"
+            ? "Currículo substituído com sucesso."
+            : query.status === "resume-deleted"
+              ? "Currículo excluído. O candidato precisará enviar um novo PDF para novas candidaturas."
+              : "Dados profissionais atualizados."}
+        </p>
+      ) : null}
+      {query.error ? (
+        <p
+          role="alert"
+          className="bg-error/10 text-error mb-6 rounded-2xl p-4 font-bold"
+        >
+          Não foi possível concluir a alteração administrativa. Revise os dados
+          e tente novamente.
+        </p>
+      ) : null}
 
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-3xl bg-white p-5">
         <div>
@@ -174,6 +206,16 @@ export default async function HrCandidateDetailPage({
           seleção.
         </p>
       </div>
+
+      <AdminCandidateProfileEditor
+        candidateId={id}
+        fullName={account.full_name}
+        profile={profile}
+        experiences={experiences}
+        education={education}
+        certifications={certifications}
+        skills={skills}
+      />
 
       <div className="grid gap-5 xl:grid-cols-2">
         <DetailSection title="Dados pessoais e objetivo">
@@ -351,37 +393,71 @@ export default async function HrCandidateDetailPage({
           )}
         </DetailSection>
 
-        <DetailSection title="Currículo privado">
-          {resumes.length ? (
-            <ol className="grid gap-3">
-              {resumes.map((resume) => (
-                <li
-                  key={resume.id}
-                  className="border-border-light flex flex-wrap items-center justify-between gap-3 rounded-2xl border p-4"
+        <DetailSection title="Currículo">
+          {currentResume ? (
+            <div className="border-border-light rounded-2xl border p-4">
+              <p className="text-ink font-bold">Currículo atual</p>
+              <p className="text-muted mt-1 text-xs">
+                {currentResume.original_name} ·{" "}
+                {formatFileSize(currentResume.size_bytes)}
+              </p>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <a
+                  className="border-brand/30 text-brand-dark inline-flex min-h-11 items-center rounded-full border px-5 text-sm font-bold"
+                  href={`/api/admin/rh/curriculos/${currentResume.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
                 >
-                  <div>
-                    <p className="text-ink font-bold">
-                      Versão {resume.version}
-                    </p>
-                    <p className="text-muted mt-1 text-xs">
-                      {resume.original_name} ·{" "}
-                      {formatFileSize(resume.size_bytes)}
-                    </p>
-                  </div>
-                  <a
-                    className="text-brand text-sm font-bold hover:underline"
-                    href={`/api/admin/rh/curriculos/${resume.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Abrir PDF com acesso auditado
-                  </a>
-                </li>
-              ))}
-            </ol>
+                  Abrir PDF
+                </a>
+                <a
+                  className="border-brand/30 text-brand-dark inline-flex min-h-11 items-center rounded-full border px-5 text-sm font-bold"
+                  href="#edicao-administrativa"
+                >
+                  Editar dados
+                </a>
+              </div>
+            </div>
           ) : (
             <p className="text-muted text-sm">Nenhum currículo enviado.</p>
           )}
+          <div className="border-warning/30 mt-5 rounded-2xl border p-4">
+            <p className="text-warning text-xs font-bold tracking-wide uppercase">
+              Alteração administrativa
+            </p>
+            <form action={replaceCandidateResumeByAdminAction} className="mt-3">
+              <input type="hidden" name="candidate_id" value={id} />
+              <label className="text-sm font-bold">
+                {currentResume ? "Substituir PDF" : "Enviar PDF"}
+                <input
+                  className="border-border-light mt-2 block w-full rounded-xl border p-3 font-normal"
+                  name="resume"
+                  type="file"
+                  accept="application/pdf,.pdf"
+                  required
+                />
+              </label>
+              <p className="text-muted mt-2 text-xs">
+                PDF de até 10 MB. O arquivo anterior só será removido após a
+                confirmação do novo envio.
+              </p>
+              <button className="bg-brand hover:bg-brand-dark mt-4 min-h-11 rounded-full px-5 text-sm font-bold text-white">
+                {currentResume ? "Substituir currículo" : "Enviar currículo"}
+              </button>
+            </form>
+            {currentResume ? (
+              <ConfirmCommandForm
+                action={deleteCandidateResumeByAdminAction}
+                message="Excluir o currículo atual deste candidato? O candidato precisará enviar um novo currículo antes de participar de novas vagas ou do Banco de Talentos."
+              >
+                <input type="hidden" name="candidate_id" value={id} />
+                <input type="hidden" name="id" value={currentResume.id} />
+                <button className="bg-error mt-4 min-h-11 rounded-full px-5 text-sm font-bold text-white">
+                  Excluir currículo
+                </button>
+              </ConfirmCommandForm>
+            ) : null}
+          </div>
           <p className="text-muted mt-4 text-xs">
             Cada acesso é autorizado no servidor, auditado e usa link
             temporário.

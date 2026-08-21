@@ -58,14 +58,16 @@ function PermissionFields({
     const dependencies: Partial<Record<AdminPermission, AdminPermission[]>> = {
       "publications.edit": ["publications.view"],
       "publications.publish": ["publications.view", "publications.edit"],
-      "hr.manage": ["hr.view"],
+      "hr.evaluate": ["hr.view"],
+      "hr.manage": ["hr.view", "hr.evaluate"],
       "scheduling.manage": ["scheduling.view"],
       "contact.manage": ["contact.view"],
     };
     const dependents: Partial<Record<AdminPermission, AdminPermission[]>> = {
       "publications.view": ["publications.edit", "publications.publish"],
       "publications.edit": ["publications.publish"],
-      "hr.view": ["hr.manage"],
+      "hr.view": ["hr.evaluate", "hr.manage"],
+      "hr.evaluate": ["hr.manage"],
       "scheduling.view": ["scheduling.manage"],
       "contact.view": ["contact.manage"],
     };

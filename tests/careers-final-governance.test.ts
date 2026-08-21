@@ -53,7 +53,10 @@ test("currículos permanecem privados e o acesso administrativo é auditado", ()
     "utf8",
   );
   assert.match(profileMigration, /'candidate-resumes'[\s\S]*false/);
-  assert.match(route, /require.*candidates:manage|hasHrPermission/);
+  assert.match(route, /hasAdminPermission\(session\.profile, "hr\.manage"\)/);
+  assert.match(route, /hasAdminPermission\(session\.profile, "hr\.evaluate"\)/);
+  assert.match(route, /getOperationalEvaluator/);
+  assert.match(route, /career_application_evaluators/);
   assert.match(route, /candidate_resume_accessed/);
   assert.match(route, /createSignedUrl\([^,]+, 120\)/);
 });

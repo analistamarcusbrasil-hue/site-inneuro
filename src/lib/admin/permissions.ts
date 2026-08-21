@@ -5,6 +5,7 @@ export const adminPermissions = [
   "publications.edit",
   "publications.publish",
   "hr.view",
+  "hr.evaluate",
   "hr.manage",
   "scheduling.view",
   "scheduling.manage",
@@ -21,6 +22,7 @@ export type AccessProfile =
   | "manager"
   | "reception"
   | "hr"
+  | "evaluator"
   | "publications"
   | "attendance"
   | "custom";
@@ -30,6 +32,7 @@ export const permissionLabels: Record<AdminPermission, string> = {
   "publications.edit": "Editar",
   "publications.publish": "Publicar",
   "hr.view": "Visualizar",
+  "hr.evaluate": "Avaliar candidatos",
   "hr.manage": "Gerenciar",
   "scheduling.view": "Visualizar",
   "scheduling.manage": "Gerenciar",
@@ -45,6 +48,7 @@ export const accessProfileLabels: Record<AccessProfile, string> = {
   manager: "Gestor",
   reception: "Recepção",
   hr: "RH",
+  evaluator: "Avaliador do Processo Seletivo",
   publications: "Publicações",
   attendance: "Atendimento",
   custom: "Personalizado",
@@ -60,6 +64,7 @@ export const permissionsByAccessProfile: Record<
     "publications.edit",
     "publications.publish",
     "hr.view",
+    "hr.evaluate",
     "hr.manage",
     "scheduling.view",
     "scheduling.manage",
@@ -67,7 +72,8 @@ export const permissionsByAccessProfile: Record<
     "contact.manage",
   ],
   reception: ["scheduling.view", "scheduling.manage"],
-  hr: ["hr.view", "hr.manage"],
+  hr: ["hr.view", "hr.evaluate", "hr.manage"],
+  evaluator: ["hr.view", "hr.evaluate"],
   publications: [
     "publications.view",
     "publications.edit",
@@ -90,7 +96,7 @@ export const permissionGroups = [
   {
     key: "hr",
     label: "RH",
-    permissions: ["hr.view", "hr.manage"],
+    permissions: ["hr.view", "hr.evaluate", "hr.manage"],
   },
   {
     key: "scheduling",
@@ -119,7 +125,8 @@ function legacyPermissions(profile: AdminProfile): readonly AdminPermission[] {
     return [...permissionsByAccessProfile.manager, "settings.manage"];
   }
   if (profile.role === "reception") return permissionsByAccessProfile.reception;
-  if (profile.hr_role) return ["hr.view", "hr.manage"];
+  if (profile.hr_role === "reviewer") return ["hr.view", "hr.evaluate"];
+  if (profile.hr_role) return ["hr.view", "hr.evaluate", "hr.manage"];
   return ["publications.view", "publications.edit"];
 }
 
@@ -132,8 +139,30 @@ export function effectivePermissions(
     profile.access_profile === "super_admin"
   )
     return adminPermissions;
-  if (Array.isArray(profile.permissions)) return profile.permissions;
+  if (Array.isArray(profile.permissions))
+    return normalizeAdminPermissions(profile.permissions);
   return legacyPermissions(profile);
+}
+
+export function normalizeAdminPermissions(
+  permissions: readonly AdminPermission[],
+): AdminPermission[] {
+  const normalized = new Set(
+    permissions.filter((permission) => adminPermissions.includes(permission)),
+  );
+  if (normalized.has("publications.publish")) {
+    normalized.add("publications.view");
+    normalized.add("publications.edit");
+  }
+  if (normalized.has("publications.edit")) normalized.add("publications.view");
+  if (normalized.has("hr.manage")) {
+    normalized.add("hr.view");
+    normalized.add("hr.evaluate");
+  }
+  if (normalized.has("hr.evaluate")) normalized.add("hr.view");
+  if (normalized.has("scheduling.manage")) normalized.add("scheduling.view");
+  if (normalized.has("contact.manage")) normalized.add("contact.view");
+  return adminPermissions.filter((permission) => normalized.has(permission));
 }
 
 export function hasAdminPermission(
