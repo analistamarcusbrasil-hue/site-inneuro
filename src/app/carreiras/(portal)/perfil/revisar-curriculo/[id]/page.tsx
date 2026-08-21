@@ -7,6 +7,7 @@ import {
 } from "@/app/carreiras/resume-review-actions";
 import { Container } from "@/components/layout/container";
 import { requireCandidateSession } from "@/lib/careers/auth";
+import { safeCareersDestination } from "@/lib/careers/auth-validation";
 import type { CandidateProfessionalProfile } from "@/lib/careers/profile";
 import {
   brazilianStates,
@@ -97,10 +98,11 @@ export default async function ResumeReviewPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; next?: string }>;
 }) {
   const { id } = await params;
   const query = await searchParams;
+  const next = query.next ? safeCareersDestination(query.next) : null;
   if (!z.string().uuid().safeParse(id).success) notFound();
   const { user, account, supabase } = await requireCandidateSession();
   const [extractionResult, profileResult, experiencesResult, educationResult] =
@@ -208,6 +210,7 @@ export default async function ResumeReviewPage({
           className="mx-auto mt-8 grid max-w-4xl gap-6"
         >
           <input type="hidden" name="extraction_id" value={id} />
+          {next ? <input type="hidden" name="next" value={next} /> : null}
 
           {[
             data.fullName,
@@ -638,6 +641,7 @@ export default async function ResumeReviewPage({
           className="mx-auto mt-4 max-w-4xl"
         >
           <input type="hidden" name="extraction_id" value={id} />
+          {next ? <input type="hidden" name="next" value={next} /> : null}
           <button className="text-muted hover:text-error min-h-11 text-sm font-bold hover:underline">
             Ignorar todas as informações identificadas
           </button>

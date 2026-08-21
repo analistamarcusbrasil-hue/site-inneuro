@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireCandidateSession } from "@/lib/careers/auth";
+import { safeCareersDestination } from "@/lib/careers/auth-validation";
 import { requireCareersPortalEnabled } from "@/lib/careers/guards";
 import {
   candidateCertificationSchema,
@@ -48,7 +49,9 @@ async function reviewContext(formData: FormData) {
   const context = await requireCandidateSession();
   const id = extractionIdSchema.safeParse(value(formData, "extraction_id"));
   if (!id.success) redirect("/carreiras/perfil?error=resume-analysis");
-  return { ...context, extractionId: id.data };
+  const requestedNext = value(formData, "next");
+  const next = requestedNext ? safeCareersDestination(requestedNext) : null;
+  return { ...context, extractionId: id.data, next };
 }
 
 async function loadPendingExtraction(
@@ -68,7 +71,7 @@ async function loadPendingExtraction(
 }
 
 export async function ignoreResumeExtractionAction(formData: FormData) {
-  const { supabase, user, extractionId } = await reviewContext(formData);
+  const { supabase, user, extractionId, next } = await reviewContext(formData);
   const extraction = await loadPendingExtraction(
     supabase,
     user.id,
@@ -82,11 +85,11 @@ export async function ignoreResumeExtractionAction(formData: FormData) {
     .eq("candidate_id", user.id);
   if (error) fail(extractionId, "save");
   revalidatePath("/carreiras/perfil");
-  redirect("/carreiras/perfil?status=resume-analysis-ignored");
+  redirect(next ?? "/carreiras/perfil?status=resume-analysis-ignored");
 }
 
 export async function applyResumeExtractionAction(formData: FormData) {
-  const { supabase, user, extractionId } = await reviewContext(formData);
+  const { supabase, user, extractionId, next } = await reviewContext(formData);
   const extraction = await loadPendingExtraction(
     supabase,
     user.id,
@@ -477,5 +480,5 @@ export async function applyResumeExtractionAction(formData: FormData) {
     .eq("candidate_id", user.id);
   if (finishError) fail(extractionId, "save");
   revalidatePath("/carreiras/perfil");
-  redirect("/carreiras/perfil?status=resume-analysis-applied");
+  redirect(next ?? "/carreiras/perfil?status=resume-analysis-applied");
 }

@@ -5,11 +5,6 @@ import { redirect } from "next/navigation";
 import { requireCandidateSession } from "@/lib/careers/auth";
 import { requireCareersPortalEnabled } from "@/lib/careers/guards";
 import {
-  CANDIDATE_RESUME_BUCKET,
-  CANDIDATE_RESUME_MAX_BYTES,
-  hasPdfMagicNumber,
-} from "@/lib/careers/profile";
-import {
   candidateCertificationSchema,
   candidateEducationSchema,
   candidateExperienceSchema,
@@ -18,12 +13,6 @@ import {
   candidatePersonalProfileSchema,
   candidateSkillSchema,
 } from "@/lib/careers/profile-validation";
-import {
-  parseResumeText,
-  RESUME_PARSER_VERSION,
-  type ResumeExtraction,
-} from "@/lib/careers/resume-extraction";
-import { extractCandidateResumePdf } from "@/lib/careers/resume-pdf";
 
 const profilePath = "/carreiras/perfil";
 
@@ -386,142 +375,4 @@ export async function deleteCandidateSkillAction(formData: FormData) {
     .eq("candidate_id", user.id);
   if (error) fail("skill-delete");
   finish("skill-deleted");
-}
-
-export async function uploadCandidateResumeAction(formData: FormData) {
-  const { supabase, user } = await candidateContext();
-  const file = formData.get("resume");
-  if (!(file instanceof File) || !file.size) fail("resume-file");
-  if (file.size > CANDIDATE_RESUME_MAX_BYTES) fail("resume-size");
-  if (
-    file.type !== "application/pdf" ||
-    !file.name.toLowerCase().endsWith(".pdf")
-  ) {
-    fail("resume-type");
-  }
-  const fileBytes = new Uint8Array(await file.arrayBuffer());
-  const signature = fileBytes.slice(0, 5);
-  if (!hasPdfMagicNumber(signature)) fail("resume-type");
-
-  const { data: latest } = await supabase
-    .from("candidate_resumes")
-    .select("version")
-    .eq("candidate_id", user.id)
-    .order("version", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const version = (latest?.version ?? 0) + 1;
-  const storagePath = `${user.id}/${Date.now()}-${crypto.randomUUID()}.pdf`;
-  const { error: uploadError } = await supabase.storage
-    .from(CANDIDATE_RESUME_BUCKET)
-    .upload(storagePath, file, {
-      contentType: "application/pdf",
-      cacheControl: "3600",
-      upsert: false,
-    });
-  if (uploadError) fail("resume-upload");
-
-  const originalName =
-    file.name
-      .replace(/[\u0000-\u001f\u007f]/g, "")
-      .trim()
-      .slice(0, 255) || "curriculo.pdf";
-  const { data: resume, error: metadataError } = await supabase
-    .from("candidate_resumes")
-    .insert({
-      candidate_id: user.id,
-      original_name: originalName,
-      storage_path: storagePath,
-      size_bytes: file.size,
-      mime_type: "application/pdf",
-      version,
-    })
-    .select("id")
-    .single();
-  if (metadataError || !resume) {
-    await supabase.storage.from(CANDIDATE_RESUME_BUCKET).remove([storagePath]);
-    fail("resume-save");
-  }
-  const { error: consentError } = await supabase
-    .from("candidate_consents")
-    .insert({
-      candidate_id: user.id,
-      consent_type: "resume_processing",
-      purpose:
-        "Processamento do currículo PDF para identificar informações profissionais que serão revisadas pelo candidato.",
-      text_version: "2026-08-v1",
-      granted: true,
-    });
-  if (consentError) {
-    await supabase.from("candidate_resumes").delete().eq("id", resume.id);
-    await supabase.storage.from(CANDIDATE_RESUME_BUCKET).remove([storagePath]);
-    fail("resume-save");
-  }
-
-  let extraction: {
-    data: ResumeExtraction;
-    textHash: string | null;
-    totalPages: number | null;
-    warnings: string[];
-    status: "ready" | "partial" | "failed";
-  };
-  try {
-    extraction = await extractCandidateResumePdf(fileBytes);
-  } catch {
-    extraction = {
-      data: parseResumeText(""),
-      textHash: null,
-      totalPages: null,
-      warnings: [
-        "Não foi possível ler o texto deste PDF. Complete o perfil manualmente.",
-      ],
-      status: "failed",
-    };
-  }
-  const { data: review, error: extractionError } = await supabase
-    .from("candidate_resume_extractions")
-    .insert({
-      candidate_id: user.id,
-      resume_id: resume.id,
-      status: extraction.status,
-      extracted_data: extraction.data,
-      warnings: extraction.warnings,
-      parser_version: RESUME_PARSER_VERSION,
-      text_sha256: extraction.textHash,
-      total_pages: extraction.totalPages,
-    })
-    .select("id")
-    .single();
-  if (extractionError || !review) fail("resume-analysis");
-  revalidatePath(profilePath);
-  if (extraction.status === "failed") {
-    redirect(`${profilePath}?error=resume-analysis-failed`);
-  }
-  redirect(`/carreiras/perfil/revisar-curriculo/${review.id}`);
-}
-
-export async function deleteCandidateResumeAction(formData: FormData) {
-  const { supabase, user } = await candidateContext();
-  const parsed = candidateOwnedRecordSchema.safeParse({
-    id: value(formData, "id"),
-  });
-  if (!parsed.success) fail("resume-delete");
-  const { data: resume, error: readError } = await supabase
-    .from("candidate_resumes")
-    .select("id, storage_path")
-    .eq("id", parsed.data.id)
-    .eq("candidate_id", user.id)
-    .maybeSingle();
-  if (readError || !resume) fail("resume-delete");
-  const { error: storageError } = await supabase.storage
-    .from(CANDIDATE_RESUME_BUCKET)
-    .remove([resume.storage_path]);
-  if (storageError) fail("resume-delete");
-  const { error } = await supabase
-    .from("candidate_resumes")
-    .delete()
-    .eq("id", resume.id)
-    .eq("candidate_id", user.id);
-  if (error) fail("resume-delete");
-  finish("resume-deleted");
 }

@@ -130,6 +130,47 @@ export default async function ReviewCareerApplicationPage({
     job.unit && (job.work_mode === "onsite" || job.work_mode === "hybrid"),
   );
 
+  if (!resume) {
+    const onboardingUrl = `/carreiras/perfil?${new URLSearchParams({
+      onboarding: "resume",
+      next: destination,
+    }).toString()}`;
+    return (
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="bg-surface min-h-screen py-10 sm:py-14"
+      >
+        <Container className="max-w-3xl">
+          <Link
+            className="text-brand text-sm font-bold hover:underline"
+            href={`/carreiras/vagas/${slug}`}
+          >
+            Voltar para a vaga
+          </Link>
+          <section className="border-brand/20 mt-6 rounded-[2rem] border bg-white p-6 shadow-[0_14px_40px_rgba(3,37,27,0.05)] sm:p-8">
+            <p className="text-brand text-xs font-bold tracking-[0.14em] uppercase">
+              Currículo necessário
+            </p>
+            <h1 className="font-heading text-brand-dark mt-3 text-3xl font-semibold">
+              Antes de confirmar sua candidatura, envie seu currículo.
+            </h1>
+            <p className="text-muted mt-4 leading-relaxed">
+              Depois do envio, você poderá revisar as informações identificadas
+              e retornar à candidatura para {job.title}.
+            </p>
+            <Link
+              className="bg-brand hover:bg-brand-dark mt-6 inline-flex min-h-12 items-center rounded-full px-6 font-bold text-white"
+              href={onboardingUrl}
+            >
+              Enviar meu currículo
+            </Link>
+          </section>
+        </Container>
+      </main>
+    );
+  }
+
   return (
     <main
       id="main-content"
@@ -252,9 +293,7 @@ export default async function ReviewCareerApplicationPage({
           <ReviewSection title="Currículo">
             {resume ? (
               <>
-                <p className="font-bold">
-                  Versão {resume.version} · {resume.original_name}
-                </p>
+                <p className="font-bold">{resume.original_name}</p>
                 <p className="text-muted mt-1 text-xs">
                   {formatFileSize(resume.size_bytes)}
                 </p>

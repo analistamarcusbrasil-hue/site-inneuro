@@ -145,7 +145,11 @@ export async function candidateRegistrationAction(formData: FormData) {
     await rollbackCandidateRegistration(admin, data.user.id);
     redirect(careersAuthUrl("cadastro", "session", next));
   }
-  redirect(next);
+  const onboarding = new URLSearchParams({
+    onboarding: "resume",
+    next,
+  });
+  redirect(`/carreiras/perfil?${onboarding.toString()}`);
 }
 
 export async function candidateRequestPasswordAction(formData: FormData) {

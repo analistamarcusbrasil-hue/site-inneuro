@@ -1,4 +1,5 @@
 import { ConfirmCommandForm } from "@/components/admin/confirm-command-form";
+import Link from "next/link";
 import {
   leaveTalentPoolAction,
   requestTalentPoolDeletionAction,
@@ -13,10 +14,12 @@ export function CandidateTalentPool({
   areas,
   membership,
   selectedAreaIds,
+  hasResume,
 }: {
   areas: TalentPoolArea[];
   membership: TalentPoolMembership | null;
   selectedAreaIds: string[];
+  hasResume: boolean;
 }) {
   if (membership?.status === "deletion_requested") {
     return (
@@ -32,6 +35,55 @@ export function CandidateTalentPool({
   }
 
   const active = membership?.status === "active";
+  const membershipControls = active ? (
+    <div className="border-border-light mt-6 flex flex-wrap gap-4 border-t pt-5">
+      <ConfirmCommandForm
+        action={leaveTalentPoolAction}
+        message="Deseja sair do Banco de Talentos INNEURO? Seus interesses serão removidos das buscas do RH."
+      >
+        <button className="text-warning text-sm font-bold hover:underline">
+          Sair do Banco de Talentos
+        </button>
+      </ConfirmCommandForm>
+      <ConfirmCommandForm
+        action={requestTalentPoolDeletionAction}
+        message="Solicitar a exclusão definitiva da sua participação no Banco de Talentos? Esta solicitação não apaga sua conta nem suas candidaturas."
+      >
+        <button className="text-error text-sm font-bold hover:underline">
+          Solicitar exclusão da participação
+        </button>
+      </ConfirmCommandForm>
+    </div>
+  ) : membership?.status === "left" ? (
+    <ConfirmCommandForm
+      action={requestTalentPoolDeletionAction}
+      message="Solicitar a exclusão definitiva do registro da sua participação anterior no Banco de Talentos?"
+    >
+      <button className="text-error mt-5 text-sm font-bold hover:underline">
+        Solicitar exclusão da participação anterior
+      </button>
+    </ConfirmCommandForm>
+  ) : null;
+
+  if (!hasResume) {
+    return (
+      <div>
+        <div className="bg-warning/10 text-ink rounded-2xl p-5">
+          <p className="font-bold">
+            Envie seu currículo antes de participar do Banco de Talentos.
+          </p>
+          <Link
+            className="bg-brand hover:bg-brand-dark mt-4 inline-flex min-h-11 items-center rounded-full px-6 text-sm font-bold text-white"
+            href="/carreiras/perfil?onboarding=resume"
+          >
+            Enviar currículo
+          </Link>
+        </div>
+        {membershipControls}
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="flex items-start gap-3">
@@ -87,35 +139,7 @@ export function CandidateTalentPool({
         </p>
       )}
 
-      {active ? (
-        <div className="border-border-light mt-6 flex flex-wrap gap-4 border-t pt-5">
-          <ConfirmCommandForm
-            action={leaveTalentPoolAction}
-            message="Deseja sair do Banco de Talentos INNEURO? Seus interesses serão removidos das buscas do RH."
-          >
-            <button className="text-warning text-sm font-bold hover:underline">
-              Sair do Banco de Talentos
-            </button>
-          </ConfirmCommandForm>
-          <ConfirmCommandForm
-            action={requestTalentPoolDeletionAction}
-            message="Solicitar a exclusão definitiva da sua participação no Banco de Talentos? Esta solicitação não apaga sua conta nem suas candidaturas."
-          >
-            <button className="text-error text-sm font-bold hover:underline">
-              Solicitar exclusão da participação
-            </button>
-          </ConfirmCommandForm>
-        </div>
-      ) : membership?.status === "left" ? (
-        <ConfirmCommandForm
-          action={requestTalentPoolDeletionAction}
-          message="Solicitar a exclusão definitiva do registro da sua participação anterior no Banco de Talentos?"
-        >
-          <button className="text-error mt-5 text-sm font-bold hover:underline">
-            Solicitar exclusão da participação anterior
-          </button>
-        </ConfirmCommandForm>
-      ) : null}
+      {membershipControls}
     </div>
   );
 }

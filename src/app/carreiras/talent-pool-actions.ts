@@ -16,13 +16,22 @@ export async function saveTalentPoolMembershipAction(formData: FormData) {
   if (!parsed.success) redirect(`${profilePath}?error=talent-areas`);
 
   const { supabase, user } = await requireCandidateSession();
+  const { data: resume } = await supabase
+    .from("candidate_resumes")
+    .select("id")
+    .eq("candidate_id", user.id)
+    .limit(1)
+    .maybeSingle();
+  if (!resume) redirect(`${profilePath}?error=talent-resume-required`);
   const { error } = await supabase.rpc("set_talent_pool_membership", {
     p_area_ids: parsed.data,
   });
   if (error) {
-    const reason = error.message.includes("deletion_pending")
-      ? "talent-deletion-pending"
-      : "talent-save";
+    const reason = error.message.includes("resume_required")
+      ? "talent-resume-required"
+      : error.message.includes("deletion_pending")
+        ? "talent-deletion-pending"
+        : "talent-save";
     redirect(`${profilePath}?error=${reason}`);
   }
   await supabase.from("candidate_consents").insert({

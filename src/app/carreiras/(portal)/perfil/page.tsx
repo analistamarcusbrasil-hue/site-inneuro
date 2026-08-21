@@ -8,10 +8,8 @@ import {
   deleteCandidateCertificationAction,
   deleteCandidateEducationAction,
   deleteCandidateExperienceAction,
-  deleteCandidateResumeAction,
   deleteCandidateSkillAction,
   moveCandidateRecordAction,
-  uploadCandidateResumeAction,
 } from "@/app/carreiras/profile-actions";
 import {
   CandidateBaseProfileForm,
@@ -19,14 +17,15 @@ import {
   CandidateEducationForm,
   CandidateExperienceForm,
 } from "@/components/careers/candidate-profile-forms";
+import { CandidateResumeUpload } from "@/components/careers/candidate-resume-upload";
 import { CandidateTalentPool } from "@/components/careers/candidate-talent-pool";
 import { Container } from "@/components/layout/container";
 import { requireCandidateSession } from "@/lib/careers/auth";
+import { safeCareersDestination } from "@/lib/careers/auth-validation";
 import {
   calculateCandidateProfileCompletion,
   CANDIDATE_RESUME_BUCKET,
   formatCandidateMonth,
-  formatFileSize,
   type CandidateCertification,
   type CandidateEducation,
   type CandidateExperience,
@@ -65,7 +64,6 @@ const statusMessages: Record<string, string> = {
     "Informações selecionadas do currículo adicionadas ao perfil.",
   "resume-analysis-ignored":
     "As sugestões do currículo foram ignoradas. Seu perfil não foi alterado.",
-  "resume-deleted": "Versão do currículo excluída.",
   "order-saved": "Ordem atualizada.",
   "order-unchanged": "O item já está nessa posição.",
   "talent-saved": "Participação no Banco de Talentos atualizada.",
@@ -102,10 +100,12 @@ const errorMessages: Record<string, string> = {
     "O currículo foi enviado, mas a análise não pôde ser registrada. Você pode completar o perfil manualmente.",
   "resume-analysis-failed":
     "Não encontramos texto suficiente neste PDF. Ele pode ser uma imagem ou digitalização. Envie uma versão com texto selecionável ou complete seu perfil manualmente.",
-  "resume-delete": "Não foi possível excluir esta versão do currículo.",
+  "resume-required": "Envie seu currículo antes de confirmar sua candidatura.",
   reorder: "Não foi possível alterar a ordem.",
   "talent-areas": "Escolha pelo menos uma área profissional de interesse.",
   "talent-save": "Não foi possível atualizar o Banco de Talentos.",
+  "talent-resume-required":
+    "Envie seu currículo antes de participar do Banco de Talentos.",
   "talent-leave": "Não foi possível sair do Banco de Talentos.",
   "talent-deletion": "Não foi possível solicitar a exclusão.",
   "talent-deletion-pending":
@@ -137,11 +137,17 @@ function ProfileSection({
 }
 
 function ResumeStartCard({
+  candidateId,
+  currentResume,
+  next,
+  onboarding,
   pendingExtractions,
-  resumes,
 }: {
+  candidateId: string;
+  currentResume: (CandidateResume & { signedUrl: string | null }) | null;
+  next?: string;
+  onboarding: boolean;
   pendingExtractions: ResumeExtractionRecord[];
-  resumes: Array<CandidateResume & { signedUrl: string | null }>;
 }) {
   const latestExtraction = pendingExtractions[0] ?? null;
   const identifiedCount = latestExtraction
@@ -151,14 +157,15 @@ function ResumeStartCard({
   return (
     <section className="border-brand/25 bg-mint/70 rounded-[2rem] border p-6 shadow-[0_18px_50px_rgba(3,37,27,0.08)] sm:p-8">
       <p className="text-brand text-xs font-bold tracking-[0.14em] uppercase">
-        Primeiro passo recomendado
+        {onboarding ? "Passo 1" : "Currículo profissional"}
       </p>
       <h2 className="font-heading text-brand-dark mt-3 text-2xl font-semibold sm:text-3xl">
-        Comece pelo seu currículo
+        {onboarding ? "Envie seu currículo" : "Mantenha seu currículo atual"}
       </h2>
       <p className="text-ink mt-3 max-w-3xl leading-relaxed">
-        Envie seu currículo em PDF. Vamos identificar suas informações
-        profissionais e preencher seu perfil para você revisar.
+        {onboarding
+          ? "Para continuar sua candidatura, envie primeiro seu currículo em PDF."
+          : "Envie seu currículo em PDF. Vamos identificar suas informações profissionais e preencher seu perfil para você revisar."}
       </p>
 
       {latestExtraction ? (
@@ -178,93 +185,13 @@ function ResumeStartCard({
           >
             Revisar e preencher meu perfil
           </Link>
-          {pendingExtractions.length > 1 ? (
-            <details className="border-border-light mt-5 border-t pt-4">
-              <summary className="text-brand cursor-pointer text-sm font-bold">
-                Outras análises pendentes ({pendingExtractions.length - 1})
-              </summary>
-              <ul className="mt-3 grid gap-2 text-sm">
-                {pendingExtractions.slice(1).map((extraction) => (
-                  <li key={extraction.id}>
-                    <Link
-                      className="text-brand font-bold hover:underline"
-                      href={`/carreiras/perfil/revisar-curriculo/${extraction.id}`}
-                    >
-                      Revisar envio de{" "}
-                      {new Date(extraction.created_at).toLocaleString("pt-BR")}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </details>
-          ) : null}
         </div>
       ) : null}
-
-      <form
-        action={uploadCandidateResumeAction}
-        className="border-brand/20 mt-6 rounded-2xl border bg-white p-5"
-      >
-        <label className="text-ink block text-sm font-bold">
-          Currículo em PDF
-          <input
-            className="border-border-light mt-2 block w-full rounded-xl border bg-white p-3 text-sm font-normal"
-            name="resume"
-            type="file"
-            accept="application/pdf,.pdf"
-            required
-          />
-        </label>
-        <p className="text-muted mt-2 text-xs">
-          Até 10 MB. O arquivo permanece privado e acessível somente por você e
-          gestores autorizados.
-        </p>
-        <button className="bg-brand hover:bg-brand-dark mt-4 min-h-12 rounded-full px-6 text-sm font-bold text-white">
-          Enviar currículo PDF
-        </button>
-      </form>
-
-      {resumes.length ? (
-        <details className="border-brand/20 mt-5 border-t pt-5">
-          <summary className="text-brand cursor-pointer text-sm font-bold">
-            Currículos enviados ({resumes.length})
-          </summary>
-          <ul className="mt-4 grid gap-3">
-            {resumes.map((resume) => (
-              <li
-                key={resume.id}
-                className="border-border-light flex flex-wrap items-center justify-between gap-4 rounded-2xl border bg-white p-4"
-              >
-                <div>
-                  <p className="text-ink font-bold">
-                    Versão {resume.version} · {resume.original_name}
-                  </p>
-                  <p className="text-muted mt-1 text-xs">
-                    {formatFileSize(resume.size_bytes)} ·{" "}
-                    {new Date(resume.created_at).toLocaleString("pt-BR")}
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  {resume.signedUrl ? (
-                    <a
-                      className="text-brand text-sm font-bold hover:underline"
-                      href={resume.signedUrl}
-                    >
-                      Abrir PDF
-                    </a>
-                  ) : null}
-                  <form action={deleteCandidateResumeAction}>
-                    <input type="hidden" name="id" value={resume.id} />
-                    <button className="text-error text-sm font-bold hover:underline">
-                      Excluir
-                    </button>
-                  </form>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </details>
-      ) : null}
+      <CandidateResumeUpload
+        candidateId={candidateId}
+        currentResume={currentResume}
+        next={next}
+      />
     </section>
   );
 }
@@ -272,7 +199,12 @@ function ResumeStartCard({
 export default async function CandidateProfilePage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; error?: string }>;
+  searchParams: Promise<{
+    status?: string;
+    error?: string;
+    onboarding?: string;
+    next?: string;
+  }>;
 }) {
   const { user, account, supabase } = await requireCandidateSession();
   const query = await searchParams;
@@ -323,7 +255,9 @@ export default async function CandidateProfilePage({
       .from("candidate_resumes")
       .select("*")
       .eq("candidate_id", user.id)
-      .order("version", { ascending: false }),
+      .order("version", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(1),
     supabase
       .from("candidate_resume_extractions")
       .select("*")
@@ -374,9 +308,12 @@ export default async function CandidateProfilePage({
   const selectedTalentAreaIds = (talentInterestsResult.data ?? []).map(
     (interest) => String(interest.area_id),
   );
+  const currentResume = resumes[0] ?? null;
   const pendingExtractions = (extractionsResult.data ?? []).flatMap((item) => {
     const parsed = resumeExtractionRecordSchema.safeParse(item);
-    return parsed.success ? [parsed.data] : [];
+    return parsed.success && parsed.data.resume_id === currentResume?.id
+      ? [parsed.data]
+      : [];
   });
   const consents = consentsResult.data ?? [];
   const deletionRequest = deletionRequestResult.data;
@@ -388,6 +325,7 @@ export default async function CandidateProfilePage({
       return { ...resume, signedUrl: data?.signedUrl ?? null };
     }),
   );
+  const safeNext = query.next ? safeCareersDestination(query.next) : undefined;
   const completion = calculateCandidateProfileCompletion({
     fullName: account.full_name,
     email: user.email,
@@ -479,8 +417,11 @@ export default async function CandidateProfilePage({
 
         <div className="mx-auto mt-8 grid max-w-5xl gap-6">
           <ResumeStartCard
+            candidateId={user.id}
+            currentResume={resumeLinks[0] ?? null}
+            next={safeNext}
+            onboarding={query.onboarding === "resume"}
             pendingExtractions={pendingExtractions}
-            resumes={resumeLinks}
           />
 
           <ProfileSection
@@ -502,6 +443,7 @@ export default async function CandidateProfilePage({
               areas={talentAreas}
               membership={talentMembership}
               selectedAreaIds={selectedTalentAreaIds}
+              hasResume={Boolean(currentResume)}
             />
           </ProfileSection>
 

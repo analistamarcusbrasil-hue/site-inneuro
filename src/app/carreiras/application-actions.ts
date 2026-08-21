@@ -16,6 +16,24 @@ export async function submitCareerJobApplicationAction(formData: FormData) {
   requireCareersPortalEnabled();
   const { supabase, account, user } = await requireCandidateSession();
   const jobId = field(formData, "job_id");
+  const slug = field(formData, "slug");
+  const safeDestination = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)
+    ? `/carreiras/vagas/${slug}/candidatar`
+    : "/carreiras/vagas";
+  const { data: resume } = await supabase
+    .from("candidate_resumes")
+    .select("id")
+    .eq("candidate_id", user.id)
+    .limit(1)
+    .maybeSingle();
+  if (!resume) {
+    const params = new URLSearchParams({
+      onboarding: "resume",
+      error: "resume-required",
+      next: safeDestination,
+    });
+    redirect(`/carreiras/perfil?${params.toString()}`);
+  }
   const { data: job } = await supabase
     .from("career_jobs")
     .select("id, title, work_mode, unit_id")
@@ -52,6 +70,14 @@ export async function submitCareerJobApplicationAction(formData: FormData) {
     },
   );
   if (error) {
+    if (error.message.includes("resume_required")) {
+      const params = new URLSearchParams({
+        onboarding: "resume",
+        error: "resume-required",
+        next: safeDestination,
+      });
+      redirect(`/carreiras/perfil?${params.toString()}`);
+    }
     const reason =
       error.code === "23505" || error.message.includes("active_application")
         ? "duplicate"
