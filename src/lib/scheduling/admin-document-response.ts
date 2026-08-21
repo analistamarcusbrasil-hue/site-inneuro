@@ -45,6 +45,22 @@ function previewErrorResponse(
   );
 }
 
+function missingFileResponse() {
+  return new NextResponse(
+    '<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Arquivo indisponível</title><body style="font-family:system-ui;margin:0;background:#f5f7f8;color:#183237"><main style="max-width:38rem;margin:10vh auto;padding:2rem;background:white;border-radius:1.5rem"><h1 style="font-size:1.4rem">⚠️ Arquivo indisponível</h1><p>Este arquivo foi removido anteriormente do armazenamento. Solicite o reenvio ao paciente.</p></main></body></html>',
+    {
+      status: 404,
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "private, no-store, max-age=0",
+        "Content-Security-Policy":
+          "default-src 'none'; style-src 'unsafe-inline'",
+        "X-Content-Type-Options": "nosniff",
+      },
+    },
+  );
+}
+
 export async function serveAppointmentDocument(
   requestId: string,
   documentId: string,
@@ -104,14 +120,7 @@ export async function serveAppointmentDocument(
     servedPreview = false;
   }
   if (storageError || !file) {
-    return disposition === "inline"
-      ? previewErrorResponse(
-          requestId,
-          documentId,
-          "O arquivo original continua disponível para download.",
-          404,
-        )
-      : errorResponse("Arquivo não encontrado ou indisponível.", 404);
+    return missingFileResponse();
   }
 
   const bytes = new Uint8Array(await file.slice(0, 16).arrayBuffer());

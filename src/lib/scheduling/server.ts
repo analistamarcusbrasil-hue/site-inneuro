@@ -30,6 +30,8 @@ import {
   UPLOAD_SESSION_TTL_MS,
   validateFileDescriptor,
 } from "@/lib/scheduling/shared";
+import { removeUnpersistedSchedulingDocuments } from "@/lib/scheduling/storage-retention";
+export { isPersistedSchedulingDocument } from "@/lib/scheduling/storage-retention";
 
 type PreparedDocument = SchedulingFileDescriptor & {
   path: string;
@@ -397,15 +399,7 @@ export function isSecureSchedulingRequest(request: Request) {
 
 export async function removeDocuments(admin: SupabaseClient, paths: string[]) {
   if (paths.length === 0) return;
-  await Promise.all(
-    paths.map(async (path) => {
-      let result = await admin.storage.from(SCHEDULING_BUCKET).remove([path]);
-      if (result.error) {
-        result = await admin.storage.from(SCHEDULING_BUCKET).remove([path]);
-      }
-      if (result.error) throw new Error("SCHEDULING_CLEANUP_FAILED");
-    }),
-  );
+  await removeUnpersistedSchedulingDocuments(admin, paths);
 }
 
 export function detectSchedulingMimeType(
