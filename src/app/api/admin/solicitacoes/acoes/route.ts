@@ -93,23 +93,25 @@ export async function POST(request: Request) {
   if (duplicate.data && action !== "complete") {
     const { data: current } = await admin
       .from("appointment_requests")
-      .select("workflow_status,confirmation_status")
+      .select("workflow_status,confirmation_status,deleted_at")
       .eq("id", requestId)
       .maybeSingle();
     return Response.json({
       ok: true,
       duplicate: true,
       removeFromActive:
-        ["CONCLUIDO", "NAO_AGENDAVEL"].includes(
+        Boolean(current?.deleted_at) ||
+        (["CONCLUIDO", "NAO_AGENDAVEL"].includes(
           current?.workflow_status ?? "",
         ) &&
-        !["PENDING", "FAILED"].includes(current?.confirmation_status ?? ""),
+          !["PENDING", "FAILED"].includes(current?.confirmation_status ?? "")),
     });
   }
   const { data: appointment } = await admin
     .from("appointment_requests")
     .select("*,appointment_request_exams(*)")
     .eq("id", requestId)
+    .is("deleted_at", null)
     .single();
   if (!appointment) return response("Solicitação não encontrada.", 404);
   const isAdministrativeOverride = Boolean(
@@ -121,7 +123,7 @@ export async function POST(request: Request) {
     appointment.assigned_to &&
     appointment.assigned_to !== user.id &&
     !canOverrideAssignment &&
-    action !== "claim"
+    !["claim", "take_over", "not_schedulable"].includes(action)
   ) {
     return response("Esta solicitação está com outro atendente.", 403);
   }
@@ -218,6 +220,90 @@ export async function POST(request: Request) {
     return sent;
   };
   try {
+    if (action === "take_over") {
+      const { data: takeover, error: takeoverError } = await admin.rpc(
+        "take_over_appointment_request",
+        {
+          p_request_id: requestId,
+          p_actor_id: user.id,
+          p_operation_id: operationId,
+        },
+      );
+      if (takeoverError) {
+        if (takeoverError.message.includes("appointment_already_closed"))
+          return response("Este agendamento já foi encerrado.", 409);
+        if (
+          takeoverError.message.includes("appointment_take_over_not_required")
+        )
+          return response("Este agendamento não precisa ser assumido.", 409);
+        if (takeoverError.message.includes("appointment_request_not_found"))
+          return response("Solicitação não encontrada.", 404);
+        throw takeoverError;
+      }
+      await admin.from("audit_logs").insert({
+        actor_id: user.id,
+        action: "APPOINTMENT_TAKEN_OVER",
+        entity_type: "appointment_request",
+        entity_id: requestId,
+        before_data: { assigned_to: takeover?.previous_assigned_to ?? null },
+        after_data: {
+          assigned_to: user.id,
+          previous_actor_name: takeover?.previous_actor_name ?? null,
+          operation_id: operationId,
+        },
+      });
+      return Response.json({
+        ok: true,
+        message: "Agendamento assumido com sucesso.",
+      });
+    }
+    if (action === "delete_request") {
+      if (!canOverrideAssignment) return response("Acesso negado.", 403);
+      const justification = sanitizeSchedulingText(body.justification, 500);
+      if (justification.length < 20 || justification.length > 500)
+        return response(
+          "A justificativa deve possuir entre 20 e 500 caracteres.",
+          400,
+        );
+      const { error: deletionError } = await admin.rpc(
+        "delete_appointment_request",
+        {
+          p_request_id: requestId,
+          p_actor_id: user.id,
+          p_operation_id: operationId,
+          p_justification: justification,
+        },
+      );
+      if (deletionError) {
+        if (deletionError.message.includes("deletion_justification_invalid"))
+          return response(
+            "A justificativa deve possuir entre 20 e 500 caracteres.",
+            400,
+          );
+        if (deletionError.message.includes("scheduling_override_required"))
+          return response("Acesso negado.", 403);
+        if (deletionError.message.includes("appointment_request_not_found"))
+          return response("Solicitação não encontrada.", 404);
+        throw deletionError;
+      }
+      await admin.from("audit_logs").insert({
+        actor_id: user.id,
+        action: "APPOINTMENT_DELETED_BY_ADMIN",
+        entity_type: "appointment_request",
+        entity_id: requestId,
+        before_data: { deleted_at: null },
+        after_data: {
+          deleted_by: user.id,
+          deletion_reason: justification,
+          operation_id: operationId,
+        },
+      });
+      return Response.json({
+        ok: true,
+        removeFromActive: true,
+        message: "Agendamento excluído da fila.",
+      });
+    }
     if (action === "claim") {
       if (appointment.workflow_status !== "NOVO")
         return response("Atendimento já assumido.", 409);
@@ -272,12 +358,15 @@ export async function POST(request: Request) {
         .min(1)
         .max(20)
         .safeParse(body.examIds);
-      const detail = sanitizeSchedulingText(body.detail, 800) || null;
+      const detail = sanitizeSchedulingText(body.detail, 800);
       const guidance = sanitizeSchedulingText(body.guidance, 1600);
       if (!reason.success || !examIds.success || !guidance)
         return response("Preencha o motivo e a orientação ao paciente.", 400);
-      if (reason.data === "other" && !detail)
-        return response("Descreva o outro motivo.", 400);
+      if (detail.length < 20)
+        return response(
+          "A justificativa deve possuir pelo menos 20 caracteres.",
+          400,
+        );
       if (!hasValidSchedulingEmail(appointment.email))
         return response("Corrija o e-mail do paciente antes de avisá-lo.", 400);
       const selectedExams = appointment.appointment_request_exams.filter(
@@ -299,8 +388,11 @@ export async function POST(request: Request) {
         },
       );
       if (closureError) {
-        if (closureError.message.includes("another_attendant"))
-          return response("Esta solicitação está com outro atendente.", 403);
+        if (closureError.message.includes("not_schedulable_input_invalid"))
+          return response(
+            "A justificativa deve possuir pelo menos 20 caracteres.",
+            400,
+          );
         throw closureError;
       }
       const allClosed = closure?.all_closed === true;

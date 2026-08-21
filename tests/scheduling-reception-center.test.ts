@@ -310,6 +310,54 @@ test("migration adiciona override, fechamento parcial, preview e contato novo", 
   assert.doesNotMatch(migration, /\bdelete\s+from\b/i);
 });
 
+test("controle final permite takeover, não agendável global e exclusão lógica", () => {
+  const migration = read(
+    "../supabase/migrations/20260821234240_scheduling_takeover_and_logical_deletion.sql",
+  );
+  const route = read("../src/app/api/admin/solicitacoes/acoes/route.ts");
+  const component = read("../src/components/admin/reception-center.tsx");
+  const page = read("../src/app/admin/(protected)/solicitacoes/page.tsx");
+
+  assert.match(migration, /take_over_appointment_request/);
+  assert.match(migration, /for update/);
+  assert.match(migration, /AGENDAMENTO ASSUMIDO POR OUTRO ATENDENTE/);
+  assert.match(migration, /deleted_at timestamptz/);
+  assert.match(migration, /deleted_by uuid references public\.profiles/);
+  assert.match(migration, /deletion_reason text/);
+  assert.match(migration, /AGENDAMENTO EXCLUÍDO/);
+  assert.match(migration, /NÃO FOI POSSÍVEL AGENDAR/);
+  assert.match(
+    migration,
+    /char_length\(justification\) not between 20 and 800/,
+  );
+  assert.doesNotMatch(
+    migration,
+    /delete\s+from\s+public\.appointment_requests/i,
+  );
+
+  assert.match(route, /action === "take_over"/);
+  assert.match(route, /APPOINTMENT_TAKEN_OVER/);
+  assert.match(route, /action === "delete_request"/);
+  assert.match(route, /APPOINTMENT_DELETED_BY_ADMIN/);
+  assert.match(
+    route,
+    /A justificativa deve possuir pelo menos 20 caracteres\./,
+  );
+  assert.match(
+    route,
+    /A justificativa deve possuir entre 20 e 500 caracteres\./,
+  );
+  assert.match(route, /\.is\("deleted_at", null\)/);
+
+  assert.match(component, /Assumir agendamento/);
+  assert.match(component, /Confirmar e assumir/);
+  assert.match(component, /Excluir agendamento/);
+  assert.match(component, /Justificativa interna/);
+  assert.match(component, /Registrado por/);
+  assert.match(page, /\.is\("deleted_at", null\)/);
+  assert.match(page, /canManageScheduling/);
+});
+
 test("upload preserva original, otimiza imagem e mede progresso real", () => {
   const scheduling = read("../src/components/sections/scheduling.tsx");
   const optimizer = read("../src/lib/scheduling/image-optimization.ts");

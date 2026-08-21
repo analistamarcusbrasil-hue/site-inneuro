@@ -4,7 +4,10 @@ import {
   type ReceptionRequest,
 } from "@/components/admin/reception-center";
 import { requireAdminPermission } from "@/lib/cms/auth";
-import { canOverrideSchedulingAssignment } from "@/lib/admin/permissions";
+import {
+  canOverrideSchedulingAssignment,
+  hasAdminPermission,
+} from "@/lib/admin/permissions";
 import { defaultDocumentsToBring } from "@/lib/scheduling/operations";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
@@ -46,6 +49,7 @@ export default async function AppointmentRequestsPage() {
         .select(
           "id,protocol,patient_name,cpf,phone,email,service_type,insurance_name,insurance_card_number,workflow_status,assigned_to,claimed_at,insurer_reference,authorization_number,authorization_valid_until,pending_reason,pending_correction,pending_guidance,documents_received_at,unit_name,confirmation_status,confirmation_communication_id,not_schedulable_reason,not_schedulable_detail,not_schedulable_guidance,not_schedulable_communication_status,not_schedulable_communication_id,completed_by,completed_at,created_at,updated_at,assigned:profiles!assigned_to(full_name),completed:profiles!appointment_requests_completed_by_fkey(full_name),appointment_request_exams(id,exam_name,exam_id,modality,status,scheduled_date,scheduled_time,preparation_text,documents_to_bring,not_schedulable_reason,not_schedulable_detail,not_schedulable_guidance,not_schedulable_at),appointment_request_documents(id,document_type,file_name,checked_at,source,created_at),appointment_request_history(id,action,details,created_at),appointment_request_communications!appointment_request_communications_appointment_request_id_fkey(id,communication_type,subject,text_body,status,attempt_count,created_at,sent_at)",
         )
+        .is("deleted_at", null)
         .order("documents_received_at", { ascending: false, nullsFirst: false })
         .order("created_at", { ascending: true })
         .limit(500),
@@ -110,6 +114,7 @@ export default async function AppointmentRequestsPage() {
         currentUser={{
           id: user.id,
           name: profile.full_name || "Atendente",
+          canManageScheduling: hasAdminPermission(profile, "scheduling.manage"),
           canOverrideAssignment: canOverrideSchedulingAssignment(profile),
         }}
       />

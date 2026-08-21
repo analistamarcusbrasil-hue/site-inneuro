@@ -17,6 +17,7 @@ import {
   RefreshCw,
   Search,
   Send,
+  Trash2,
   UserCheck,
   X,
 } from "lucide-react";
@@ -130,6 +131,8 @@ type Modal =
   | "rejected"
   | "authorize"
   | "not_schedulable"
+  | "take_over"
+  | "delete_request"
   | "complete"
   | "message"
   | "view-message"
@@ -236,6 +239,7 @@ export function ReceptionCenter({
   currentUser: {
     id: string;
     name: string;
+    canManageScheduling: boolean;
     canOverrideAssignment: boolean;
   };
 }) {
@@ -270,6 +274,7 @@ export function ReceptionCenter({
   const [notSchedulableReason, setNotSchedulableReason] =
     useState<NotSchedulableReason>("clinic_does_not_offer");
   const [notSchedulableDetail, setNotSchedulableDetail] = useState("");
+  const [deletionJustification, setDeletionJustification] = useState("");
   const [notSchedulableOrientation, setNotSchedulableOrientation] = useState(
     notSchedulableGuidance.clinic_does_not_offer,
   );
@@ -445,6 +450,11 @@ export function ReceptionCenter({
     setModal("not_schedulable");
   }
 
+  function openDeletion() {
+    setDeletionJustification("");
+    setModal("delete_request");
+  }
+
   function openMessage() {
     if (!selected || !emailIsValid) {
       setShowContactCorrection(true);
@@ -585,6 +595,12 @@ export function ReceptionCenter({
           {saving ? "Reenviando..." : "Reenviar confirmação"}
         </button>
       );
+    if (selected.workflow_status === "NOVO" && ownedByAnother)
+      return (
+        <p className="rounded-xl bg-amber-50 p-4 text-sm font-bold text-amber-900">
+          Assuma o agendamento acima para continuar o atendimento.
+        </p>
+      );
     if (selected.workflow_status === "NOVO")
       return (
         <div className="grid gap-2 sm:grid-cols-2">
@@ -597,7 +613,7 @@ export function ReceptionCenter({
             <UserCheck className="mr-2 inline" size={17} />
             {saving ? "Assumindo..." : "Assumir atendimento"}
           </button>
-          {currentUser.canOverrideAssignment ? (
+          {currentUser.canManageScheduling ? (
             <button
               type="button"
               disabled={saving || !emailIsValid}
@@ -622,7 +638,7 @@ export function ReceptionCenter({
           </button>
           <button
             type="button"
-            disabled={saving || lockedByAnother || !emailIsValid}
+            disabled={saving || !emailIsValid}
             onClick={openNotSchedulable}
             className="min-h-12 rounded-full border border-rose-300 px-5 font-bold text-rose-800 disabled:opacity-50"
           >
@@ -671,14 +687,16 @@ export function ReceptionCenter({
         >
           Autorizar agendamento
         </button>
-        <button
-          type="button"
-          disabled={saving || !emailIsValid}
-          onClick={openNotSchedulable}
-          className="min-h-11 rounded-full border border-rose-300 px-4 font-bold text-rose-800 disabled:opacity-50"
-        >
-          <Ban className="mr-1 inline" size={15} /> Não é possível agendar
-        </button>
+        {currentUser.canManageScheduling ? (
+          <button
+            type="button"
+            disabled={saving || !emailIsValid}
+            onClick={openNotSchedulable}
+            className="min-h-11 rounded-full border border-rose-300 px-4 font-bold text-rose-800 disabled:opacity-50"
+          >
+            <Ban className="mr-1 inline" size={15} /> Não é possível agendar
+          </button>
+        ) : null}
       </div>
     );
   }
@@ -940,6 +958,40 @@ export function ReceptionCenter({
                       Administrador intervindo: {currentUser.name}
                     </p>
                   </div>
+                ) : null}
+                {view === "active" &&
+                ownedByAnother &&
+                currentUser.canManageScheduling ? (
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={() => setModal("take_over")}
+                      className="bg-brand min-h-11 rounded-full px-4 font-bold text-white disabled:opacity-50"
+                    >
+                      <UserCheck className="mr-1 inline" size={16} /> Assumir
+                      agendamento
+                    </button>
+                    <button
+                      type="button"
+                      disabled={saving || !emailIsValid}
+                      onClick={openNotSchedulable}
+                      className="min-h-11 rounded-full border border-rose-300 px-4 font-bold text-rose-800 disabled:opacity-50"
+                    >
+                      <Ban className="mr-1 inline" size={16} /> Não é possível
+                      agendar
+                    </button>
+                  </div>
+                ) : null}
+                {view === "active" && currentUser.canOverrideAssignment ? (
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={openDeletion}
+                    className="mt-3 inline-flex min-h-10 items-center rounded-full border border-rose-300 px-4 text-sm font-bold text-rose-800 disabled:opacity-50"
+                  >
+                    <Trash2 className="mr-1" size={15} /> Excluir agendamento
+                  </button>
                 ) : null}
               </header>
 
@@ -1302,6 +1354,49 @@ export function ReceptionCenter({
                               <> · {entry.details.actor_name}</>
                             ) : null}
                           </p>
+                          {typeof entry.details?.message === "string" ? (
+                            <p className="mt-1 text-xs">
+                              {entry.details.message}
+                            </p>
+                          ) : null}
+                          {entry.action === "NÃO FOI POSSÍVEL AGENDAR" ? (
+                            <dl className="mt-2 space-y-1 rounded-lg bg-rose-50 p-2 text-xs text-rose-950">
+                              <div>
+                                <dt className="inline font-bold">Motivo: </dt>
+                                <dd className="inline">
+                                  {typeof entry.details.reason === "string" &&
+                                  entry.details.reason in
+                                    notSchedulableReasonLabels
+                                    ? notSchedulableReasonLabels[
+                                        entry.details
+                                          .reason as NotSchedulableReason
+                                      ]
+                                    : "Motivo registrado"}
+                                </dd>
+                              </div>
+                              <div>
+                                <dt className="inline font-bold">
+                                  Justificativa:{" "}
+                                </dt>
+                                <dd className="inline">
+                                  {typeof entry.details.justification ===
+                                  "string"
+                                    ? entry.details.justification
+                                    : "—"}
+                                </dd>
+                              </div>
+                              <div>
+                                <dt className="inline font-bold">
+                                  Registrado por:{" "}
+                                </dt>
+                                <dd className="inline">
+                                  {typeof entry.details.actor_name === "string"
+                                    ? entry.details.actor_name
+                                    : "Atendente"}
+                                </dd>
+                              </div>
+                            </dl>
+                          ) : null}
                         </li>
                       ))}
                   </ol>
@@ -1315,6 +1410,64 @@ export function ReceptionCenter({
           )}
         </section>
       </div>
+
+      {modal === "take_over" && selected ? (
+        <ModalShell title="Assumir agendamento" onClose={() => setModal(null)}>
+          <p className="mt-5 text-sm text-slate-700">
+            Este agendamento está com{" "}
+            <strong>
+              {relationName(selected.assigned, "outro atendente")}
+            </strong>
+            . Confirma que deseja assumir o atendimento?
+          </p>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => act("take_over")}
+            className="bg-brand mt-6 min-h-12 w-full rounded-full px-5 font-bold text-white disabled:opacity-50"
+          >
+            {saving ? "Assumindo..." : "Confirmar e assumir"}
+          </button>
+        </ModalShell>
+      ) : null}
+
+      {modal === "delete_request" && selected ? (
+        <ModalShell
+          title="Excluir agendamento da fila"
+          onClose={() => setModal(null)}
+        >
+          <p className="mt-5 rounded-xl bg-amber-50 p-3 text-sm text-amber-950">
+            A exclusão é lógica: o registro, o histórico e os documentos serão
+            preservados, mas o agendamento sairá da central operacional.
+          </p>
+          <label className="mt-5 block text-sm font-bold">
+            Justificativa interna
+            <textarea
+              value={deletionJustification}
+              onChange={(event) => setDeletionJustification(event.target.value)}
+              minLength={20}
+              maxLength={500}
+              rows={4}
+              className="border-border-light mt-2 w-full rounded-xl border p-3 font-normal"
+            />
+            <span className="text-muted mt-1 block text-xs font-normal">
+              {deletionJustification.trim().length}/500 caracteres (mínimo 20)
+            </span>
+          </label>
+          <button
+            type="button"
+            disabled={saving || deletionJustification.trim().length < 20}
+            onClick={() =>
+              act("delete_request", {
+                justification: deletionJustification,
+              })
+            }
+            className="mt-6 min-h-12 w-full rounded-full bg-rose-800 px-5 font-bold text-white disabled:opacity-50"
+          >
+            {saving ? "Excluindo..." : "Confirmar exclusão lógica"}
+          </button>
+        </ModalShell>
+      ) : null}
 
       {modal === "not_schedulable" && selected ? (
         <ModalShell
@@ -1386,7 +1539,6 @@ export function ReceptionCenter({
                   const value = event.target.value as NotSchedulableReason;
                   setNotSchedulableReason(value);
                   setNotSchedulableOrientation(notSchedulableGuidance[value]);
-                  if (value !== "other") setNotSchedulableDetail("");
                 }}
                 className="border-border-light mt-2 min-h-12 w-full rounded-xl border px-3 font-normal"
               >
@@ -1397,20 +1549,24 @@ export function ReceptionCenter({
                 ))}
               </select>
             </label>
-            {notSchedulableReason === "other" ? (
-              <label className="block text-sm font-bold">
-                Descrição do motivo
-                <textarea
-                  value={notSchedulableDetail}
-                  onChange={(event) =>
-                    setNotSchedulableDetail(event.target.value)
-                  }
-                  rows={3}
-                  maxLength={800}
-                  className="border-border-light mt-2 w-full rounded-xl border p-3 font-normal"
-                />
-              </label>
-            ) : null}
+            <label className="block text-sm font-bold">
+              Justificativa interna
+              <textarea
+                value={notSchedulableDetail}
+                onChange={(event) =>
+                  setNotSchedulableDetail(event.target.value)
+                }
+                rows={3}
+                minLength={20}
+                maxLength={800}
+                className="border-border-light mt-2 w-full rounded-xl border p-3 font-normal"
+              />
+              <span className="text-muted mt-1 block text-xs font-normal">
+                Explique a decisão em pelo menos 20 caracteres. Esta informação
+                fica no histórico interno e é separada da orientação enviada ao
+                paciente.
+              </span>
+            </label>
             <label className="block text-sm font-bold">
               Orientação ao paciente
               <textarea
@@ -1430,8 +1586,7 @@ export function ReceptionCenter({
                 !emailIsValid ||
                 selectedClosureExams.length === 0 ||
                 !notSchedulableOrientation.trim() ||
-                (notSchedulableReason === "other" &&
-                  !notSchedulableDetail.trim())
+                notSchedulableDetail.trim().length < 20
               }
               onClick={() =>
                 act("not_schedulable", {
