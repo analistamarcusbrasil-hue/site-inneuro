@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
   adminPermissions,
+  canOverrideSchedulingAssignment,
   hasAdminPermission,
   permissionsForProfile,
   permissionsToModuleLabels,
@@ -83,6 +84,36 @@ test("recepção pode receber Fale Conosco sem ganhar outros módulos", () => {
     "Agendamentos",
     "Fale Conosco",
   ]);
+});
+
+test("override de agendamento é administrativo e não vem de scheduling.manage", () => {
+  assert.equal(
+    canOverrideSchedulingAssignment(
+      profile(["scheduling.view", "scheduling.manage"], {
+        role: "reception",
+        access_profile: "reception",
+      }),
+    ),
+    false,
+  );
+  assert.equal(
+    canOverrideSchedulingAssignment(
+      profile(["scheduling.view", "scheduling.manage"], {
+        role: "admin",
+        access_profile: "manager",
+      }),
+    ),
+    true,
+  );
+  assert.equal(
+    canOverrideSchedulingAssignment(
+      profile(["scheduling.view"], {
+        role: "super_admin",
+        access_profile: "super_admin",
+      }),
+    ),
+    true,
+  );
 });
 
 test("usuário inativo não possui permissão e legado permanece compatível", () => {

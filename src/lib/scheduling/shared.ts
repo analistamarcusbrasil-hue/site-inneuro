@@ -1,6 +1,7 @@
 export const SCHEDULING_BUCKET = "scheduling-documents";
-export const MAX_FILE_SIZE = 10 * 1024 * 1024;
-export const MAX_REQUEST_SIZE = 25 * 1024 * 1024;
+export const MAX_FILE_SIZE = 15 * 1024 * 1024;
+export const MAX_PREVIEW_SIZE = 3 * 1024 * 1024;
+export const MAX_REQUEST_SIZE = 35 * 1024 * 1024;
 export const REQUEST_TTL_MS = 48 * 60 * 60 * 1000;
 export const UPLOAD_SESSION_TTL_MS = 2 * 60 * 60 * 1000;
 
@@ -104,12 +105,18 @@ export type SchedulingFileDescriptor = {
   name: string;
   size: number;
   type: string;
+  preview?: {
+    name: string;
+    size: number;
+    type: string;
+  } | null;
 };
 
 export type PreparedUpload = {
   id: string;
   kind: DocumentKind;
   signedUrl: string;
+  role: "original" | "preview";
 };
 
 export type PrepareUploadResponse = {
@@ -154,6 +161,16 @@ export function isAllowedMimeType(value: string): value is AllowedMimeType {
   );
 }
 
+export function resolveSchedulingMimeType(name: string, reportedType: string) {
+  const normalized = normalizeMimeType(reportedType);
+  if (isAllowedMimeType(normalized)) return normalized;
+  if (normalized && normalized !== "application/octet-stream") return null;
+  const extension = name.split(".").pop()?.toLowerCase() ?? "";
+  return (Object.entries(mimeExtensions).find(([, extensions]) =>
+    extensions.includes(extension),
+  )?.[0] ?? null) as AllowedMimeType | null;
+}
+
 export function isDocumentKind(value: string): value is DocumentKind {
   return (documentKinds as readonly string[]).includes(value);
 }
@@ -166,18 +183,40 @@ export function getSafeExtension(name: string, mimeType: AllowedMimeType) {
 }
 
 export function validateFileDescriptor(file: SchedulingFileDescriptor) {
-  const normalizedType = normalizeMimeType(file.type);
+  const normalizedType = resolveSchedulingMimeType(file.name, file.type);
   if (!isDocumentKind(file.kind)) return "Tipo de documento inválido.";
-  if (!isAllowedMimeType(normalizedType))
+  if (!normalizedType)
     return "Formato não permitido. Use PDF, JPG, PNG ou WebP.";
   if (!Number.isSafeInteger(file.size) || file.size <= 0)
     return "O arquivo selecionado está vazio ou inválido.";
   if (file.size > MAX_FILE_SIZE)
-    return "Cada arquivo pode ter no máximo 10 MB.";
+    return "Este arquivo é muito grande. Tente fotografar ou digitalizar novamente.";
   const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
   if (!mimeExtensions[normalizedType].includes(extension))
     return "A extensão do arquivo não corresponde ao formato informado.";
   return null;
+}
+
+export function normalizeSchedulingPhone(value: unknown) {
+  const digits = String(value ?? "").replace(/\D/g, "");
+  const national = digits.startsWith("55") ? digits.slice(2) : digits;
+  if (/^(\d)\1+$/.test(national)) return null;
+  if (!/^[1-9]\d(?:[2-5]\d{7}|9\d{8})$/.test(national)) return null;
+  return national;
+}
+
+export function normalizeSchedulingEmail(value: unknown) {
+  const email = String(value ?? "")
+    .trim()
+    .toLowerCase();
+  if (
+    !email ||
+    email.length > 254 ||
+    /[\r\n]/.test(email) ||
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  )
+    return null;
+  return email;
 }
 
 export function formatFileSize(bytes: number) {

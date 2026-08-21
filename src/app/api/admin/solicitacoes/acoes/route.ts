@@ -1,12 +1,25 @@
 import { z } from "zod";
 import { getAdminSession } from "@/lib/cms/auth";
-import { hasAdminPermission } from "@/lib/admin/permissions";
+import {
+  canOverrideSchedulingAssignment,
+  hasAdminPermission,
+} from "@/lib/admin/permissions";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { sanitizeSchedulingText } from "@/lib/scheduling/shared";
-import { hasValidSchedulingEmail } from "@/lib/scheduling/operations";
+import {
+  normalizeSchedulingEmail,
+  normalizeSchedulingPhone,
+  sanitizeSchedulingText,
+} from "@/lib/scheduling/shared";
+import {
+  buildAppointmentWhatsAppUrl,
+  hasValidSchedulingEmail,
+  notSchedulableReasonLabels,
+  notSchedulableReasons,
+} from "@/lib/scheduling/operations";
 import {
   buildConfirmationMessage,
   buildManualMessage,
+  buildNotSchedulableMessage,
   buildPendingMessage,
 } from "@/lib/scheduling/communications/templates";
 import {
@@ -47,6 +60,7 @@ const legacyStatus: Record<string, string> = {
   PENDENCIA: "DOCUMENT_PENDING",
   RECUSADO: "DOCUMENT_PENDING",
   AUTORIZADO: "IN_REVIEW",
+  NAO_AGENDAVEL: "CANCELLED",
   CONCLUIDO: "COMPLETED",
   CANCELADO: "CANCELLED",
 };
@@ -68,6 +82,7 @@ export async function POST(request: Request) {
   const parsed = baseSchema.safeParse(body);
   if (!parsed.success) return response("Dados inválidos.", 400);
   const { requestId, operationId, action } = parsed.data;
+  const canOverrideAssignment = canOverrideSchedulingAssignment(profile);
   const duplicate = await admin
     .from("appointment_request_history")
     .select("id")
@@ -85,7 +100,9 @@ export async function POST(request: Request) {
       ok: true,
       duplicate: true,
       removeFromActive:
-        current?.workflow_status === "CONCLUIDO" &&
+        ["CONCLUIDO", "NAO_AGENDAVEL"].includes(
+          current?.workflow_status ?? "",
+        ) &&
         !["PENDING", "FAILED"].includes(current?.confirmation_status ?? ""),
     });
   }
@@ -95,14 +112,20 @@ export async function POST(request: Request) {
     .eq("id", requestId)
     .single();
   if (!appointment) return response("Solicitação não encontrada.", 404);
+  const isAdministrativeOverride = Boolean(
+    canOverrideAssignment &&
+    appointment.assigned_to &&
+    appointment.assigned_to !== user.id,
+  );
   if (
-    profile.role === "reception" &&
     appointment.assigned_to &&
     appointment.assigned_to !== user.id &&
+    !canOverrideAssignment &&
     action !== "claim"
   ) {
-    return response("Esta solicitação está com outro atendente.", 409);
+    return response("Esta solicitação está com outro atendente.", 403);
   }
+  let overrideAudited = false;
   const history = async (
     label: string,
     details: Record<string, unknown> = {},
@@ -111,8 +134,27 @@ export async function POST(request: Request) {
       appointment_request_id: requestId,
       actor_id: user.id,
       action: label,
-      details: { ...details, operation_id: operationId },
+      details: {
+        ...details,
+        operation_id: operationId,
+        administrative_override: isAdministrativeOverride,
+        actor_name: profile.full_name,
+      },
     });
+    if (isAdministrativeOverride && !overrideAudited) {
+      overrideAudited = true;
+      await admin.from("audit_logs").insert({
+        actor_id: user.id,
+        action: "APPOINTMENT_ADMIN_OVERRIDE_ACTION",
+        entity_type: "appointment_request",
+        entity_id: requestId,
+        after_data: {
+          request_id: requestId,
+          assigned_to: appointment.assigned_to,
+          operation: action,
+        },
+      });
+    }
   };
   const setWorkflow = async (
     workflow: string,
@@ -197,14 +239,143 @@ export async function POST(request: Request) {
       return Response.json({ ok: true, message: "Atendimento assumido." });
     }
     if (action === "update_contact") {
-      const email = z.string().trim().email().safeParse(body.email);
-      if (!email.success) return response("Informe um e-mail válido.", 400);
+      if (!canOverrideAssignment) return response("Acesso negado.", 403);
+      const email = normalizeSchedulingEmail(body.email);
+      const phone = normalizeSchedulingPhone(body.phone);
+      if (!phone) return response("Informe um WhatsApp válido com DDD.", 400);
+      if (!email) return response("Informe um e-mail válido.", 400);
+      const { error: contactError } = await admin
+        .from("appointment_requests")
+        .update({ email, phone })
+        .eq("id", requestId);
+      if (contactError) throw contactError;
+      await history("Contato do paciente atualizado", {
+        previous_phone: appointment.phone,
+        previous_email: appointment.email,
+        new_phone: phone,
+        new_email: email,
+      });
+      await admin.from("audit_logs").insert({
+        actor_id: user.id,
+        action: "APPOINTMENT_CONTACT_UPDATED",
+        entity_type: "appointment_request",
+        entity_id: requestId,
+        before_data: { phone: appointment.phone, email: appointment.email },
+        after_data: { phone, email },
+      });
+      return Response.json({ ok: true, message: "Contato atualizado." });
+    }
+    if (action === "not_schedulable") {
+      const reason = z.enum(notSchedulableReasons).safeParse(body.reason);
+      const examIds = z
+        .array(z.string().uuid())
+        .min(1)
+        .max(20)
+        .safeParse(body.examIds);
+      const detail = sanitizeSchedulingText(body.detail, 800) || null;
+      const guidance = sanitizeSchedulingText(body.guidance, 1600);
+      if (!reason.success || !examIds.success || !guidance)
+        return response("Preencha o motivo e a orientação ao paciente.", 400);
+      if (reason.data === "other" && !detail)
+        return response("Descreva o outro motivo.", 400);
+      if (!hasValidSchedulingEmail(appointment.email))
+        return response("Corrija o e-mail do paciente antes de avisá-lo.", 400);
+      const selectedExams = appointment.appointment_request_exams.filter(
+        (exam: { id: string; status: string }) =>
+          examIds.data.includes(exam.id) && exam.status !== "NOT_SCHEDULABLE",
+      );
+      if (selectedExams.length !== examIds.data.length)
+        return response("Selecione exames válidos para encerrar.", 400);
+      const { data: closure, error: closureError } = await admin.rpc(
+        "mark_appointment_not_schedulable",
+        {
+          p_request_id: requestId,
+          p_actor_id: user.id,
+          p_operation_id: operationId,
+          p_exam_ids: examIds.data,
+          p_reason: reason.data,
+          p_detail: detail,
+          p_guidance: guidance,
+        },
+      );
+      if (closureError) {
+        if (closureError.message.includes("another_attendant"))
+          return response("Esta solicitação está com outro atendente.", 403);
+        throw closureError;
+      }
+      const allClosed = closure?.all_closed === true;
+      const friendlyReason =
+        reason.data === "other" && detail
+          ? detail
+          : notSchedulableReasonLabels[reason.data];
+      let communication: { id: string; status: string } | null = null;
+      try {
+        communication = await queueAndSendSchedulingCommunication({
+          admin,
+          requestId,
+          actorId: user.id,
+          type: "NOT_SCHEDULABLE",
+          recipient: appointment.email,
+          message: buildNotSchedulableMessage({
+            name: appointment.patient_name,
+            protocol: appointment.protocol,
+            exams: selectedExams.map(
+              (exam: { exam_name: string }) => exam.exam_name,
+            ),
+            reason: friendlyReason,
+            guidance,
+            partial: !allClosed,
+          }),
+          idempotencyKey: `${requestId}:not-schedulable:${operationId}`,
+        });
+      } catch {
+        communication = null;
+      }
+      const sent = communication?.status === "SENT";
       await admin
         .from("appointment_requests")
-        .update({ email: email.data })
+        .update({
+          not_schedulable_communication_status: sent ? "SENT" : "FAILED",
+          not_schedulable_communication_id: communication?.id ?? null,
+          confirmation_status: allClosed
+            ? sent
+              ? "SENT"
+              : "FAILED"
+            : appointment.confirmation_status,
+        })
         .eq("id", requestId);
-      await history("Contato do paciente atualizado");
-      return Response.json({ ok: true, message: "Contato atualizado." });
+      await admin.from("audit_logs").insert({
+        actor_id: user.id,
+        action: "APPOINTMENT_MARKED_NOT_SCHEDULABLE",
+        entity_type: "appointment_request",
+        entity_id: requestId,
+        after_data: {
+          request_id: requestId,
+          exam_ids: examIds.data,
+          reason: reason.data,
+          all_closed: allClosed,
+        },
+      });
+      await history(
+        sent
+          ? "Paciente avisado sobre exame não agendável"
+          : "Comunicação de não agendamento pendente",
+        { communication_id: communication?.id ?? null },
+      );
+      return Response.json({
+        ok: true,
+        removeFromActive: allClosed && sent,
+        whatsappUrl: buildAppointmentWhatsAppUrl({
+          phone: appointment.phone,
+          patientName: appointment.patient_name,
+          protocol: appointment.protocol,
+        }),
+        message: sent
+          ? allClosed
+            ? "Solicitação encerrada e paciente avisado."
+            : "Exame encerrado; os demais continuam em atendimento."
+          : "Motivo registrado. A comunicação por e-mail está pendente.",
+      });
     }
     if (action === "wait_insurance") {
       const reference = sanitizeSchedulingText(body.reference, 120) || null;
@@ -318,9 +489,15 @@ export async function POST(request: Request) {
         .safeParse(body.schedules);
       if (
         !schedules.success ||
-        schedules.data.length !== appointment.appointment_request_exams.length
+        schedules.data.length !==
+          appointment.appointment_request_exams.filter(
+            (exam: { status: string }) => exam.status !== "NOT_SCHEDULABLE",
+          ).length
       )
-        return response("Preencha data e horário de todos os exames.", 400);
+        return response(
+          "Preencha data e horário de todos os exames agendáveis.",
+          400,
+        );
       if (!hasValidSchedulingEmail(appointment.email))
         return response("Corrija o e-mail do paciente antes de concluir.", 400);
       const { error: completionError } = await admin.rpc(
@@ -470,14 +647,37 @@ export async function POST(request: Request) {
       if (communication.communication_type === "SCHEDULE_CONFIRMED") {
         await markConfirmation(retried);
       }
+      let notSchedulableClosed = false;
+      if (communication.communication_type === "NOT_SCHEDULABLE") {
+        const sent = retried?.status === "SENT";
+        const { count: remaining } = await admin
+          .from("appointment_request_exams")
+          .select("id", { count: "exact", head: true })
+          .eq("appointment_request_id", requestId)
+          .neq("status", "NOT_SCHEDULABLE");
+        notSchedulableClosed = remaining === 0;
+        await admin
+          .from("appointment_requests")
+          .update({
+            not_schedulable_communication_status: sent ? "SENT" : "FAILED",
+            confirmation_status: notSchedulableClosed
+              ? sent
+                ? "SENT"
+                : "FAILED"
+              : appointment.confirmation_status,
+          })
+          .eq("id", requestId);
+      }
       await history("Reenvio de mensagem solicitado", {
         communication_id: communicationId.data,
       });
       return Response.json({
         ok: true,
         removeFromActive:
-          communication.communication_type === "SCHEDULE_CONFIRMED" &&
-          retried?.status === "SENT",
+          retried?.status === "SENT" &&
+          (communication.communication_type === "SCHEDULE_CONFIRMED" ||
+            (communication.communication_type === "NOT_SCHEDULABLE" &&
+              notSchedulableClosed)),
         message:
           retried?.status === "SENT"
             ? "Reenvio concluído."

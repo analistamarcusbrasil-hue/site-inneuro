@@ -4,6 +4,7 @@ import test from "node:test";
 import { PDFDocument } from "pdf-lib";
 import {
   buildConfirmationMessage,
+  buildNotSchedulableMessage,
   buildPendingMessage,
 } from "../src/lib/scheduling/communications/templates";
 import {
@@ -21,6 +22,11 @@ import {
   workflowStatuses,
 } from "../src/lib/scheduling/operations";
 import {
+  normalizeSchedulingEmail,
+  normalizeSchedulingPhone,
+  resolveSchedulingMimeType,
+} from "../src/lib/scheduling/shared";
+import {
   buildSchedulingFormPdf,
   sanitizeDownloadName,
   schedulingFormFileName,
@@ -37,6 +43,7 @@ test("fluxo operacional contém os estados simples da recepção", () => {
     "PENDENCIA",
     "RECUSADO",
     "AUTORIZADO",
+    "NAO_AGENDAVEL",
     "CONCLUIDO",
     "CANCELADO",
   ]);
@@ -89,6 +96,21 @@ test("WhatsApp normaliza telefones brasileiros e monta mensagem segura", () => {
   assert.equal(normalizeWhatsAppPhone("96999999999"), "5596999999999");
   assert.equal(normalizeWhatsAppPhone("123"), null);
   assert.equal(normalizeWhatsAppPhone(null), null);
+  assert.equal(normalizeSchedulingPhone("(96) 99999-9999"), "96999999999");
+  assert.equal(normalizeSchedulingPhone("+55 96 99999-9999"), "96999999999");
+  assert.equal(normalizeSchedulingPhone("00000000000"), null);
+  assert.equal(normalizeSchedulingPhone("11111111111"), null);
+  assert.equal(normalizeSchedulingPhone("99999999999"), null);
+  assert.equal(
+    normalizeSchedulingEmail("  MARIA@EXAMPLE.COM  "),
+    "maria@example.com",
+  );
+  assert.equal(normalizeSchedulingEmail("sem-email"), null);
+  assert.equal(
+    resolveSchedulingMimeType("foto-rg.jpeg", "application/octet-stream"),
+    "image/jpeg",
+  );
+  assert.equal(resolveSchedulingMimeType("arquivo.exe", ""), null);
   const url = buildAppointmentWhatsAppUrl({
     phone: "+55 (96) 99999-9999",
     patientName: "Maria Silva",
@@ -106,8 +128,26 @@ test("fila distingue atendidos de confirmações pendentes", () => {
   assert.equal(isAttendedRequest("CONCLUIDO", "SENT"), true);
   assert.equal(isAttendedRequest("CONCLUIDO", "NOT_REQUIRED"), true);
   assert.equal(isActiveRequest("CONCLUIDO", "SENT"), false);
+  assert.equal(isActiveRequest("NAO_AGENDAVEL", "FAILED"), true);
+  assert.equal(isAttendedRequest("NAO_AGENDAVEL", "SENT"), true);
+  assert.equal(isActiveRequest("NAO_AGENDAVEL", "SENT"), false);
   assert.equal(hasValidSchedulingEmail("paciente@example.com"), true);
   assert.equal(hasValidSchedulingEmail("sem-email"), false);
+});
+
+test("não agendável comunica motivo sem expor conteúdo sensível", () => {
+  const message = buildNotSchedulableMessage({
+    name: "Maria Silva",
+    protocol: "INN-20260816-ABC234",
+    exams: ["Ressonância de Crânio"],
+    reason: "O convênio não possui cobertura para este exame",
+    guidance: "Consulte a operadora sobre os prestadores disponíveis.",
+    partial: true,
+  });
+  assert.match(message.text, /não foi possível realizar esta parte/);
+  assert.match(message.text, /demais exames[\s\S]*continuam em análise/);
+  assert.match(message.text, /INN-20260816-ABC234/);
+  assert.doesNotMatch(message.text, /diagnóstico|laudo|CPF/i);
 });
 
 test("e-mail de pendência inclui protocolo, contexto e link seguro", () => {
@@ -196,6 +236,11 @@ test("endpoint administrativo registra autoria, idempotência e falha de e-mail"
   assert.match(route, /eq\("appointment_request_id", requestId\)/);
   assert.match(route, /appointment_request_history/);
   assert.match(route, /assigned_to[\s\S]*user\.id/);
+  assert.match(route, /canOverrideSchedulingAssignment/);
+  assert.match(route, /APPOINTMENT_ADMIN_OVERRIDE_ACTION/);
+  assert.match(route, /mark_appointment_not_schedulable/);
+  assert.match(route, /APPOINTMENT_MARKED_NOT_SCHEDULABLE/);
+  assert.match(route, /APPOINTMENT_CONTACT_UPDATED/);
 });
 
 test("correção do paciente usa token hash, armazenamento privado e destaca a fila", () => {
@@ -221,7 +266,7 @@ test("tela única oferece fila, atalhos e ações conforme status", () => {
   assert.match(component, /\["mine", "Meus"\]/);
   assert.match(component, /Assumir atendimento/);
   assert.match(component, /FILA ATIVA/);
-  assert.match(component, /ATENDIDOS/);
+  assert.match(component, /ENCERRADOS/);
   assert.match(component, /Confirmar data e horário/);
   assert.match(component, /PRÓXIMO/);
   assert.match(component, /event\.key === "\/"/);
@@ -231,6 +276,8 @@ test("tela única oferece fila, atalhos e ações conforme status", () => {
   assert.match(component, /Confirmação pendente/);
   assert.match(component, /DOCUMENTO RECEBIDO/);
   assert.match(component, /Registrar e avisar paciente/);
+  assert.match(component, /Não é possível agendar/);
+  assert.match(component, /Administrador intervindo/);
   assert.match(component, /Confirmar agendamento e avisar paciente/);
   assert.match(layout, /requireAdmin\(\)/);
   const page = read("../src/app/admin/(protected)/solicitacoes/page.tsx");
@@ -244,6 +291,37 @@ test("tela única oferece fila, atalhos e ações conforme status", () => {
     page.indexOf('requireAdminPermission("scheduling.view")') <
       page.indexOf("createSupabaseAdminClient()"),
   );
+});
+
+test("migration adiciona override, fechamento parcial, preview e contato novo", () => {
+  const migration = read(
+    "../supabase/migrations/20260821194557_scheduling_admin_override_documents_and_closure.sql",
+  );
+  assert.match(migration, /preview_storage_path/);
+  assert.match(migration, /NOT_SCHEDULABLE/);
+  assert.match(migration, /NAO_AGENDAVEL/);
+  assert.match(migration, /mark_appointment_not_schedulable/);
+  assert.match(migration, /can_override_scheduling_assignment/);
+  assert.match(migration, /appointment_requests_require_new_contact/);
+  assert.match(migration, /before insert on public\.appointment_requests/);
+  assert.match(migration, /status <> 'NOT_SCHEDULABLE'/);
+  assert.match(migration, /grant execute[\s\S]*to service_role/);
+  assert.doesNotMatch(migration, /\btruncate\b/i);
+  assert.doesNotMatch(migration, /\bdelete\s+from\b/i);
+});
+
+test("upload preserva original, otimiza imagem e mede progresso real", () => {
+  const scheduling = read("../src/components/sections/scheduling.tsx");
+  const optimizer = read("../src/lib/scheduling/image-optimization.ts");
+  const server = read("../src/lib/scheduling/server.ts");
+  assert.match(optimizer, /PREVIEW_MAX_DIMENSION = 2200/);
+  assert.match(optimizer, /image\/webp/);
+  assert.match(optimizer, /PREVIEW_QUALITY = 0\.84/);
+  assert.match(scheduling, /request\.upload\.addEventListener\("progress"/);
+  assert.match(scheduling, /loadedByTransfer/);
+  assert.match(server, /previewPath/);
+  assert.match(server, /detectSchedulingMimeType/);
+  assert.match(server, /preview_storage_path/);
 });
 
 test("migration da bancada conclui de forma atômica e preserva dados", () => {
@@ -366,6 +444,9 @@ test("downloads administrativos validam permissão, vínculo, privacidade e audi
   assert.match(documentServer, /eq\("appointment_request_id", requestId\)/);
   assert.match(documentServer, /\.download\(document\.storage_path\)/);
   assert.match(documentServer, /APPOINTMENT_DOCUMENT_DOWNLOADED/);
+  assert.match(documentServer, /APPOINTMENT_DOCUMENT_VIEWED/);
+  assert.match(documentServer, /detectSchedulingMimeType/);
+  assert.match(documentServer, /preview_storage_path/);
   assert.match(documentServer, /Content-Disposition/);
   assert.match(documentServer, /Cache-Control": "private, no-store/);
   assert.doesNotMatch(documentServer, /createSignedUrl|getPublicUrl/);

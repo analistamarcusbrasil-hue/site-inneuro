@@ -16,8 +16,10 @@ import {
   isAllowedMimeType,
   isDocumentKind,
   MAX_FILE_SIZE,
+  MAX_PREVIEW_SIZE,
   MAX_REQUEST_SIZE,
   normalizeMimeType,
+  resolveSchedulingMimeType,
   REQUEST_TTL_MS,
   SCHEDULING_BUCKET,
   type AllowedMimeType,
@@ -31,10 +33,11 @@ import {
 
 type PreparedDocument = SchedulingFileDescriptor & {
   path: string;
+  previewPath: string | null;
 };
 
 type UploadSession = {
-  version: 2;
+  version: 2 | 3;
   expiresAt: string;
   protocol: string;
   accessToken: string;
@@ -50,10 +53,13 @@ export type StoredDocument = {
   path: string;
   mimeType: AllowedMimeType;
   size: number;
+  previewPath?: string | null;
+  previewMimeType?: AllowedMimeType | null;
+  previewSize?: number | null;
 };
 
 export type SchedulingManifest = {
-  version: 1 | 2 | 3;
+  version: 1 | 2 | 3 | 4;
   protocol: string;
   patientName: string;
   birthDate: string;
@@ -101,7 +107,7 @@ export type SchedulingDatabaseInput = {
   cpf: string | null;
   birthDate: string;
   phone: string;
-  email: string | null;
+  email: string;
   city: string | null;
   responsibleName: string | null;
   serviceType: ServiceType;
@@ -232,7 +238,7 @@ export function readUploadSessionToken(token: string): UploadSession | null {
       Buffer.from(payload, "base64url").toString("utf8"),
     );
     if (
-      value?.version !== 2 ||
+      ![2, 3].includes(Number(value?.version)) ||
       typeof value.protocol !== "string" ||
       typeof value.accessToken !== "string" ||
       !["PARTICULAR", "INSURANCE", "SUS"].includes(value.serviceType) ||
@@ -262,20 +268,33 @@ export function prepareDocuments(
     if (!/^[A-Za-z0-9_-]{8,80}$/.test(file.id) || seen.has(file.id))
       throw new Error("Revise os arquivos selecionados.");
     seen.add(file.id);
-    const mimeType = normalizeMimeType(file.type) as AllowedMimeType;
+    const mimeType = resolveSchedulingMimeType(file.name, file.type);
+    if (!mimeType) throw new Error("Formato de documento não permitido.");
+    if (file.preview) {
+      if (
+        file.preview.type !== "image/webp" ||
+        file.preview.size <= 0 ||
+        file.preview.size > MAX_PREVIEW_SIZE ||
+        !file.preview.name.toLowerCase().endsWith(".webp")
+      )
+        throw new Error("A visualização otimizada é inválida.");
+    }
     totalSize += file.size;
     documents.push({
       id: file.id,
       kind: file.kind,
       name: file.name.slice(0, 180),
       path: `uploads/${protocol}/${randomUUID()}.${getSafeExtension(file.name, mimeType)}`,
+      previewPath: file.preview
+        ? `uploads/${protocol}/${randomUUID()}-preview.webp`
+        : null,
       size: file.size,
       type: mimeType,
     });
   }
 
   if (totalSize > MAX_REQUEST_SIZE)
-    throw new Error("O total dos arquivos pode ter no máximo 25 MB.");
+    throw new Error("O total dos arquivos pode ter no máximo 35 MB.");
   return documents;
 }
 
@@ -389,7 +408,9 @@ export async function removeDocuments(admin: SupabaseClient, paths: string[]) {
   );
 }
 
-function detectMimeType(bytes: Uint8Array): AllowedMimeType | null {
+export function detectSchedulingMimeType(
+  bytes: Uint8Array,
+): AllowedMimeType | null {
   if (
     bytes.length >= 5 &&
     bytes[0] === 0x25 &&
@@ -443,16 +464,37 @@ export async function verifyUploadedDocuments(
       if (error || !data)
         throw new Error("Um dos documentos não foi enviado corretamente.");
       if (data.size <= 0 || data.size > MAX_FILE_SIZE)
-        throw new Error("Um dos documentos ultrapassa o limite de 10 MB.");
+        throw new Error("Um dos documentos ultrapassa o limite de 15 MB.");
       totalSize += data.size;
       if (totalSize > MAX_REQUEST_SIZE)
-        throw new Error("O total dos arquivos ultrapassa 25 MB.");
+        throw new Error("O total dos arquivos ultrapassa 35 MB.");
       const bytes = new Uint8Array(await data.slice(0, 16).arrayBuffer());
-      const detectedType = detectMimeType(bytes);
+      const detectedType = detectSchedulingMimeType(bytes);
       if (!detectedType || detectedType !== normalizeMimeType(document.type))
         throw new Error(
           "O conteúdo real de um dos arquivos não corresponde ao formato permitido.",
         );
+      let previewSize: number | null = null;
+      if (document.preview && document.previewPath) {
+        const preview = await admin.storage
+          .from(SCHEDULING_BUCKET)
+          .download(document.previewPath);
+        if (
+          preview.error ||
+          !preview.data ||
+          preview.data.size <= 0 ||
+          preview.data.size > MAX_PREVIEW_SIZE
+        )
+          throw new Error(
+            "A visualização otimizada não foi enviada corretamente.",
+          );
+        const previewBytes = new Uint8Array(
+          await preview.data.slice(0, 16).arrayBuffer(),
+        );
+        if (detectSchedulingMimeType(previewBytes) !== "image/webp")
+          throw new Error("A visualização otimizada é inválida.");
+        previewSize = preview.data.size;
+      }
       verified.push({
         id: document.id,
         kind: document.kind,
@@ -460,13 +502,19 @@ export async function verifyUploadedDocuments(
         path: document.path,
         mimeType: detectedType,
         size: data.size,
+        previewPath: document.previewPath,
+        previewMimeType: document.previewPath ? "image/webp" : null,
+        previewSize,
       });
     }
     return verified;
   } catch (error) {
     await removeDocuments(
       admin,
-      documents.map((document) => document.path),
+      documents.flatMap(
+        (document) =>
+          [document.path, document.previewPath].filter(Boolean) as string[],
+      ),
     );
     throw error;
   }
@@ -610,6 +658,9 @@ export async function saveSchedulingRequestRecord(
     file_name: document.name,
     mime_type: document.mimeType,
     file_size: document.size,
+    preview_storage_path: document.previewPath ?? null,
+    preview_mime_type: document.previewMimeType ?? null,
+    preview_file_size: document.previewSize ?? null,
   }));
 
   const [
@@ -646,7 +697,7 @@ function isSchedulingManifest(value: unknown): value is SchedulingManifest {
   if (!value || typeof value !== "object") return false;
   const manifest = value as Partial<SchedulingManifest>;
   return (
-    [1, 2, 3].includes(Number(manifest.version)) &&
+    [1, 2, 3, 4].includes(Number(manifest.version)) &&
     typeof manifest.protocol === "string" &&
     typeof manifest.patientName === "string" &&
     typeof manifest.expiresAt === "string" &&
@@ -671,7 +722,10 @@ export async function purgeSchedulingRequest(
 ) {
   await removeDocuments(
     admin,
-    manifest.documents.map((document) => document.path),
+    manifest.documents.flatMap(
+      (document) =>
+        [document.path, document.previewPath].filter(Boolean) as string[],
+    ),
   );
   const tombstone: ExpiredManifest = {
     version: 1,
@@ -744,10 +798,26 @@ export async function createPreparedUploadSession(
       id: document.id,
       kind: document.kind,
       signedUrl: data.signedUrl,
+      role: "original" as const,
     });
+    if (document.previewPath) {
+      const preview = await admin.storage
+        .from(SCHEDULING_BUCKET)
+        .createSignedUploadUrl(document.previewPath);
+      if (preview.error || !preview.data?.signedUrl)
+        throw new Error(
+          "Não foi possível preparar a visualização do documento.",
+        );
+      uploads.push({
+        id: document.id,
+        kind: document.kind,
+        signedUrl: preview.data.signedUrl,
+        role: "preview" as const,
+      });
+    }
   }
   const session: UploadSession = {
-    version: 2,
+    version: 3,
     expiresAt: new Date(Date.now() + UPLOAD_SESSION_TTL_MS).toISOString(),
     protocol,
     accessToken,
@@ -758,7 +828,10 @@ export async function createPreparedUploadSession(
   const pendingMarker: PendingUploadMarker = {
     tokenHash: hashAccessToken(accessToken),
     expiresAt: session.expiresAt,
-    paths: documents.map((document) => document.path),
+    paths: documents.flatMap(
+      (document) =>
+        [document.path, document.previewPath].filter(Boolean) as string[],
+    ),
   };
   await uploadJson(
     admin,

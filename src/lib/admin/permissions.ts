@@ -172,6 +172,18 @@ export function hasAdminPermission(
   return effectivePermissions(profile).includes(permission);
 }
 
+export function canOverrideSchedulingAssignment(
+  profile: AdminProfile | null | undefined,
+) {
+  if (!profile?.active) return false;
+  return (
+    profile.role === "super_admin" ||
+    profile.role === "admin" ||
+    profile.access_profile === "super_admin" ||
+    profile.access_profile === "manager"
+  );
+}
+
 export function permissionsForProfile(profile: AccessProfile) {
   return [...permissionsByAccessProfile[profile]];
 }

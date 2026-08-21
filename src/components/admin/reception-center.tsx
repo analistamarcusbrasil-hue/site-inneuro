@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
+  Ban,
   CheckCircle2,
   ChevronRight,
   Clipboard,
@@ -28,11 +29,15 @@ import {
   isAttendedRequest,
   isConfirmationPending,
   isLongWaiting,
+  notSchedulableGuidance,
+  notSchedulableReasonLabels,
+  notSchedulableReasons,
   pendingSuggestions,
   quickPendingReasons,
   workflowLabels,
   type ConfirmationStatus,
   type WorkflowStatus,
+  type NotSchedulableReason,
 } from "@/lib/scheduling/operations";
 
 type ExamRow = {
@@ -40,12 +45,17 @@ type ExamRow = {
   exam_name: string;
   exam_id: string | null;
   modality: string | null;
+  status: string;
   scheduled_date: string | null;
   scheduled_time: string | null;
   preparation_text: string | null;
   documents_to_bring: string[];
   automatic_preparation: string;
   automatic_documents: string[];
+  not_schedulable_reason: NotSchedulableReason | null;
+  not_schedulable_detail: string | null;
+  not_schedulable_guidance: string | null;
+  not_schedulable_at: string | null;
 };
 type DocumentRow = {
   id: string;
@@ -99,6 +109,11 @@ export type ReceptionRequest = {
   pending_reason: string | null;
   pending_correction: string | null;
   pending_guidance: string | null;
+  not_schedulable_reason: NotSchedulableReason | null;
+  not_schedulable_detail: string | null;
+  not_schedulable_guidance: string | null;
+  not_schedulable_communication_status: ConfirmationStatus;
+  not_schedulable_communication_id: string | null;
   documents_received_at: string | null;
   unit_name: string;
   created_at: string;
@@ -114,6 +129,7 @@ type Modal =
   | "pending"
   | "rejected"
   | "authorize"
+  | "not_schedulable"
   | "complete"
   | "message"
   | "view-message"
@@ -152,6 +168,11 @@ function relationName(relation: ProfileRelation, fallback: string) {
 
 function effectiveStatus(request: ReceptionRequest) {
   if (
+    request.workflow_status === "NAO_AGENDAVEL" &&
+    request.not_schedulable_communication_status !== "SENT"
+  )
+    return "Comunicação pendente";
+  if (
     isConfirmationPending(request.workflow_status, request.confirmation_status)
   )
     return "Confirmação pendente";
@@ -168,6 +189,8 @@ function statusColor(request: ReceptionRequest) {
   if (["PENDENCIA", "RECUSADO"].includes(request.workflow_status))
     return "bg-amber-100 text-amber-900";
   if (request.workflow_status === "NOVO") return "bg-sky-100 text-sky-800";
+  if (request.workflow_status === "NAO_AGENDAVEL")
+    return "bg-rose-100 text-rose-900";
   return "bg-slate-100 text-slate-700";
 }
 
@@ -210,7 +233,11 @@ export function ReceptionCenter({
   currentUser,
 }: {
   requests: ReceptionRequest[];
-  currentUser: { id: string; name: string };
+  currentUser: {
+    id: string;
+    name: string;
+    canOverrideAssignment: boolean;
+  };
 }) {
   const router = useRouter();
   const searchRef = useRef<HTMLInputElement>(null);
@@ -240,6 +267,17 @@ export function ReceptionCenter({
   const [messageBody, setMessageBody] = useState("");
   const [messageType, setMessageType] = useState("GUIDANCE");
   const [viewMessage, setViewMessage] = useState<CommunicationRow | null>(null);
+  const [notSchedulableReason, setNotSchedulableReason] =
+    useState<NotSchedulableReason>("clinic_does_not_offer");
+  const [notSchedulableDetail, setNotSchedulableDetail] = useState("");
+  const [notSchedulableOrientation, setNotSchedulableOrientation] = useState(
+    notSchedulableGuidance.clinic_does_not_offer,
+  );
+  const [closureScope, setClosureScope] = useState<"all" | "selected">("all");
+  const [selectedClosureExams, setSelectedClosureExams] = useState<string[]>(
+    [],
+  );
+  const [postActionWhatsappUrl, setPostActionWhatsappUrl] = useState("");
 
   const activeRequests = useMemo(
     () =>
@@ -331,6 +369,7 @@ export function ReceptionCenter({
   const ownedByAnother = Boolean(
     selected?.assigned_to && selected.assigned_to !== currentUser.id,
   );
+  const lockedByAnother = ownedByAnother && !currentUser.canOverrideAssignment;
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -373,22 +412,37 @@ export function ReceptionCenter({
     if (!selected) return;
     setSharedDate("");
     setSchedules(
-      selected.appointment_request_exams.map((exam) => ({
-        examId: exam.id,
-        name: exam.exam_name,
-        date: exam.scheduled_date ?? "",
-        time: exam.scheduled_time?.slice(0, 5) ?? "",
-        preparation:
-          exam.preparation_text ||
-          exam.automatic_preparation ||
-          "Sem preparo específico cadastrado.",
-        documents: (exam.documents_to_bring?.length
-          ? exam.documents_to_bring
-          : exam.automatic_documents
-        ).join("\n"),
-      })),
+      selected.appointment_request_exams
+        .filter((exam) => exam.status !== "NOT_SCHEDULABLE")
+        .map((exam) => ({
+          examId: exam.id,
+          name: exam.exam_name,
+          date: exam.scheduled_date ?? "",
+          time: exam.scheduled_time?.slice(0, 5) ?? "",
+          preparation:
+            exam.preparation_text ||
+            exam.automatic_preparation ||
+            "Sem preparo específico cadastrado.",
+          documents: (exam.documents_to_bring?.length
+            ? exam.documents_to_bring
+            : exam.automatic_documents
+          ).join("\n"),
+        })),
     );
     setModal("complete");
+  }
+
+  function openNotSchedulable() {
+    if (!selected) return;
+    const available = selected.appointment_request_exams
+      .filter((exam) => exam.status !== "NOT_SCHEDULABLE")
+      .map((exam) => exam.id);
+    setNotSchedulableReason("clinic_does_not_offer");
+    setNotSchedulableDetail("");
+    setNotSchedulableOrientation(notSchedulableGuidance.clinic_does_not_offer);
+    setClosureScope("all");
+    setSelectedClosureExams(available);
+    setModal("not_schedulable");
   }
 
   function openMessage() {
@@ -438,6 +492,7 @@ export function ReceptionCenter({
       if (!response.ok)
         throw new Error(result.error || "Não foi possível concluir.");
       setNotice(result.message || "Ação concluída.");
+      setPostActionWhatsappUrl(result.whatsappUrl || "");
       if (result.removeFromActive)
         setHiddenActiveIds((ids) => [...ids, actedId]);
       setModal(null);
@@ -453,9 +508,10 @@ export function ReceptionCenter({
     }
   }
 
-  async function updateEmail(form: FormData) {
+  async function updateContact(form: FormData) {
     const updated = await act("update_contact", {
       email: String(form.get("email") ?? ""),
+      phone: String(form.get("phone") ?? ""),
     });
     if (updated) setShowContactCorrection(false);
   }
@@ -465,17 +521,53 @@ export function ReceptionCenter({
     if (view === "attended")
       return (
         <div className="rounded-2xl bg-emerald-50 p-4 text-emerald-900">
-          <p className="font-bold">Atendimento finalizado</p>
+          <p className="font-bold">
+            {selected.workflow_status === "NAO_AGENDAVEL"
+              ? "Solicitação não agendável"
+              : "Atendimento finalizado"}
+          </p>
           <p className="mt-1 text-sm">
-            Por {relationName(selected.completed, "Atendente não identificado")}{" "}
-            em {formatReceptionDate(selected.completed_at)}. Confirmação{" "}
-            {selected.confirmation_status === "SENT"
-              ? "enviada"
-              : "não necessária"}
-            .
+            {selected.workflow_status === "NAO_AGENDAVEL" ? (
+              selected.not_schedulable_detail ||
+              (selected.not_schedulable_reason
+                ? notSchedulableReasonLabels[selected.not_schedulable_reason]
+                : "Motivo registrado no histórico.")
+            ) : (
+              <>
+                Por{" "}
+                {relationName(selected.completed, "Atendente não identificado")}{" "}
+                em {formatReceptionDate(selected.completed_at)}.
+              </>
+            )}
           </p>
         </div>
       );
+    if (selected.workflow_status === "NAO_AGENDAVEL") {
+      const communication = selected.appointment_request_communications.find(
+        (item) => item.id === selected.not_schedulable_communication_id,
+      );
+      return (
+        <div className="rounded-2xl bg-rose-50 p-4 text-rose-950">
+          <p className="font-bold">Comunicação pendente</p>
+          <p className="mt-1 text-sm">
+            O motivo foi preservado. Reenvie o e-mail para encerrar a fila.
+          </p>
+          {communication ? (
+            <button
+              type="button"
+              disabled={saving || lockedByAnother || !emailIsValid}
+              onClick={() =>
+                act("retry", { communicationId: communication.id })
+              }
+              className="mt-3 min-h-11 rounded-full bg-rose-800 px-4 font-bold text-white disabled:opacity-50"
+            >
+              <RefreshCw className="mr-1 inline" size={15} /> Reenviar
+              comunicação
+            </button>
+          ) : null}
+        </div>
+      );
+    }
     if (
       isConfirmationPending(
         selected.workflow_status,
@@ -485,7 +577,7 @@ export function ReceptionCenter({
       return (
         <button
           type="button"
-          disabled={saving || ownedByAnother || !emailIsValid}
+          disabled={saving || lockedByAnother || !emailIsValid}
           onClick={() => act("retry_confirmation")}
           className="min-h-12 w-full rounded-full bg-rose-700 px-5 font-bold text-white disabled:opacity-50"
         >
@@ -495,28 +587,50 @@ export function ReceptionCenter({
       );
     if (selected.workflow_status === "NOVO")
       return (
-        <button
-          type="button"
-          disabled={saving}
-          onClick={() => act("claim")}
-          className="bg-brand min-h-12 w-full rounded-full px-5 font-bold text-white disabled:opacity-50"
-        >
-          <UserCheck className="mr-2 inline" size={17} />
-          {saving ? "Assumindo..." : "Assumir atendimento"}
-        </button>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => act("claim")}
+            className="bg-brand min-h-12 rounded-full px-5 font-bold text-white disabled:opacity-50"
+          >
+            <UserCheck className="mr-2 inline" size={17} />
+            {saving ? "Assumindo..." : "Assumir atendimento"}
+          </button>
+          {currentUser.canOverrideAssignment ? (
+            <button
+              type="button"
+              disabled={saving || !emailIsValid}
+              onClick={openNotSchedulable}
+              className="min-h-12 rounded-full border border-rose-300 px-5 font-bold text-rose-800 disabled:opacity-50"
+            >
+              <Ban className="mr-1 inline" size={16} /> Não é possível agendar
+            </button>
+          ) : null}
+        </div>
       );
     if (selected.workflow_status === "AUTORIZADO")
       return (
-        <button
-          type="button"
-          disabled={saving || ownedByAnother || !emailIsValid}
-          onClick={openComplete}
-          className="min-h-12 w-full rounded-full bg-emerald-700 px-5 font-bold text-white disabled:opacity-50"
-        >
-          Confirmar data e horário
-        </button>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <button
+            type="button"
+            disabled={saving || lockedByAnother || !emailIsValid}
+            onClick={openComplete}
+            className="min-h-12 rounded-full bg-emerald-700 px-5 font-bold text-white disabled:opacity-50"
+          >
+            Confirmar data e horário
+          </button>
+          <button
+            type="button"
+            disabled={saving || lockedByAnother || !emailIsValid}
+            onClick={openNotSchedulable}
+            className="min-h-12 rounded-full border border-rose-300 px-5 font-bold text-rose-800 disabled:opacity-50"
+          >
+            <Ban className="mr-1 inline" size={16} /> Não é possível agendar
+          </button>
+        </div>
       );
-    if (ownedByAnother)
+    if (lockedByAnother)
       return (
         <p className="rounded-xl bg-amber-50 p-4 text-sm font-bold text-amber-900">
           Atendimento em andamento com{" "}
@@ -557,6 +671,14 @@ export function ReceptionCenter({
         >
           Autorizar agendamento
         </button>
+        <button
+          type="button"
+          disabled={saving || !emailIsValid}
+          onClick={openNotSchedulable}
+          className="min-h-11 rounded-full border border-rose-300 px-4 font-bold text-rose-800 disabled:opacity-50"
+        >
+          <Ban className="mr-1 inline" size={15} /> Não é possível agendar
+        </button>
       </div>
     );
   }
@@ -564,12 +686,24 @@ export function ReceptionCenter({
   return (
     <div>
       {notice ? (
-        <p
+        <div
           role="status"
-          className="bg-mint text-brand mb-4 flex items-center gap-2 rounded-xl p-3 font-bold"
+          className="bg-mint text-brand mb-4 rounded-xl p-3 font-bold"
         >
-          <CheckCircle2 aria-hidden="true" size={18} /> {notice}
-        </p>
+          <p className="flex items-center gap-2">
+            <CheckCircle2 aria-hidden="true" size={18} /> {notice}
+          </p>
+          {postActionWhatsappUrl ? (
+            <a
+              href={postActionWhatsappUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2 inline-flex min-h-10 items-center rounded-full bg-emerald-700 px-4 text-sm text-white"
+            >
+              <MessageCircle className="mr-1" size={15} /> Avisar pelo WhatsApp
+            </a>
+          ) : null}
+        </div>
       ) : null}
       {error ? (
         <p
@@ -606,7 +740,7 @@ export function ReceptionCenter({
               }}
               className={`min-h-10 rounded-lg px-4 text-sm font-extrabold ${view === "attended" ? "bg-brand text-white shadow-sm" : "text-slate-600"}`}
             >
-              ATENDIDOS · {attendedRequests.length}
+              ENCERRADOS · {attendedRequests.length}
             </button>
           </div>
           {view === "active" ? (
@@ -787,11 +921,25 @@ export function ReceptionCenter({
                     </span>
                   </div>
                 </div>
-                {ownedByAnother && view === "active" ? (
+                {lockedByAnother && view === "active" ? (
                   <p className="mt-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
                     Esta solicitação está sendo atendida por outra pessoa. As
                     ações operacionais ficam protegidas.
                   </p>
+                ) : null}
+                {ownedByAnother &&
+                currentUser.canOverrideAssignment &&
+                view === "active" ? (
+                  <div className="mt-3 rounded-xl bg-sky-50 p-3 text-sm text-sky-950">
+                    <p>
+                      Este atendimento está atribuído a{" "}
+                      {relationName(selected.assigned, "outro atendente")}. Você
+                      possui permissão administrativa para realizar alterações.
+                    </p>
+                    <p className="mt-1 font-bold">
+                      Administrador intervindo: {currentUser.name}
+                    </p>
+                  </div>
                 ) : null}
               </header>
 
@@ -859,7 +1007,7 @@ export function ReceptionCenter({
                             Copiar
                           </button>
                         </>
-                      ) : (
+                      ) : currentUser.canOverrideAssignment ? (
                         <button
                           type="button"
                           onClick={() =>
@@ -869,15 +1017,36 @@ export function ReceptionCenter({
                         >
                           Corrigir contato
                         </button>
-                      )}
+                      ) : null}
+                      {emailIsValid && currentUser.canOverrideAssignment ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setShowContactCorrection((value) => !value)
+                          }
+                          className="min-h-9 rounded-full bg-white px-3 text-xs font-bold ring-1 ring-slate-200"
+                        >
+                          Corrigir contato
+                        </button>
+                      ) : null}
                     </div>
                   </div>
                 </div>
                 {showContactCorrection ? (
                   <form
-                    action={updateEmail}
-                    className="mt-3 flex flex-col gap-2 rounded-xl bg-amber-50 p-3 sm:flex-row sm:items-end"
+                    action={updateContact}
+                    className="mt-3 grid gap-2 rounded-xl bg-amber-50 p-3 sm:grid-cols-2"
                   >
+                    <label className="text-xs font-bold">
+                      WhatsApp correto
+                      <input
+                        name="phone"
+                        type="tel"
+                        required
+                        defaultValue={selected.phone ?? ""}
+                        className="mt-1 min-h-11 w-full rounded-lg border border-amber-200 bg-white px-3 font-normal"
+                      />
+                    </label>
                     <label className="flex-1 text-xs font-bold">
                       E-mail correto
                       <input
@@ -891,7 +1060,7 @@ export function ReceptionCenter({
                     <button
                       type="submit"
                       disabled={saving}
-                      className="bg-brand min-h-11 rounded-full px-5 text-sm font-bold text-white disabled:opacity-50"
+                      className="bg-brand min-h-11 rounded-full px-5 text-sm font-bold text-white disabled:opacity-50 sm:col-span-2"
                     >
                       Salvar contato
                     </button>
@@ -927,6 +1096,19 @@ export function ReceptionCenter({
                         className="rounded-xl bg-slate-50 p-3 text-sm"
                       >
                         <p className="font-bold">{exam.exam_name}</p>
+                        {exam.status === "NOT_SCHEDULABLE" ? (
+                          <div className="mt-2 rounded-lg bg-rose-100 p-2 text-rose-900">
+                            <p className="font-bold">Não agendável</p>
+                            <p className="mt-1 text-xs">
+                              {exam.not_schedulable_detail ||
+                                (exam.not_schedulable_reason
+                                  ? notSchedulableReasonLabels[
+                                      exam.not_schedulable_reason
+                                    ]
+                                  : "Motivo registrado.")}
+                            </p>
+                          </div>
+                        ) : null}
                         {exam.scheduled_date ? (
                           <p className="mt-1 text-emerald-800">
                             {formatReceptionDate(exam.scheduled_date)} ·{" "}
@@ -1116,6 +1298,9 @@ export function ReceptionCenter({
                           <p className="font-bold">{entry.action}</p>
                           <p className="text-muted text-xs">
                             {formatReceptionDate(entry.created_at)}
+                            {typeof entry.details?.actor_name === "string" ? (
+                              <> · {entry.details.actor_name}</>
+                            ) : null}
                           </p>
                         </li>
                       ))}
@@ -1130,6 +1315,139 @@ export function ReceptionCenter({
           )}
         </section>
       </div>
+
+      {modal === "not_schedulable" && selected ? (
+        <ModalShell
+          title="Não é possível agendar"
+          onClose={() => setModal(null)}
+        >
+          <div className="mt-5 space-y-5">
+            <fieldset>
+              <legend className="text-sm font-bold">Aplicar a</legend>
+              <label className="mt-2 flex items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  name="closure-scope"
+                  checked={closureScope === "all"}
+                  onChange={() => {
+                    setClosureScope("all");
+                    setSelectedClosureExams(
+                      selected.appointment_request_exams
+                        .filter((exam) => exam.status !== "NOT_SCHEDULABLE")
+                        .map((exam) => exam.id),
+                    );
+                  }}
+                />
+                Toda a solicitação
+              </label>
+              <label className="mt-2 flex items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  name="closure-scope"
+                  checked={closureScope === "selected"}
+                  onChange={() => {
+                    setClosureScope("selected");
+                    setSelectedClosureExams([]);
+                  }}
+                />
+                Somente exames selecionados
+              </label>
+              {closureScope === "selected" ? (
+                <div className="mt-3 space-y-2 rounded-xl bg-slate-50 p-3">
+                  {selected.appointment_request_exams
+                    .filter((exam) => exam.status !== "NOT_SCHEDULABLE")
+                    .map((exam) => (
+                      <label
+                        key={exam.id}
+                        className="flex items-start gap-2 text-sm"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedClosureExams.includes(exam.id)}
+                          onChange={(event) =>
+                            setSelectedClosureExams((current) =>
+                              event.target.checked
+                                ? [...current, exam.id]
+                                : current.filter((id) => id !== exam.id),
+                            )
+                          }
+                        />
+                        {exam.exam_name}
+                      </label>
+                    ))}
+                </div>
+              ) : null}
+            </fieldset>
+            <label className="block text-sm font-bold">
+              Motivo
+              <select
+                value={notSchedulableReason}
+                onChange={(event) => {
+                  const value = event.target.value as NotSchedulableReason;
+                  setNotSchedulableReason(value);
+                  setNotSchedulableOrientation(notSchedulableGuidance[value]);
+                  if (value !== "other") setNotSchedulableDetail("");
+                }}
+                className="border-border-light mt-2 min-h-12 w-full rounded-xl border px-3 font-normal"
+              >
+                {notSchedulableReasons.map((item) => (
+                  <option key={item} value={item}>
+                    {notSchedulableReasonLabels[item]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {notSchedulableReason === "other" ? (
+              <label className="block text-sm font-bold">
+                Descrição do motivo
+                <textarea
+                  value={notSchedulableDetail}
+                  onChange={(event) =>
+                    setNotSchedulableDetail(event.target.value)
+                  }
+                  rows={3}
+                  maxLength={800}
+                  className="border-border-light mt-2 w-full rounded-xl border p-3 font-normal"
+                />
+              </label>
+            ) : null}
+            <label className="block text-sm font-bold">
+              Orientação ao paciente
+              <textarea
+                value={notSchedulableOrientation}
+                onChange={(event) =>
+                  setNotSchedulableOrientation(event.target.value)
+                }
+                rows={4}
+                maxLength={1600}
+                className="border-border-light mt-2 w-full rounded-xl border p-3 font-normal"
+              />
+            </label>
+            <button
+              type="button"
+              disabled={
+                saving ||
+                !emailIsValid ||
+                selectedClosureExams.length === 0 ||
+                !notSchedulableOrientation.trim() ||
+                (notSchedulableReason === "other" &&
+                  !notSchedulableDetail.trim())
+              }
+              onClick={() =>
+                act("not_schedulable", {
+                  reason: notSchedulableReason,
+                  detail: notSchedulableDetail,
+                  guidance: notSchedulableOrientation,
+                  examIds: selectedClosureExams,
+                })
+              }
+              className="min-h-12 w-full rounded-full bg-rose-800 px-5 font-bold text-white disabled:opacity-50"
+            >
+              {saving ? "Registrando..." : "Registrar e avisar paciente"}
+            </button>
+          </div>
+        </ModalShell>
+      ) : null}
 
       {modal === "wait" && selected ? (
         <ModalShell title="Enviar ao convênio" onClose={() => setModal(null)}>

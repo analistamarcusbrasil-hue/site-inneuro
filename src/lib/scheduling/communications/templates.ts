@@ -129,6 +129,35 @@ https://inneuroap.com.br`;
   };
 }
 
+export function buildNotSchedulableMessage(input: {
+  name: string;
+  protocol: string;
+  exams: string[];
+  reason: string;
+  guidance: string;
+  partial: boolean;
+}): SchedulingMessage {
+  const text = `Olá, ${input.name}.
+
+Analisamos sua solicitação de pré-agendamento referente ${input.exams.length === 1 ? "ao exame" : "aos exames"}:
+${input.exams.join("\n")}
+
+No momento não foi possível realizar ${input.partial ? "esta parte do" : "o"} agendamento pelo seguinte motivo:
+
+${input.reason}
+
+${input.guidance}
+
+${input.partial ? "Os demais exames da solicitação continuam em análise pela nossa equipe.\n\n" : ""}Protocolo: ${input.protocol}
+
+INNEURO`;
+  return {
+    subject: "Retorno sobre seu pré-agendamento — INNEURO",
+    text,
+    html: htmlFromText(text),
+  };
+}
+
 export function buildManualMessage(input: {
   subject: string;
   body: string;

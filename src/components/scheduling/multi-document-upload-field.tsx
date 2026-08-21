@@ -77,7 +77,7 @@ export function MultiDocumentUploadField({
             </span>
           ) : null}
         </label>
-        <span className="text-muted text-[.68rem]">Até 10 MB por arquivo</span>
+        <span className="text-muted text-[.68rem]">Até 15 MB por arquivo</span>
       </div>
       <p id={descriptionId} className="text-muted mt-1 text-xs leading-relaxed">
         {description}

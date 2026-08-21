@@ -68,7 +68,7 @@ export function DocumentUploadField({
             </span>
           ) : null}
         </label>
-        <span className="text-muted text-[0.68rem]">Até 10 MB</span>
+        <span className="text-muted text-[0.68rem]">Até 15 MB</span>
       </div>
       <p id={descriptionId} className="text-muted mt-1 text-xs leading-relaxed">
         {description}

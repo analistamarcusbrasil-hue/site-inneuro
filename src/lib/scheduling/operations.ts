@@ -5,6 +5,7 @@ export const workflowStatuses = [
   "PENDENCIA",
   "RECUSADO",
   "AUTORIZADO",
+  "NAO_AGENDAVEL",
   "CONCLUIDO",
   "CANCELADO",
 ] as const;
@@ -18,6 +19,7 @@ export const workflowLabels: Record<WorkflowStatus, string> = {
   PENDENCIA: "Pendência",
   RECUSADO: "Recusado pelo convênio",
   AUTORIZADO: "Autorizado",
+  NAO_AGENDAVEL: "Não agendável",
   CONCLUIDO: "Atendido",
   CANCELADO: "Cancelado",
 };
@@ -39,8 +41,10 @@ export function isAttendedRequest(
   confirmationStatus: ConfirmationStatus,
 ) {
   return (
-    workflowStatus === "CONCLUIDO" &&
-    !isConfirmationPending(workflowStatus, confirmationStatus)
+    (workflowStatus === "CONCLUIDO" &&
+      !isConfirmationPending(workflowStatus, confirmationStatus)) ||
+    (workflowStatus === "NAO_AGENDAVEL" && confirmationStatus === "SENT") ||
+    workflowStatus === "CANCELADO"
   );
 }
 
@@ -50,14 +54,17 @@ export function isActiveRequest(
 ) {
   return (
     isConfirmationPending(workflowStatus, confirmationStatus) ||
-    !["CONCLUIDO", "CANCELADO"].includes(workflowStatus)
+    (workflowStatus === "NAO_AGENDAVEL"
+      ? ["PENDING", "FAILED"].includes(confirmationStatus)
+      : !["CONCLUIDO", "CANCELADO"].includes(workflowStatus))
   );
 }
 
 export function normalizeWhatsAppPhone(value: string | null | undefined) {
   const digits = String(value ?? "").replace(/\D/g, "");
   const national = digits.startsWith("55") ? digits.slice(2) : digits;
-  if (!/^[1-9]\d(?:[2-9]\d{7}|9\d{8})$/.test(national)) return null;
+  if (/^(\d)\1+$/.test(national)) return null;
+  if (!/^[1-9]\d(?:[2-5]\d{7}|9\d{8})$/.test(national)) return null;
   return `55${national}`;
 }
 
@@ -77,8 +84,44 @@ export function buildAppointmentWhatsAppUrl(input: {
 }
 
 export function hasValidSchedulingEmail(value: string | null | undefined) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value ?? "").trim());
+  const email = String(value ?? "").trim();
+  return (
+    email.length <= 254 &&
+    !/[\r\n]/.test(email) &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  );
 }
+
+export const notSchedulableReasons = [
+  "clinic_does_not_offer",
+  "insurance_not_covered",
+  "insurance_not_authorized",
+  "contract_not_covered",
+  "other",
+] as const;
+export type NotSchedulableReason = (typeof notSchedulableReasons)[number];
+
+export const notSchedulableReasonLabels: Record<NotSchedulableReason, string> =
+  {
+    clinic_does_not_offer: "A INNEURO não realiza este exame",
+    insurance_not_covered: "O convênio não possui cobertura para este exame",
+    insurance_not_authorized: "O convênio não autorizou o procedimento",
+    contract_not_covered: "Exame fora da cobertura contratual",
+    other: "Outro motivo",
+  };
+
+export const notSchedulableGuidance: Record<NotSchedulableReason, string> = {
+  clinic_does_not_offer:
+    "Orientamos procurar o profissional solicitante ou a operadora para verificar outro prestador disponível.",
+  insurance_not_covered:
+    "Orientamos confirmar com a operadora as opções de cobertura e os prestadores disponíveis.",
+  insurance_not_authorized:
+    "Orientamos entrar em contato com a operadora para verificar a autorização do procedimento.",
+  contract_not_covered:
+    "Orientamos consultar a operadora sobre alternativas previstas no contrato.",
+  other:
+    "Nossa equipe permanece disponível para orientar sobre os próximos passos.",
+};
 
 export const quickPendingReasons = [
   "Pedido médico incompleto",

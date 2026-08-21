@@ -21,11 +21,16 @@ import { Badge } from "@/components/ui/badge";
 import type { SiteConfig } from "@/config/site";
 import type { SchedulingExamOption } from "@/lib/cms/public-content";
 import type { SchedulingSettings } from "@/lib/scheduling/settings";
+import { createSchedulingImagePreview } from "@/lib/scheduling/image-optimization";
 import {
   getSchedulingModalityLabel,
   inferSchedulingModality,
   isValidCpf,
   MAX_REQUEST_SIZE,
+  MAX_PREVIEW_SIZE,
+  normalizeSchedulingEmail,
+  normalizeSchedulingPhone,
+  resolveSchedulingMimeType,
   schedulingModalities,
   type DocumentKind,
   type FinalizeSchedulingResponse,
@@ -39,7 +44,7 @@ import {
 import { normalizeWhatsAppNumber } from "@/lib/whatsapp";
 import type { Convenio } from "@/types/convenio";
 
-type SubmitPhase = "idle" | "uploading" | "saving";
+type SubmitPhase = "idle" | "optimizing" | "uploading" | "saving";
 type Success = FinalizeSchedulingResponse & {
   examCount: number;
   serviceType: ServiceType;
@@ -70,7 +75,12 @@ function isSchedulingModality(value: unknown): value is SchedulingModality {
 }
 
 function formatPhone(value: string) {
-  const digits = value.replace(/\D/g, "").slice(0, 11);
+  const rawDigits = value.replace(/\D/g, "");
+  const digits = (
+    rawDigits.startsWith("55") && rawDigits.length > 11
+      ? rawDigits.slice(2)
+      : rawDigits
+  ).slice(0, 11);
   if (digits.length <= 2) return digits;
   if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
   if (digits.length <= 10)
@@ -113,7 +123,7 @@ function readJsonResponse<T>(response: Response): Promise<T> {
 function uploadFileToSignedUrl(
   signedUrl: string,
   file: File,
-  onProgress: (progress: number) => void,
+  onProgress: (loaded: number, total: number) => void,
 ) {
   return new Promise<void>((resolve, reject) => {
     const request = new XMLHttpRequest();
@@ -123,14 +133,11 @@ function uploadFileToSignedUrl(
     request.open("PUT", signedUrl);
     request.timeout = 5 * 60 * 1000;
     request.upload.addEventListener("progress", (event) => {
-      if (event.lengthComputable)
-        onProgress(
-          Math.min(99, Math.round((event.loaded / event.total) * 100)),
-        );
+      if (event.lengthComputable) onProgress(event.loaded, event.total);
     });
     request.addEventListener("load", () => {
       if (request.status >= 200 && request.status < 300) {
-        onProgress(100);
+        onProgress(file.size, file.size);
         resolve();
       } else {
         reject(
@@ -274,25 +281,37 @@ export function Scheduling({
 
   function validateSelectedFile(kind: DocumentKind, file: File) {
     const id = crypto.randomUUID();
+    const resolvedType = resolveSchedulingMimeType(file.name, file.type);
+    const normalizedFile =
+      resolvedType && resolvedType !== file.type
+        ? new File([file], file.name, {
+            type: resolvedType,
+            lastModified: file.lastModified,
+          })
+        : file;
     const error = validateFileDescriptor({
       id,
       kind,
-      name: file.name,
-      size: file.size,
-      type: file.type,
+      name: normalizedFile.name,
+      size: normalizedFile.size,
+      type: normalizedFile.type,
     });
-    return { id, error };
+    return { id, error, file: normalizedFile };
   }
 
   function addFiles(kind: DocumentKind, incoming: File[]) {
     const nextErrors: string[] = [];
     const accepted = incoming.slice(0, 12).flatMap((file) => {
-      const { id, error } = validateSelectedFile(kind, file);
+      const {
+        id,
+        error,
+        file: normalizedFile,
+      } = validateSelectedFile(kind, file);
       if (error) {
         nextErrors.push(`${file.name}: ${error}`);
         return [];
       }
-      return [{ id, kind, file }];
+      return [{ id, kind, file: normalizedFile }];
     });
     const singleKinds: DocumentKind[] = [
       "photoId",
@@ -309,7 +328,7 @@ export function Scheduling({
         result.reduce((total, item) => total + item.file.size, 0) >
         MAX_REQUEST_SIZE
       ) {
-        setErrors(["O total dos arquivos pode ter no máximo 25 MB."]);
+        setErrors(["O total dos arquivos pode ter no máximo 35 MB."]);
         return current;
       }
       return result;
@@ -327,13 +346,13 @@ export function Scheduling({
     }
     setFiles((current) => {
       const result = current.map((item) =>
-        item.id === id ? { id: checked.id, kind, file } : item,
+        item.id === id ? { id: checked.id, kind, file: checked.file } : item,
       );
       if (
         result.reduce((total, item) => total + item.file.size, 0) >
         MAX_REQUEST_SIZE
       ) {
-        setErrors(["O total dos arquivos pode ter no máximo 25 MB."]);
+        setErrors(["O total dos arquivos pode ter no máximo 35 MB."]);
         return current;
       }
       return result;
@@ -377,9 +396,9 @@ export function Scheduling({
       if (!birthDate) next.push("Informe a data de nascimento.");
       else if (birthDate > new Date().toISOString().slice(0, 10))
         next.push("A data de nascimento não pode estar no futuro.");
-      if (!/^\d{10,11}$/.test(phone.replace(/\D/g, "")))
-        next.push("Informe um Telefone / WhatsApp válido com DDD.");
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
+      if (!normalizeSchedulingPhone(phone))
+        next.push("Informe um WhatsApp válido com DDD.");
+      if (!normalizeSchedulingEmail(email))
         next.push("Informe um e-mail válido para receber as orientações.");
       if (!serviceType) next.push("Escolha como será o atendimento.");
       if (serviceType === "INSURANCE" && !insuranceId)
@@ -451,7 +470,19 @@ export function Scheduling({
         ? insuranceOther.trim()
         : (selectedPartner?.name ?? "");
     try {
-      setPhase("uploading");
+      setPhase("optimizing");
+      const preparedFiles = await Promise.all(
+        files.map(async (item) => {
+          const preview = await createSchedulingImagePreview(item.file);
+          return {
+            ...item,
+            preview:
+              preview && preview.file.size <= MAX_PREVIEW_SIZE
+                ? preview.file
+                : null,
+          };
+        }),
+      );
       const prepared = await fetch("/api/pre-agendamento/preparar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -460,26 +491,55 @@ export function Scheduling({
           authorizationPending,
           website: data.get("website"),
           startedAt,
-          files: files.map((item) => ({
+          files: preparedFiles.map((item) => ({
             id: item.id,
             kind: item.kind,
             name: item.file.name,
             size: item.file.size,
             type: item.file.type,
+            preview: item.preview
+              ? {
+                  name: item.preview.name,
+                  size: item.preview.size,
+                  type: item.preview.type,
+                }
+              : null,
           })),
         }),
       }).then((response) => readJsonResponse<PrepareUploadResponse>(response));
+      setPhase("uploading");
+      const loadedByTransfer = new Map<string, number>();
+      const totalByDocument = new Map(
+        preparedFiles.map((item) => [
+          item.id,
+          item.file.size + (item.preview?.size ?? 0),
+        ]),
+      );
       await Promise.all(
         prepared.uploads.map(async (upload) => {
-          const selected = files.find((item) => item.id === upload.id);
+          const selected = preparedFiles.find((item) => item.id === upload.id);
           if (!selected)
             throw new Error("Um arquivo selecionado não está disponível.");
+          const uploadFile =
+            upload.role === "preview" ? selected.preview : selected.file;
+          if (!uploadFile)
+            throw new Error("A visualização otimizada não está disponível.");
           setProgress((current) => ({ ...current, [upload.id]: 0 }));
           await uploadFileToSignedUrl(
             upload.signedUrl,
-            selected.file,
-            (value) =>
-              setProgress((current) => ({ ...current, [upload.id]: value })),
+            uploadFile,
+            (loaded) => {
+              loadedByTransfer.set(`${upload.id}:${upload.role}`, loaded);
+              const documentLoaded = [...loadedByTransfer.entries()]
+                .filter(([key]) => key.startsWith(`${upload.id}:`))
+                .reduce((total, [, value]) => total + value, 0);
+              const documentTotal = totalByDocument.get(upload.id) ?? 1;
+              const value = Math.min(
+                100,
+                Math.round((documentLoaded / documentTotal) * 100),
+              );
+              setProgress((current) => ({ ...current, [upload.id]: value }));
+            },
           );
         }),
       );
@@ -752,7 +812,7 @@ export function Scheduling({
                   />
                 </label>
                 <label className="text-ink text-sm font-semibold">
-                  Telefone / WhatsApp <span className="text-error">*</span>
+                  WhatsApp <span className="text-error">*</span>
                   <input
                     type="tel"
                     value={phone}
@@ -762,8 +822,13 @@ export function Scheduling({
                     inputMode="tel"
                     autoComplete="tel"
                     placeholder="(00) 00000-0000"
+                    required
                     className={inputClasses}
                   />
+                  <span className="text-muted mt-1 block text-xs font-normal">
+                    Usaremos este número para entrar em contato sobre seu
+                    agendamento.
+                  </span>
                 </label>
                 <label className="text-ink text-sm font-semibold">
                   E-mail <span className="text-error">*</span>
@@ -775,8 +840,14 @@ export function Scheduling({
                     }
                     autoComplete="email"
                     placeholder="voce@exemplo.com.br"
+                    maxLength={254}
+                    required
                     className={inputClasses}
                   />
+                  <span className="text-muted mt-1 block text-xs font-normal">
+                    Enviaremos confirmações e orientações sobre seu agendamento
+                    para este e-mail.
+                  </span>
                 </label>
               </div>
 
@@ -1162,8 +1233,15 @@ export function Scheduling({
                       <p className="text-muted">
                         Nascimento: {formatDate(birthDate)}
                       </p>
-                      <p className="text-muted">WhatsApp: {phone}</p>
+                    </section>
+                    <section className="rounded-2xl bg-white p-4">
+                      <h3 className="text-brand font-bold">CONTATO</h3>
+                      <p className="text-ink mt-2">WhatsApp: {phone}</p>
                       <p className="text-muted">E-mail: {email}</p>
+                      <p className="text-muted mt-2 text-xs">
+                        Confira seus dados. A INNEURO usará estes contatos para
+                        falar com você sobre esta solicitação.
+                      </p>
                     </section>
                     <section className="rounded-2xl bg-white p-4">
                       <h3 className="text-brand font-bold">ATENDIMENTO</h3>
@@ -1271,11 +1349,13 @@ export function Scheduling({
                 ) : (
                   <>
                     <ShieldCheck aria-hidden="true" size={18} />
-                    {phase === "uploading"
-                      ? "Enviando documentos…"
-                      : phase === "saving"
-                        ? "Salvando solicitação…"
-                        : "Enviar solicitação"}
+                    {phase === "optimizing"
+                      ? "Otimizando imagens…"
+                      : phase === "uploading"
+                        ? "Enviando documentos…"
+                        : phase === "saving"
+                          ? "Salvando solicitação…"
+                          : "Enviar solicitação"}
                   </>
                 )}
               </button>

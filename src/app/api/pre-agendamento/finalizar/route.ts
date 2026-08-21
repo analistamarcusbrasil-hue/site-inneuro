@@ -19,6 +19,8 @@ import {
   documentLabels,
   inferSchedulingModality,
   isValidCpf,
+  normalizeSchedulingEmail,
+  normalizeSchedulingPhone,
   preferredPeriods,
   sanitizeSchedulingText,
   schedulingModalities,
@@ -152,8 +154,9 @@ export async function POST(request: NextRequest) {
     const patientName = sanitizeSchedulingText(body.name, 120);
     const cpf = sanitizeSchedulingText(body.cpf, 18).replace(/\D/g, "");
     const birthDate = sanitizeSchedulingText(body.birthDate, 10);
-    const phone = sanitizeSchedulingText(body.phone, 24);
-    const email = sanitizeSchedulingText(body.email, 254).toLowerCase();
+    const phoneInput = sanitizeSchedulingText(body.phone, 24);
+    const phone = normalizeSchedulingPhone(phoneInput);
+    const email = normalizeSchedulingEmail(body.email);
     const insuranceId = sanitizeSchedulingText(body.insuranceId, 40);
     const insuranceName = sanitizeSchedulingText(body.insuranceName, 100);
     const observations = sanitizeSchedulingText(body.observations, 500);
@@ -168,15 +171,14 @@ export async function POST(request: NextRequest) {
       return json({ error: "Confira o CPF informado." }, 400);
     if (!isValidDate(birthDate, false))
       return json({ error: "Informe uma data de nascimento válida." }, 400);
-    if (!/^\d{10,11}$/.test(phone.replace(/\D/g, "")))
-      return json({ error: "Informe um telefone válido com DDD." }, 400);
+    if (!phone)
+      return json({ error: "Informe um WhatsApp válido com DDD." }, 400);
     if (!exams)
       return json(
         { error: "Informe pelo menos um exame e sua modalidade." },
         400,
       );
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
-      return json({ error: "Informe um e-mail válido." }, 400);
+    if (!email) return json({ error: "Informe um e-mail válido." }, 400);
     if (dates.length < 1 || dates.some((date) => !isValidDate(date, true)))
       return json({ error: "Escolha uma data preferencial válida." }, 400);
     if (
@@ -278,12 +280,15 @@ export async function POST(request: NextRequest) {
     }));
 
     const documents = await verifyUploadedDocuments(admin, session.documents);
-    uploadedPaths = documents.map((document) => document.path);
+    uploadedPaths = documents.flatMap(
+      (document) =>
+        [document.path, document.previewPath].filter(Boolean) as string[],
+    );
     const createdAt = new Date().toISOString();
     const expiresAt = createManifestExpiration();
     const attendance = serviceLabels[session.serviceType];
     const manifest: SchedulingManifest = {
-      version: 3,
+      version: 4,
       protocol: session.protocol,
       patientName,
       birthDate,
