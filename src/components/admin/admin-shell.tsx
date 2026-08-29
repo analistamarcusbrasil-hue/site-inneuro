@@ -17,6 +17,8 @@ import {
   BriefcaseBusiness,
   MessageSquareText,
   Settings,
+  HeartHandshake,
+  CloudSun,
 } from "lucide-react";
 import { cmsModules } from "@/lib/cms/modules";
 import { canAccessHr } from "@/lib/careers/hr-permissions";
@@ -94,10 +96,43 @@ export function AdminShell({
         },
       ]
     : [];
+  const surveyCanView = hasAdminPermission(profile, "surveys.view");
+  const surveyLinks = [
+    {
+      href: surveyCanView
+        ? "/admin/pesquisas/satisfacao"
+        : "/admin/pesquisas/satisfacao/qrcode",
+      label: "Satisfação do Cliente",
+      icon: HeartHandshake,
+    },
+    ...(surveyCanView
+      ? [
+          {
+            href: "/admin/pesquisas/clima",
+            label: "Clima Institucional",
+            icon: CloudSun,
+          },
+        ]
+      : []),
+  ].filter(() =>
+    [
+      "surveys.view",
+      "surveys.manage",
+      "surveys.reports",
+      "surveys.qrcode",
+      "surveys.admin",
+    ].some((permission) =>
+      hasAdminPermission(
+        profile,
+        permission as import("@/lib/admin/permissions").AdminPermission,
+      ),
+    ),
+  );
   const links = [
     { href: "/admin", label: "Visão geral", icon: LayoutDashboard },
     ...contentLinks,
     ...hrLinks,
+    ...surveyLinks,
     ...managementLinks,
   ];
   const isLinkActive = (href: string) =>
@@ -212,6 +247,31 @@ export function AdminShell({
                 >
                   <Icon size={18} aria-hidden="true" />
                   {label}
+                </Link>
+              </li>
+            ))}
+            {surveyLinks.length ? (
+              <li>
+                <p className="px-3 pt-5 pb-1 text-[0.65rem] font-bold tracking-widest text-white/45 uppercase">
+                  Experiência e Pesquisas
+                </p>
+              </li>
+            ) : null}
+            {surveyLinks.map(({ href, label, icon: Icon }) => (
+              <li key={href}>
+                <Link
+                  href={href}
+                  onClick={() => setOpen(false)}
+                  aria-current={isLinkActive(href) ? "page" : undefined}
+                  className={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold ${isLinkActive(href) ? "bg-tech text-brand-dark" : "text-white/80 hover:bg-white/10 hover:text-white"}`}
+                >
+                  <Icon size={18} aria-hidden="true" />
+                  <span className="min-w-0 flex-1">{label}</span>
+                  {href.endsWith("/clima") ? (
+                    <span className="rounded-full bg-white/10 px-2 py-1 text-[0.52rem] font-extrabold tracking-wide uppercase">
+                      Em desenvolvimento
+                    </span>
+                  ) : null}
                 </Link>
               </li>
             ))}

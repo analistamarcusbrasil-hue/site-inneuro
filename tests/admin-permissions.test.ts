@@ -65,6 +65,11 @@ test("perfis rápidos liberam somente os módulos previstos", () => {
     "scheduling.manage",
     "contact.view",
     "contact.manage",
+    "surveys.view",
+    "surveys.manage",
+    "surveys.reports",
+    "surveys.qrcode",
+    "surveys.admin",
   ]);
   assert.deepEqual(permissionsForProfile("super_admin"), adminPermissions);
 });

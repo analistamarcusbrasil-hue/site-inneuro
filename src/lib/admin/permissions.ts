@@ -14,6 +14,11 @@ export const adminPermissions = [
   "users.manage",
   "audit.view",
   "settings.manage",
+  "surveys.view",
+  "surveys.manage",
+  "surveys.reports",
+  "surveys.qrcode",
+  "surveys.admin",
 ] as const;
 
 export type AdminPermission = (typeof adminPermissions)[number];
@@ -41,6 +46,11 @@ export const permissionLabels: Record<AdminPermission, string> = {
   "users.manage": "Gerenciar usuários",
   "audit.view": "Consultar auditoria",
   "settings.manage": "Gerenciar configurações",
+  "surveys.view": "Visualizar indicadores e respostas",
+  "surveys.manage": "Gerenciar pesquisa e perguntas",
+  "surveys.reports": "Relatórios, prioridades e fechamentos",
+  "surveys.qrcode": "Visualizar e baixar QR Code",
+  "surveys.admin": "Controle completo",
 };
 
 export const accessProfileLabels: Record<AccessProfile, string> = {
@@ -70,6 +80,11 @@ export const permissionsByAccessProfile: Record<
     "scheduling.manage",
     "contact.view",
     "contact.manage",
+    "surveys.view",
+    "surveys.manage",
+    "surveys.reports",
+    "surveys.qrcode",
+    "surveys.admin",
   ],
   reception: ["scheduling.view", "scheduling.manage"],
   hr: ["hr.view", "hr.evaluate", "hr.manage"],
@@ -84,6 +99,17 @@ export const permissionsByAccessProfile: Record<
 };
 
 export const permissionGroups = [
+  {
+    key: "surveys",
+    label: "Experiência e Pesquisas",
+    permissions: [
+      "surveys.view",
+      "surveys.manage",
+      "surveys.reports",
+      "surveys.qrcode",
+      "surveys.admin",
+    ],
+  },
   {
     key: "publications",
     label: "Publicações",
@@ -162,6 +188,14 @@ export function normalizeAdminPermissions(
   if (normalized.has("hr.evaluate")) normalized.add("hr.view");
   if (normalized.has("scheduling.manage")) normalized.add("scheduling.view");
   if (normalized.has("contact.manage")) normalized.add("contact.view");
+  if (normalized.has("surveys.admin")) {
+    normalized.add("surveys.view");
+    normalized.add("surveys.manage");
+    normalized.add("surveys.reports");
+    normalized.add("surveys.qrcode");
+  }
+  if (normalized.has("surveys.manage")) normalized.add("surveys.view");
+  if (normalized.has("surveys.reports")) normalized.add("surveys.view");
   return adminPermissions.filter((permission) => normalized.has(permission));
 }
 

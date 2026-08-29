@@ -5,6 +5,7 @@ import {
   MessageSquareText,
   Newspaper,
   Users,
+  HeartHandshake,
 } from "lucide-react";
 import { AdminPageHeading } from "@/components/admin/admin-page-heading";
 import { requireAdmin } from "@/lib/cms/auth";
@@ -69,6 +70,19 @@ export default async function AdminDashboardPage({
       description: "Mensagens novas e em atendimento",
       count: count ?? 0,
       icon: MessageSquareText,
+    });
+  }
+  if (
+    hasAdminPermission(profile, "surveys.view") ||
+    hasAdminPermission(profile, "surveys.qrcode")
+  ) {
+    cards.push({
+      href: hasAdminPermission(profile, "surveys.view")
+        ? "/admin/pesquisas/satisfacao"
+        : "/admin/pesquisas/satisfacao/qrcode",
+      label: "Experiência e Pesquisas",
+      description: "Satisfação do cliente, indicadores e melhorias",
+      icon: HeartHandshake,
     });
   }
   if (hasAdminPermission(profile, "users.manage")) {

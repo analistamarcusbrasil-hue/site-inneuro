@@ -16,8 +16,9 @@ export function SiteChrome({
   config: SiteConfig;
   scheduling: SchedulingSettings;
 }) {
-  const isAdmin = usePathname().startsWith("/admin");
-  if (isAdmin) return children;
+  const pathname = usePathname();
+  const isStandalone = pathname.startsWith("/admin") || pathname.startsWith("/q/s/");
+  if (isStandalone) return children;
   return (
     <>
       <SkipLink />
