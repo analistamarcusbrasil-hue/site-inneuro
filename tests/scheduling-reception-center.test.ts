@@ -12,15 +12,22 @@ import {
   defaultDocumentsToBring,
   formatReceptionDate,
   formatWaitingTime,
+  getOperationalStatus,
   hasValidSchedulingEmail,
   isActiveRequest,
   isAttendedRequest,
   isConfirmationPending,
+  isPendingFollowUp,
   normalizeWhatsAppPhone,
   pendingSuggestions,
   quickPendingReasons,
   workflowStatuses,
+  waitingTimeTone,
 } from "../src/lib/scheduling/operations";
+import {
+  calculateSchedulingConversionRate,
+  formatOperationalDuration,
+} from "../src/lib/scheduling/analytics";
 import {
   normalizeSchedulingEmail,
   normalizeSchedulingPhone,
@@ -77,6 +84,82 @@ test("tempo de espera é legível para minutos, horas e dias", () => {
   assert.equal(formatWaitingTime("2026-08-16T14:42:00Z", now), "há 18 min");
   assert.equal(formatWaitingTime("2026-08-16T12:00:00Z", now), "há 3 h");
   assert.equal(formatWaitingTime("2026-08-14T12:00:00Z", now), "há 2 dias");
+});
+
+test("status operacional, atrasos e retornos seguem a central", () => {
+  const now = Date.parse("2026-09-01T15:00:00Z");
+  assert.equal(getOperationalStatus("NOVO"), "AGUARDANDO");
+  assert.equal(getOperationalStatus("AUTORIZADO"), "EM_ATENDIMENTO");
+  assert.equal(getOperationalStatus("CONCLUIDO"), "AGENDADO");
+  assert.equal(getOperationalStatus("NAO_AGENDAVEL"), "NAO_AGENDADO");
+  assert.equal(waitingTimeTone("2026-09-01T12:00:00Z", now), "normal");
+  assert.equal(waitingTimeTone("2026-09-01T09:00:00Z", now), "attention");
+  assert.equal(waitingTimeTone("2026-08-31T20:00:00Z", now), "warning");
+  assert.equal(waitingTimeTone("2026-08-30T12:00:00Z", now), "critical");
+  assert.equal(
+    isPendingFollowUp("2026-09-01T14:00:00Z", "EM_ANALISE", now),
+    true,
+  );
+  assert.equal(
+    isPendingFollowUp("2026-09-01T14:00:00Z", "CONCLUIDO", now),
+    false,
+  );
+});
+
+test("conversão e tempos operacionais usam funções reutilizáveis", () => {
+  assert.equal(
+    calculateSchedulingConversionRate({ scheduled: 8, unscheduled: 2 }),
+    80,
+  );
+  assert.equal(
+    calculateSchedulingConversionRate({ scheduled: 0, unscheduled: 0 }),
+    0,
+  );
+  assert.equal(formatOperationalDuration(32), "32 min");
+  assert.equal(formatOperationalDuration(90), "1,5 h");
+  assert.equal(formatOperationalDuration(null), "—");
+});
+
+test("central operacional pagina, filtra e mantém justificativa em modal", () => {
+  const page = read("../src/app/admin/(protected)/solicitacoes/page.tsx");
+  const center = read("../src/components/admin/scheduling-command-center.tsx");
+  assert.match(page, /const PAGE_SIZE = 25/);
+  assert.match(page, /\.range\(rangeFrom, rangeFrom \+ PAGE_SIZE - 1\)/);
+  assert.match(center, /Central|Resumo da central/);
+  assert.match(center, /Buscar por paciente, CPF, telefone ou exame/);
+  assert.match(center, /Não foi possível realizar o agendamento/);
+  assert.match(center, /Registrar como não agendado/);
+  assert.match(center, /Registrar tentativa/);
+  assert.match(center, /Retornos pendentes/);
+  assert.match(center, /Indicadores/);
+  assert.match(center, /hidden overflow-x-auto md:block/);
+  assert.match(center, /divide-border-light divide-y md:hidden/);
+  assert.doesNotMatch(
+    center,
+    /textarea[\s\S]{0,200}Motivo de não agendamento[\s\S]{0,200}<table/,
+  );
+});
+
+test("migration operacional é aditiva, atômica e protegida", () => {
+  const migration = read(
+    "../supabase/migrations/20260901025913_scheduling_operations_command_center.sql",
+  );
+  assert.match(migration, /appointment_request_contact_attempts/);
+  assert.match(migration, /operation_id uuid not null unique/);
+  assert.match(migration, /on conflict \(operation_id\) do nothing/);
+  assert.match(migration, /follow_up_at timestamptz/);
+  assert.match(migration, /register_scheduling_contact_attempt/);
+  assert.match(migration, /close_appointment_unscheduled/);
+  assert.match(migration, /get_scheduling_indicators/);
+  assert.match(migration, /for update/);
+  assert.match(migration, /enable row level security/);
+  assert.match(migration, /revoke all on function[\s\S]*authenticated/);
+  assert.match(migration, /grant execute on function[\s\S]*service_role/);
+  assert.doesNotMatch(
+    migration,
+    /delete\s+from\s+public\.appointment_requests/i,
+  );
+  assert.doesNotMatch(migration, /truncate/i);
 });
 
 test("data e horário da recepção renderizam sem opção inválida", () => {

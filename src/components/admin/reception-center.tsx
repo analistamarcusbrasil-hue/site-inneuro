@@ -23,6 +23,8 @@ import {
 } from "lucide-react";
 import {
   buildAppointmentWhatsAppUrl,
+  contactResultLabels,
+  contactTypeLabels,
   formatReceptionDate,
   formatWaitingTime,
   hasValidSchedulingEmail,
@@ -37,6 +39,8 @@ import {
   quickPendingReasons,
   workflowLabels,
   type ConfirmationStatus,
+  type ContactResult,
+  type ContactType,
   type WorkflowStatus,
   type NotSchedulableReason,
 } from "@/lib/scheduling/operations";
@@ -63,6 +67,7 @@ type DocumentRow = {
   document_type: string;
   file_name: string;
   checked_at: string | null;
+  checked_by: string | null;
   source: string;
   created_at: string;
 };
@@ -71,6 +76,15 @@ type HistoryRow = {
   action: string;
   details: Record<string, unknown>;
   created_at: string;
+};
+export type ContactAttemptRow = {
+  id: string;
+  contact_type: string;
+  result: string;
+  note: string | null;
+  follow_up_at: string | null;
+  created_at: string;
+  actor: ProfileRelation;
 };
 type CommunicationRow = {
   id: string;
@@ -90,11 +104,16 @@ export type ReceptionRequest = {
   protocol: string;
   patient_name: string;
   cpf: string | null;
+  birth_date: string | null;
   phone: string;
   email: string | null;
   service_type: string;
   insurance_name: string | null;
   insurance_card_number: string | null;
+  insurance_card_expiry: string | null;
+  preferred_dates: string[];
+  preferred_periods: string[];
+  notes: string | null;
   workflow_status: WorkflowStatus;
   confirmation_status: ConfirmationStatus;
   confirmation_communication_id: string | null;
@@ -116,6 +135,11 @@ export type ReceptionRequest = {
   not_schedulable_communication_status: ConfirmationStatus;
   not_schedulable_communication_id: string | null;
   documents_received_at: string | null;
+  first_contact_at: string | null;
+  follow_up_at: string | null;
+  operational_outcome_reason: string | null;
+  operational_outcome_note: string | null;
+  scheduling_note: string | null;
   unit_name: string;
   created_at: string;
   updated_at: string;
@@ -123,6 +147,7 @@ export type ReceptionRequest = {
   appointment_request_documents: DocumentRow[];
   appointment_request_history: HistoryRow[];
   appointment_request_communications: CommunicationRow[];
+  appointment_request_contact_attempts: ContactAttemptRow[];
 };
 
 type Modal =
@@ -151,6 +176,12 @@ const serviceLabels: Record<string, string> = {
   INSURANCE: "Convênio",
   SUS: "SUS",
 };
+const periodLabels: Record<string, string> = {
+  MORNING: "Manhã",
+  AFTERNOON: "Tarde",
+  EVENING: "Noite",
+  ANY: "Sem preferência",
+};
 const documentLabels: Record<string, string> = {
   photo_id: "Documento com foto",
   medical_request: "Pedido médico",
@@ -169,6 +200,13 @@ function relationName(relation: ProfileRelation, fallback: string) {
   );
 }
 
+function formatCpf(value: string | null) {
+  const digits = String(value ?? "").replace(/\D/g, "");
+  return digits.length === 11
+    ? `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`
+    : value || "Não informado";
+}
+
 function effectiveStatus(request: ReceptionRequest) {
   if (
     request.workflow_status === "NAO_AGENDAVEL" &&
@@ -179,6 +217,9 @@ function effectiveStatus(request: ReceptionRequest) {
     isConfirmationPending(request.workflow_status, request.confirmation_status)
   )
     return "Confirmação pendente";
+  if (request.workflow_status === "NOVO") return "Aguardando";
+  if (request.workflow_status === "CONCLUIDO") return "Agendado";
+  if (request.workflow_status === "NAO_AGENDAVEL") return "Não agendado";
   return workflowLabels[request.workflow_status];
 }
 
@@ -234,6 +275,9 @@ function ModalShell({
 export function ReceptionCenter({
   requests,
   currentUser,
+  initialSelectedId,
+  initialSelectionMissing = false,
+  embedded = false,
 }: {
   requests: ReceptionRequest[];
   currentUser: {
@@ -242,17 +286,33 @@ export function ReceptionCenter({
     canManageScheduling: boolean;
     canOverrideAssignment: boolean;
   };
+  initialSelectedId?: string;
+  initialSelectionMissing?: boolean;
+  embedded?: boolean;
 }) {
   const router = useRouter();
   const searchRef = useRef<HTMLInputElement>(null);
-  const [view, setView] = useState<"active" | "attended">("active");
+  const initialRequest = requests.find((item) => item.id === initialSelectedId);
+  const [view, setView] = useState<"active" | "attended">(() =>
+    initialRequest &&
+    isAttendedRequest(
+      initialRequest.workflow_status,
+      initialRequest.confirmation_status,
+    )
+      ? "attended"
+      : "active",
+  );
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
-  const [selectedId, setSelectedId] = useState("");
+  const [selectedId, setSelectedId] = useState(initialSelectedId ?? "");
   const [hiddenActiveIds, setHiddenActiveIds] = useState<string[]>([]);
   const [modal, setModal] = useState<Modal>(null);
   const [saving, setSaving] = useState(false);
-  const [notice, setNotice] = useState("");
+  const [notice, setNotice] = useState(
+    initialSelectionMissing
+      ? "Solicitação não encontrada ou não está mais disponível nesta fila."
+      : "",
+  );
   const [error, setError] = useState("");
   const [showContactCorrection, setShowContactCorrection] = useState(false);
   const [reason, setReason] = useState<string>(quickPendingReasons[0]);
@@ -375,6 +435,14 @@ export function ReceptionCenter({
     selected?.assigned_to && selected.assigned_to !== currentUser.id,
   );
   const lockedByAnother = ownedByAnother && !currentUser.canOverrideAssignment;
+  const checkedDocumentCount =
+    selected?.appointment_request_documents.filter(
+      (document) => document.checked_at,
+    ).length ?? 0;
+  const allDocumentsChecked = Boolean(
+    selected?.appointment_request_documents.length &&
+    checkedDocumentCount === selected.appointment_request_documents.length,
+  );
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -732,177 +800,192 @@ export function ReceptionCenter({
         </p>
       ) : null}
 
-      <section className="border-border-light mb-4 rounded-2xl border bg-white p-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div
-            className="flex rounded-xl bg-slate-100 p-1"
-            aria-label="Visualização da central"
-          >
-            <button
-              type="button"
-              onClick={() => {
-                setView("active");
-                setFilter("all");
-                setShowContactCorrection(false);
-              }}
-              className={`min-h-10 rounded-lg px-4 text-sm font-extrabold ${view === "active" ? "bg-brand text-white shadow-sm" : "text-slate-600"}`}
-            >
-              FILA ATIVA · {activeRequests.length}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setView("attended");
-                setFilter("all");
-                setShowContactCorrection(false);
-              }}
-              className={`min-h-10 rounded-lg px-4 text-sm font-extrabold ${view === "attended" ? "bg-brand text-white shadow-sm" : "text-slate-600"}`}
-            >
-              ENCERRADOS · {attendedRequests.length}
-            </button>
-          </div>
-          {view === "active" ? (
-            <div className="text-muted flex flex-wrap gap-x-4 gap-y-1 text-xs font-bold">
-              <span>{activeRequests.length} aguardando atendimento</span>
-              <span>{pendingCount} pendências</span>
-              <span>{authorizedCount} autorizados</span>
-              <span>{confirmationCount} confirmações pendentes</span>
-            </div>
-          ) : null}
-        </div>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <label className="relative min-w-[16rem] flex-1">
-            <Search
-              className="text-muted absolute top-3.5 left-3"
-              size={18}
-              aria-hidden="true"
-            />
-            <span className="sr-only">Buscar paciente</span>
-            <input
-              ref={searchRef}
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Nome, CPF, telefone ou protocolo  /"
-              className="border-border-light min-h-12 w-full rounded-xl border pr-3 pl-10"
-            />
-          </label>
-          {view === "active" ? (
+      {!embedded ? (
+        <section className="border-border-light mb-4 rounded-2xl border bg-white p-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div
-              className="flex flex-wrap gap-1.5"
-              aria-label="Filtros rápidos"
+              className="flex rounded-xl bg-slate-100 p-1"
+              aria-label="Visualização da central"
             >
-              {[
-                ["all", "Todos"],
-                ["mine", "Meus"],
-                ["new", "Novos"],
-                ["pending", "Pendências"],
-                ["authorized", "Autorizados"],
-                ["confirmation", "Confirmação"],
-              ].map(([key, label]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setFilter(key)}
-                  className={`min-h-9 rounded-full px-3 text-xs font-bold ${filter === key ? "bg-brand text-white" : "bg-slate-100 text-slate-700"}`}
-                >
-                  {label}
-                </button>
-              ))}
+              <button
+                type="button"
+                onClick={() => {
+                  setView("active");
+                  setFilter("all");
+                  setShowContactCorrection(false);
+                }}
+                className={`min-h-10 rounded-lg px-4 text-sm font-extrabold ${view === "active" ? "bg-brand text-white shadow-sm" : "text-slate-600"}`}
+              >
+                FILA ATIVA · {activeRequests.length}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setView("attended");
+                  setFilter("all");
+                  setShowContactCorrection(false);
+                }}
+                className={`min-h-10 rounded-lg px-4 text-sm font-extrabold ${view === "attended" ? "bg-brand text-white shadow-sm" : "text-slate-600"}`}
+              >
+                ENCERRADOS · {attendedRequests.length}
+              </button>
             </div>
-          ) : null}
-        </div>
-      </section>
-
-      <div className="grid items-start gap-4 xl:grid-cols-[minmax(20rem,.75fr)_minmax(36rem,1.25fr)]">
-        <section
-          aria-label={view === "active" ? "Fila ativa" : "Atendidos"}
-          className="min-w-0"
-        >
-          <div className="mb-2 flex items-center justify-between px-1">
-            <p className="text-muted text-xs font-bold tracking-wide uppercase">
-              {filtered.length} registro(s)
-            </p>
-            <button
-              type="button"
-              onClick={nextRequest}
-              className="text-brand min-h-9 px-2 text-xs font-bold"
-            >
-              PRÓXIMO <ChevronRight className="inline" size={15} />
-            </button>
+            {view === "active" ? (
+              <div className="text-muted flex flex-wrap gap-x-4 gap-y-1 text-xs font-bold">
+                <span>{activeRequests.length} aguardando atendimento</span>
+                <span>{pendingCount} pendências</span>
+                <span>{authorizedCount} autorizados</span>
+                <span>{confirmationCount} confirmações pendentes</span>
+              </div>
+            ) : null}
           </div>
-          <div className="space-y-2 xl:max-h-[72vh] xl:overflow-y-auto xl:pr-1">
-            {filtered.map((item) => {
-              const exams = item.appointment_request_exams;
-              const received = Boolean(item.documents_received_at);
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedId(item.id);
-                    setShowContactCorrection(false);
-                  }}
-                  className={`border-border-light w-full rounded-2xl border p-3 text-left transition ${selected?.id === item.id ? "ring-brand bg-sky-50 ring-2" : "bg-white hover:bg-slate-50"}`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate font-bold text-slate-950">
-                        {item.patient_name}
-                      </p>
-                      <p className="text-muted mt-0.5 truncate text-xs">
-                        {exams[0]?.exam_name || "Exame não informado"}
-                        {exams.length > 1
-                          ? ` + ${exams.length - 1}`
-                          : ""} ·{" "}
-                        {item.insurance_name ||
-                          serviceLabels[item.service_type] ||
-                          item.service_type}
-                      </p>
-                    </div>
-                    <span
-                      className={`shrink-0 rounded-full px-2 py-1 text-[.65rem] font-extrabold ${statusColor(item)}`}
-                    >
-                      {effectiveStatus(item)}
-                    </span>
-                  </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[.7rem]">
-                    <span
-                      className={
-                        isLongWaiting(item.created_at) && view === "active"
-                          ? "font-bold text-amber-800"
-                          : "text-muted"
-                      }
-                    >
-                      <Clock3 className="mr-1 inline" size={13} />
-                      {view === "active"
-                        ? formatWaitingTime(item.created_at)
-                        : formatReceptionDate(item.completed_at)}
-                    </span>
-                    {received ? (
-                      <span className="font-bold text-emerald-800">
-                        DOCUMENTO RECEBIDO
-                      </span>
-                    ) : null}
-                    {item.assigned_to ? (
-                      <span className="text-muted">
-                        Responsável: {relationName(item.assigned, "Atendente")}
-                      </span>
-                    ) : null}
-                  </div>
-                </button>
-              );
-            })}
-            {!filtered.length ? (
-              <div className="border-border-light rounded-2xl border bg-white p-8 text-center text-sm text-slate-600">
-                Nenhum registro nesta visualização.
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <label className="relative min-w-[16rem] flex-1">
+              <Search
+                className="text-muted absolute top-3.5 left-3"
+                size={18}
+                aria-hidden="true"
+              />
+              <span className="sr-only">Buscar paciente</span>
+              <input
+                ref={searchRef}
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Nome, CPF, telefone ou protocolo  /"
+                className="border-border-light min-h-12 w-full rounded-xl border pr-3 pl-10"
+              />
+            </label>
+            {view === "active" ? (
+              <div
+                className="flex flex-wrap gap-1.5"
+                aria-label="Filtros rápidos"
+              >
+                {[
+                  ["all", "Todos"],
+                  ["mine", "Meus"],
+                  ["new", "Novos"],
+                  ["pending", "Pendências"],
+                  ["authorized", "Autorizados"],
+                  ["confirmation", "Confirmação"],
+                ].map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setFilter(key)}
+                    className={`min-h-9 rounded-full px-3 text-xs font-bold ${filter === key ? "bg-brand text-white" : "bg-slate-100 text-slate-700"}`}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
             ) : null}
           </div>
         </section>
+      ) : null}
+
+      <div
+        className={
+          embedded
+            ? "block"
+            : "grid items-start gap-4 xl:grid-cols-[minmax(20rem,.75fr)_minmax(36rem,1.25fr)]"
+        }
+      >
+        {!embedded ? (
+          <section
+            aria-label={view === "active" ? "Fila ativa" : "Atendidos"}
+            className="order-2 min-w-0 xl:order-none"
+          >
+            <div className="mb-2 flex items-center justify-between px-1">
+              <p className="text-muted text-xs font-bold tracking-wide uppercase">
+                {filtered.length} registro(s)
+              </p>
+              <button
+                type="button"
+                onClick={nextRequest}
+                className="text-brand min-h-9 px-2 text-xs font-bold"
+              >
+                PRÓXIMO <ChevronRight className="inline" size={15} />
+              </button>
+            </div>
+            <div className="space-y-2 xl:max-h-[72vh] xl:overflow-y-auto xl:pr-1">
+              {filtered.map((item) => {
+                const exams = item.appointment_request_exams;
+                const received = Boolean(item.documents_received_at);
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedId(item.id);
+                      setShowContactCorrection(false);
+                    }}
+                    className={`border-border-light w-full rounded-2xl border p-3 text-left transition ${selected?.id === item.id ? "ring-brand bg-sky-50 ring-2" : "bg-white hover:bg-slate-50"}`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate font-bold text-slate-950">
+                          {item.patient_name}
+                        </p>
+                        <p className="text-muted mt-0.5 truncate text-xs">
+                          {exams[0]?.exam_name || "Exame não informado"}
+                          {exams.length > 1
+                            ? ` + ${exams.length - 1}`
+                            : ""} ·{" "}
+                          {item.insurance_name ||
+                            serviceLabels[item.service_type] ||
+                            item.service_type}
+                        </p>
+                      </div>
+                      <span
+                        className={`shrink-0 rounded-full px-2 py-1 text-[.65rem] font-extrabold ${statusColor(item)}`}
+                      >
+                        {effectiveStatus(item)}
+                      </span>
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[.7rem]">
+                      <span
+                        className={
+                          isLongWaiting(item.created_at) && view === "active"
+                            ? "font-bold text-amber-800"
+                            : "text-muted"
+                        }
+                      >
+                        <Clock3 className="mr-1 inline" size={13} />
+                        {view === "active"
+                          ? formatWaitingTime(item.created_at)
+                          : formatReceptionDate(item.completed_at)}
+                      </span>
+                      {received ? (
+                        <span className="font-bold text-emerald-800">
+                          DOCUMENTO RECEBIDO
+                        </span>
+                      ) : null}
+                      {item.assigned_to ? (
+                        <span className="text-muted">
+                          Responsável:{" "}
+                          {relationName(item.assigned, "Atendente")}
+                        </span>
+                      ) : null}
+                    </div>
+                  </button>
+                );
+              })}
+              {!filtered.length ? (
+                <div className="border-border-light rounded-2xl border bg-white p-8 text-center text-sm text-slate-600">
+                  Nenhum registro nesta visualização.
+                </div>
+              ) : null}
+            </div>
+          </section>
+        ) : null}
 
         <section
           aria-label="Detalhes do atendimento"
-          className="border-border-light min-w-0 rounded-2xl border bg-white"
+          className={
+            embedded
+              ? "min-w-0 bg-white"
+              : "border-border-light order-1 min-w-0 rounded-2xl border bg-white xl:order-none"
+          }
         >
           {selected ? (
             <>
@@ -918,6 +1001,9 @@ export function ReceptionCenter({
                     <p className="text-muted mt-1 text-sm">
                       Responsável:{" "}
                       {relationName(selected.assigned, "Não atribuído")}
+                    </p>
+                    <p className="text-muted mt-1 text-xs">
+                      Recebida em {formatReceptionDate(selected.created_at)}
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center justify-end gap-2">
@@ -984,16 +1070,55 @@ export function ReceptionCenter({
                   </div>
                 ) : null}
                 {view === "active" && currentUser.canOverrideAssignment ? (
-                  <button
-                    type="button"
-                    disabled={saving}
-                    onClick={openDeletion}
-                    className="mt-3 inline-flex min-h-10 items-center rounded-full border border-rose-300 px-4 text-sm font-bold text-rose-800 disabled:opacity-50"
-                  >
-                    <Trash2 className="mr-1" size={15} /> Excluir agendamento
-                  </button>
+                  embedded ? (
+                    <details className="mt-3 text-sm">
+                      <summary className="text-muted cursor-pointer font-bold">
+                        Administração
+                      </summary>
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={openDeletion}
+                        className="mt-2 inline-flex min-h-9 items-center rounded-lg border border-rose-200 px-3 text-xs font-bold text-rose-800 disabled:opacity-50"
+                      >
+                        <Trash2 className="mr-1" size={14} /> Excluir
+                        agendamento
+                      </button>
+                    </details>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={openDeletion}
+                      className="mt-3 inline-flex min-h-10 items-center rounded-full border border-rose-300 px-4 text-sm font-bold text-rose-800 disabled:opacity-50"
+                    >
+                      <Trash2 className="mr-1" size={15} /> Excluir agendamento
+                    </button>
+                  )
                 ) : null}
               </header>
+
+              <details open className="border-border-light border-b p-4 sm:p-5">
+                <summary className="cursor-pointer list-none text-[.68rem] font-extrabold tracking-wide text-slate-500 uppercase">
+                  Paciente
+                </summary>
+                <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-3">
+                  <div>
+                    <dt className="text-muted">Nome</dt>
+                    <dd className="font-bold">{selected.patient_name}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted">CPF</dt>
+                    <dd className="font-bold">{formatCpf(selected.cpf)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted">Nascimento</dt>
+                    <dd className="font-bold">
+                      {formatReceptionDate(selected.birth_date)}
+                    </dd>
+                  </div>
+                </dl>
+              </details>
 
               <div className="border-border-light border-b p-4 sm:p-5">
                 <p className="text-muted mb-2 text-[.68rem] font-extrabold tracking-wide uppercase">
@@ -1121,19 +1246,54 @@ export function ReceptionCenter({
               </div>
 
               <div className="border-border-light border-b p-4 sm:p-5">
-                <p className="text-muted mb-3 text-[.68rem] font-extrabold tracking-wide uppercase">
-                  Próxima ação
-                </p>
-                {!emailIsValid &&
-                ["AUTORIZADO", "CONCLUIDO"].includes(
-                  selected.workflow_status,
-                ) ? (
-                  <p className="mb-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
-                    Corrija o e-mail antes de concluir ou reenviar a
-                    confirmação.
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-muted text-[.68rem] font-extrabold tracking-wide uppercase">
+                    Tentativas de contato
                   </p>
-                ) : null}
-                {renderNextAction()}
+                  {selected.follow_up_at ? (
+                    <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-900">
+                      <Clock3 className="mr-1 inline" size={13} /> Retorno em{" "}
+                      {formatReceptionDate(selected.follow_up_at)}
+                    </span>
+                  ) : null}
+                </div>
+                <ol className="mt-3 space-y-2">
+                  {[...selected.appointment_request_contact_attempts]
+                    .sort(
+                      (a, b) =>
+                        Date.parse(b.created_at) - Date.parse(a.created_at),
+                    )
+                    .map((attempt) => (
+                      <li
+                        key={attempt.id}
+                        className="rounded-xl bg-slate-50 p-3 text-sm"
+                      >
+                        <p className="font-bold">
+                          {contactTypeLabels[
+                            attempt.contact_type as ContactType
+                          ] || attempt.contact_type}
+                          {" — "}
+                          {contactResultLabels[
+                            attempt.result as ContactResult
+                          ] || attempt.result}
+                        </p>
+                        <p className="text-muted mt-1 text-xs">
+                          {formatReceptionDate(attempt.created_at)} ·{" "}
+                          {relationName(attempt.actor, "Atendente")}
+                        </p>
+                        {attempt.note ? (
+                          <p className="mt-2 text-xs text-slate-700">
+                            {attempt.note}
+                          </p>
+                        ) : null}
+                      </li>
+                    ))}
+                  {!selected.appointment_request_contact_attempts.length ? (
+                    <li className="text-muted text-sm">
+                      Nenhuma tentativa registrada.
+                    </li>
+                  ) : null}
+                </ol>
               </div>
 
               <div className="divide-border-light divide-y p-2 sm:p-3">
@@ -1194,6 +1354,18 @@ export function ReceptionCenter({
                       </dd>
                     </div>
                     <div>
+                      <dt className="text-muted">Carteirinha</dt>
+                      <dd className="font-bold">
+                        {selected.insurance_card_number || "—"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted">Validade da carteirinha</dt>
+                      <dd className="font-bold">
+                        {formatReceptionDate(selected.insurance_card_expiry)}
+                      </dd>
+                    </div>
+                    <div>
                       <dt className="text-muted">Unidade</dt>
                       <dd className="font-bold">{selected.unit_name}</dd>
                     </div>
@@ -1221,10 +1393,44 @@ export function ReceptionCenter({
                 </details>
                 <details open className="p-2">
                   <summary className="cursor-pointer list-none py-2 font-bold">
-                    Documentos · {selected.appointment_request_documents.length}{" "}
-                    {selected.appointment_request_documents.length === 1
-                      ? "arquivo"
-                      : "arquivos"}
+                    Preferência
+                  </summary>
+                  <dl className="grid gap-3 pb-2 text-sm sm:grid-cols-2">
+                    <div>
+                      <dt className="text-muted">Datas</dt>
+                      <dd className="font-bold">
+                        {selected.preferred_dates.length
+                          ? selected.preferred_dates
+                              .map((date) => formatReceptionDate(date))
+                              .join(" · ")
+                          : "Não informadas"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted">Períodos</dt>
+                      <dd className="font-bold">
+                        {selected.preferred_periods.length
+                          ? selected.preferred_periods
+                              .map((period) => periodLabels[period] ?? period)
+                              .join(" · ")
+                          : "Não informados"}
+                      </dd>
+                    </div>
+                  </dl>
+                </details>
+                <details className="p-2">
+                  <summary className="cursor-pointer list-none py-2 font-bold">
+                    Observações
+                  </summary>
+                  <p className="pb-2 text-sm whitespace-pre-wrap text-slate-700">
+                    {selected.notes || "Nenhuma observação informada."}
+                  </p>
+                </details>
+                <details open className="p-2">
+                  <summary className="cursor-pointer list-none py-2 font-bold">
+                    {allDocumentsChecked
+                      ? "✓ Documentos conferidos"
+                      : `Documentos · ${checkedDocumentCount}/${selected.appointment_request_documents.length} conferidos`}
                   </summary>
                   <div className="space-y-2 pb-2">
                     {selected.appointment_request_documents.map((document) => (
@@ -1240,8 +1446,14 @@ export function ReceptionCenter({
                           <p className="text-muted truncate text-xs">
                             {document.file_name}
                           </p>
+                          {document.checked_at ? (
+                            <p className="mt-1 text-xs font-bold text-emerald-700">
+                              ✓ Documento conferido ·{" "}
+                              {formatReceptionDate(document.checked_at)}
+                            </p>
+                          ) : null}
                         </div>
-                        <div className="flex shrink-0 items-center gap-2">
+                        <div className="flex shrink-0 flex-wrap items-center gap-2">
                           <a
                             href={`/api/admin/solicitacoes/${selected.id}/documentos/${document.id}/visualizar`}
                             target="_blank"
@@ -1258,12 +1470,40 @@ export function ReceptionCenter({
                           </a>
                           <a
                             href={`/api/admin/solicitacoes/${selected.id}/documentos/${document.id}/download`}
-                            className="inline-flex size-9 items-center justify-center rounded-full bg-white ring-1 ring-slate-200"
+                            className="inline-flex min-h-9 items-center justify-center rounded-full bg-white px-3 text-xs font-bold ring-1 ring-slate-200"
                             aria-label={`Baixar documento ${document.file_name}`}
                             title="Baixar documento"
                           >
-                            <Download size={15} aria-hidden="true" />
+                            <Download
+                              className="mr-1"
+                              size={15}
+                              aria-hidden="true"
+                            />
+                            Download
                           </a>
+                          <button
+                            type="button"
+                            disabled={
+                              saving ||
+                              lockedByAnother ||
+                              Boolean(document.checked_at)
+                            }
+                            onClick={() =>
+                              act("check_document", {
+                                documentId: document.id,
+                              })
+                            }
+                            className="inline-flex min-h-9 items-center rounded-full bg-emerald-700 px-3 text-xs font-bold text-white disabled:bg-emerald-100 disabled:text-emerald-800"
+                          >
+                            <CheckCircle2
+                              className="mr-1"
+                              size={14}
+                              aria-hidden="true"
+                            />
+                            {document.checked_at
+                              ? "Documento conferido"
+                              : "Confirmar documento"}
+                          </button>
                         </div>
                       </div>
                     ))}
@@ -1274,6 +1514,19 @@ export function ReceptionCenter({
                     ) : null}
                   </div>
                 </details>
+                <section className="p-2" aria-label="Próxima ação">
+                  <p className="py-2 font-bold">Próxima ação</p>
+                  {!emailIsValid &&
+                  ["AUTORIZADO", "CONCLUIDO"].includes(
+                    selected.workflow_status,
+                  ) ? (
+                    <p className="mb-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
+                      Corrija o e-mail antes de concluir ou reenviar a
+                      confirmação.
+                    </p>
+                  ) : null}
+                  {renderNextAction()}
+                </section>
                 <details className="p-2">
                   <summary className="cursor-pointer list-none py-2 font-bold">
                     Comunicações (

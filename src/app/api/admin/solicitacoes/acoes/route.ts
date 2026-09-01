@@ -12,9 +12,12 @@ import {
 } from "@/lib/scheduling/shared";
 import {
   buildAppointmentWhatsAppUrl,
+  contactResults,
+  contactTypes,
   hasValidSchedulingEmail,
   notSchedulableReasonLabels,
   notSchedulableReasons,
+  operationalOutcomeReasons,
 } from "@/lib/scheduling/operations";
 import {
   buildConfirmationMessage,
@@ -351,6 +354,172 @@ export async function POST(request: Request) {
       });
       return Response.json({ ok: true, message: "Contato atualizado." });
     }
+    if (action === "check_document") {
+      const documentId = z.string().uuid().safeParse(body.documentId);
+      if (!documentId.success) return response("Documento inválido.", 400);
+      const { data: document, error: documentReadError } = await admin
+        .from("appointment_request_documents")
+        .select("id,document_type,checked_at,checked_by")
+        .eq("id", documentId.data)
+        .eq("appointment_request_id", requestId)
+        .maybeSingle();
+      if (documentReadError) throw documentReadError;
+      if (!document) return response("Documento não encontrado.", 404);
+      if (document.checked_at)
+        return Response.json({
+          ok: true,
+          duplicate: true,
+          message: "Documento já estava conferido.",
+        });
+
+      const checkedAt = new Date().toISOString();
+      const { data: checkedDocument, error: documentUpdateError } = await admin
+        .from("appointment_request_documents")
+        .update({ checked_at: checkedAt, checked_by: user.id })
+        .eq("id", documentId.data)
+        .eq("appointment_request_id", requestId)
+        .is("checked_at", null)
+        .select("id")
+        .maybeSingle();
+      if (documentUpdateError) throw documentUpdateError;
+      if (!checkedDocument)
+        return Response.json({
+          ok: true,
+          duplicate: true,
+          message: "Documento já estava conferido.",
+        });
+
+      await history("Documento conferido", {
+        document_id: document.id,
+        document_type: document.document_type,
+        checked_at: checkedAt,
+      });
+      await admin.from("audit_logs").insert({
+        actor_id: user.id,
+        action: "APPOINTMENT_DOCUMENT_CHECKED",
+        entity_type: "appointment_request_document",
+        entity_id: document.id,
+        after_data: {
+          request_id: requestId,
+          document_id: document.id,
+          document_type: document.document_type,
+          checked_at: checkedAt,
+          checked_by: user.id,
+        },
+      });
+      return Response.json({ ok: true, message: "Documento conferido." });
+    }
+    if (action === "register_contact") {
+      const contactType = z.enum(contactTypes).safeParse(body.contactType);
+      const result = z.enum(contactResults).safeParse(body.result);
+      const note = sanitizeSchedulingText(body.note, 1000) || null;
+      const followUpAt = z
+        .string()
+        .datetime({ offset: true })
+        .nullable()
+        .safeParse(body.followUpAt ?? null);
+      if (!contactType.success || !result.success || !followUpAt.success)
+        return response("Preencha os dados da tentativa de contato.", 400);
+      if (result.data === "follow_up_requested" && !followUpAt.data)
+        return response("Informe a data e o horário do retorno.", 400);
+      const { data: attempt, error: attemptError } = await admin.rpc(
+        "register_scheduling_contact_attempt",
+        {
+          p_request_id: requestId,
+          p_actor_id: user.id,
+          p_operation_id: operationId,
+          p_contact_type: contactType.data,
+          p_result: result.data,
+          p_note: note,
+          p_follow_up_at: followUpAt.data,
+        },
+      );
+      if (attemptError) {
+        if (attemptError.message.includes("contact_attempt_input_invalid"))
+          return response("Revise os dados da tentativa de contato.", 400);
+        if (
+          attemptError.message.includes(
+            "appointment_assigned_to_another_attendant",
+          )
+        )
+          return response("Esta solicitação está com outro atendente.", 409);
+        if (attemptError.message.includes("appointment_already_closed"))
+          return response("Esta solicitação já foi concluída.", 409);
+        throw attemptError;
+      }
+      await admin.from("audit_logs").insert({
+        actor_id: user.id,
+        action: "APPOINTMENT_CONTACT_ATTEMPT_RECORDED",
+        entity_type: "appointment_request",
+        entity_id: requestId,
+        before_data: {
+          workflow_status: appointment.workflow_status,
+          follow_up_at: appointment.follow_up_at ?? null,
+        },
+        after_data: {
+          contact_attempt_id: attempt?.id ?? null,
+          contact_type: contactType.data,
+          result: result.data,
+          follow_up_at: attempt?.follow_up_at ?? null,
+          operation_id: operationId,
+        },
+      });
+      return Response.json({
+        ok: true,
+        message:
+          result.data === "follow_up_requested"
+            ? "Tentativa registrada e retorno programado."
+            : "Tentativa de contato registrada.",
+      });
+    }
+    if (action === "mark_not_scheduled") {
+      const reason = z.enum(operationalOutcomeReasons).safeParse(body.reason);
+      const observation = sanitizeSchedulingText(body.observation, 1000);
+      if (!reason.success)
+        return response("Selecione o motivo do não agendamento.", 400);
+      if (reason.data === "other" && !observation)
+        return response("Descreva o motivo em observação.", 400);
+      const { error: closureError } = await admin.rpc(
+        "close_appointment_unscheduled",
+        {
+          p_request_id: requestId,
+          p_actor_id: user.id,
+          p_operation_id: operationId,
+          p_reason: reason.data,
+          p_note: observation || null,
+        },
+      );
+      if (closureError) {
+        if (closureError.message.includes("unscheduled_input_invalid"))
+          return response("Revise o motivo e a observação.", 400);
+        if (
+          closureError.message.includes(
+            "appointment_assigned_to_another_attendant",
+          )
+        )
+          return response("Esta solicitação está com outro atendente.", 409);
+        if (closureError.message.includes("appointment_already_closed"))
+          return response("Esta solicitação já foi concluída.", 409);
+        throw closureError;
+      }
+      await admin.from("audit_logs").insert({
+        actor_id: user.id,
+        action: "APPOINTMENT_MARKED_UNSCHEDULED",
+        entity_type: "appointment_request",
+        entity_id: requestId,
+        before_data: { workflow_status: appointment.workflow_status },
+        after_data: {
+          workflow_status: "NAO_AGENDAVEL",
+          reason: reason.data,
+          operation_id: operationId,
+        },
+      });
+      return Response.json({
+        ok: true,
+        removeFromActive: true,
+        message: "Solicitação registrada como não agendada.",
+      });
+    }
     if (action === "not_schedulable") {
       const reason = z.enum(notSchedulableReasons).safeParse(body.reason);
       const examIds = z
@@ -567,6 +736,8 @@ export async function POST(request: Request) {
       return Response.json({ ok: true, message: "Convênio autorizado." });
     }
     if (action === "complete") {
+      const observation =
+        sanitizeSchedulingText(body.observation, 1000) || null;
       const schedules = z
         .array(
           z.object({
@@ -607,6 +778,18 @@ export async function POST(request: Request) {
         if (completionError.message.includes("not_authorized"))
           return response("A solicitação não está autorizada.", 409);
         throw completionError;
+      }
+      if (observation) {
+        const { error: observationError } = await admin
+          .from("appointment_requests")
+          .update({ scheduling_note: observation })
+          .eq("id", requestId);
+        if (observationError) throw observationError;
+        await history("Observação do agendamento registrada", {
+          observation,
+          previous_status: appointment.workflow_status,
+          new_status: "CONCLUIDO",
+        });
       }
       let communication: { id: string; status: string } | null = null;
       try {

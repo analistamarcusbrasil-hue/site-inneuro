@@ -26,6 +26,31 @@ export const workflowLabels: Record<WorkflowStatus, string> = {
 
 export type ConfirmationStatus = "NOT_REQUIRED" | "PENDING" | "SENT" | "FAILED";
 
+export const operationalStatuses = [
+  "AGUARDANDO",
+  "EM_ATENDIMENTO",
+  "AGENDADO",
+  "NAO_AGENDADO",
+] as const;
+export type OperationalStatus = (typeof operationalStatuses)[number];
+
+export const operationalStatusLabels: Record<OperationalStatus, string> = {
+  AGUARDANDO: "Aguardando",
+  EM_ATENDIMENTO: "Em atendimento",
+  AGENDADO: "Agendado",
+  NAO_AGENDADO: "Não agendado",
+};
+
+export function getOperationalStatus(
+  workflowStatus: WorkflowStatus,
+): OperationalStatus {
+  if (workflowStatus === "NOVO") return "AGUARDANDO";
+  if (workflowStatus === "CONCLUIDO") return "AGENDADO";
+  if (["NAO_AGENDAVEL", "CANCELADO"].includes(workflowStatus))
+    return "NAO_AGENDADO";
+  return "EM_ATENDIMENTO";
+}
+
 export function isConfirmationPending(
   workflowStatus: WorkflowStatus,
   confirmationStatus: ConfirmationStatus,
@@ -121,6 +146,68 @@ export const notSchedulableGuidance: Record<NotSchedulableReason, string> = {
     "Orientamos consultar a operadora sobre alternativas previstas no contrato.",
   other:
     "Nossa equipe permanece disponível para orientar sobre os próximos passos.",
+};
+
+export const operationalOutcomeReasons = [
+  "no_contact",
+  "whatsapp_no_response",
+  "invalid_phone",
+  "patient_declined",
+  "exam_already_completed",
+  "patient_unavailable",
+  "insurance_not_authorized",
+  "exam_unavailable",
+  "duplicate_request",
+  "other",
+] as const;
+export type OperationalOutcomeReason =
+  (typeof operationalOutcomeReasons)[number];
+
+export const operationalOutcomeReasonLabels: Record<
+  OperationalOutcomeReason,
+  string
+> = {
+  no_contact: "Não conseguimos contato",
+  whatsapp_no_response: "WhatsApp sem retorno",
+  invalid_phone: "Telefone inválido",
+  patient_declined: "Paciente desistiu",
+  exam_already_completed: "Paciente já realizou o exame",
+  patient_unavailable: "Paciente sem disponibilidade",
+  insurance_not_authorized: "Convênio não autorizado",
+  exam_unavailable: "Exame indisponível",
+  duplicate_request: "Solicitação duplicada",
+  other: "Outro",
+};
+
+export const contactTypes = ["phone", "whatsapp", "email", "other"] as const;
+export type ContactType = (typeof contactTypes)[number];
+export const contactTypeLabels: Record<ContactType, string> = {
+  phone: "Ligação",
+  whatsapp: "WhatsApp",
+  email: "E-mail",
+  other: "Outro",
+};
+
+export const contactResults = [
+  "no_answer",
+  "voicemail",
+  "invalid_number",
+  "message_sent",
+  "no_response",
+  "follow_up_requested",
+  "contact_made",
+  "other",
+] as const;
+export type ContactResult = (typeof contactResults)[number];
+export const contactResultLabels: Record<ContactResult, string> = {
+  no_answer: "Não atendeu",
+  voicemail: "Caixa postal",
+  invalid_number: "Número inválido",
+  message_sent: "Mensagem enviada",
+  no_response: "Sem retorno",
+  follow_up_requested: "Paciente pediu retorno",
+  contact_made: "Contato realizado",
+  other: "Outro",
 };
 
 export const quickPendingReasons = [
@@ -242,5 +329,25 @@ export function formatReceptionDate(value: string | null) {
 }
 
 export function isLongWaiting(createdAt: string, now = Date.now()) {
-  return now - Date.parse(createdAt) >= 60 * 60 * 1000;
+  return now - Date.parse(createdAt) >= 4 * 60 * 60 * 1000;
+}
+
+export function waitingTimeTone(createdAt: string, now = Date.now()) {
+  const elapsedHours = (now - Date.parse(createdAt)) / (60 * 60 * 1000);
+  if (elapsedHours > 24) return "critical" as const;
+  if (elapsedHours >= 12) return "warning" as const;
+  if (elapsedHours >= 4) return "attention" as const;
+  return "normal" as const;
+}
+
+export function isPendingFollowUp(
+  followUpAt: string | null | undefined,
+  workflowStatus: WorkflowStatus,
+  now = Date.now(),
+) {
+  return Boolean(
+    followUpAt &&
+    Date.parse(followUpAt) <= now &&
+    !["CONCLUIDO", "NAO_AGENDAVEL", "CANCELADO"].includes(workflowStatus),
+  );
 }
