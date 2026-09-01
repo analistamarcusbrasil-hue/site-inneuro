@@ -123,12 +123,19 @@ test("conversão e tempos operacionais usam funções reutilizáveis", () => {
 test("central operacional pagina, filtra e mantém justificativa em modal", () => {
   const page = read("../src/app/admin/(protected)/solicitacoes/page.tsx");
   const center = read("../src/components/admin/scheduling-command-center.tsx");
+  const details = read("../src/components/admin/reception-center.tsx");
+  const nextActionIndex = details.indexOf('aria-label="Próxima ação"');
+  const patientDataIndex = details.indexOf(
+    '<details open className="border-border-light border-b p-4 sm:p-5">',
+  );
   assert.match(page, /const PAGE_SIZE = 25/);
   assert.match(page, /\.range\(rangeFrom, rangeFrom \+ PAGE_SIZE - 1\)/);
   assert.match(center, /Central|Resumo da central/);
   assert.match(center, /Buscar por paciente, CPF, telefone ou exame/);
-  assert.match(center, /Não foi possível realizar o agendamento/);
+  assert.match(center, /Não foi possível agendar/);
   assert.match(center, /Registrar como não agendado/);
+  assert.match(center, /Informe uma justificativa para continuar\./);
+  assert.match(center, /placeholder="Descreva o motivo\.\.\."/);
   assert.match(center, /Registrar tentativa/);
   assert.match(center, /Retornos pendentes/);
   assert.match(center, /Indicadores/);
@@ -138,6 +145,26 @@ test("central operacional pagina, filtra e mantém justificativa em modal", () =
     center,
     /textarea[\s\S]{0,200}Motivo de não agendamento[\s\S]{0,200}<table/,
   );
+  assert.ok(nextActionIndex > 0);
+  assert.ok(nextActionIndex < patientDataIndex);
+  assert.equal(details.match(/aria-label="Próxima ação"/g)?.length, 1);
+  assert.match(details, /onClick={openMarkNotScheduled}/);
+  assert.match(details, /bg-rose-700[\s\S]{0,180}hover:bg-rose-800/);
+  assert.match(details, /title="Não foi possível agendar"/);
+  assert.match(details, /await act\("mark_not_scheduled"/);
+  assert.match(details, /Justificativa[\s\S]{0,300}required/);
+  assert.match(details, /placeholder="Descreva o motivo\.\.\."/);
+});
+
+test("não agendamento exige justificativa e confirma persistência operacional", () => {
+  const route = read("../src/app/api/admin/solicitacoes/acoes/route.ts");
+  assert.match(route, /if \(!observation\)/);
+  assert.match(route, /Informe uma justificativa para continuar\./);
+  assert.match(route, /close_appointment_unscheduled/);
+  assert.match(route, /p_actor_id: user\.id/);
+  assert.match(route, /APPOINTMENT_MARKED_UNSCHEDULED/);
+  assert.match(route, /Registro salvo como não agendado\./);
+  assert.match(route, /Agendamento autorizado com sucesso\./);
 });
 
 test("migration operacional é aditiva, atômica e protegida", () => {

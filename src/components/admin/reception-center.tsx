@@ -35,6 +35,8 @@ import {
   notSchedulableGuidance,
   notSchedulableReasonLabels,
   notSchedulableReasons,
+  operationalOutcomeReasonLabels,
+  operationalOutcomeReasons,
   pendingSuggestions,
   quickPendingReasons,
   workflowLabels,
@@ -43,6 +45,7 @@ import {
   type ContactType,
   type WorkflowStatus,
   type NotSchedulableReason,
+  type OperationalOutcomeReason,
 } from "@/lib/scheduling/operations";
 
 type ExamRow = {
@@ -155,6 +158,7 @@ type Modal =
   | "pending"
   | "rejected"
   | "authorize"
+  | "mark_not_scheduled"
   | "not_schedulable"
   | "take_over"
   | "delete_request"
@@ -334,6 +338,9 @@ export function ReceptionCenter({
   const [notSchedulableReason, setNotSchedulableReason] =
     useState<NotSchedulableReason>("clinic_does_not_offer");
   const [notSchedulableDetail, setNotSchedulableDetail] = useState("");
+  const [unscheduledReason, setUnscheduledReason] =
+    useState<OperationalOutcomeReason>("no_contact");
+  const [unscheduledJustification, setUnscheduledJustification] = useState("");
   const [deletionJustification, setDeletionJustification] = useState("");
   const [notSchedulableOrientation, setNotSchedulableOrientation] = useState(
     notSchedulableGuidance.clinic_does_not_offer,
@@ -518,6 +525,13 @@ export function ReceptionCenter({
     setModal("not_schedulable");
   }
 
+  function openMarkNotScheduled() {
+    setUnscheduledReason("no_contact");
+    setUnscheduledJustification("");
+    setError("");
+    setModal("mark_not_scheduled");
+  }
+
   function openDeletion() {
     setDeletionJustification("");
     setModal("delete_request");
@@ -684,11 +698,11 @@ export function ReceptionCenter({
           {currentUser.canManageScheduling ? (
             <button
               type="button"
-              disabled={saving || !emailIsValid}
-              onClick={openNotSchedulable}
-              className="min-h-12 rounded-full border border-rose-300 px-5 font-bold text-rose-800 disabled:opacity-50"
+              disabled={saving}
+              onClick={openMarkNotScheduled}
+              className="min-h-11 cursor-pointer rounded-xl bg-rose-700 px-4 text-sm font-bold text-white transition hover:bg-rose-800 disabled:cursor-wait disabled:bg-rose-400"
             >
-              <Ban className="mr-1 inline" size={16} /> Não é possível agendar
+              <X className="mr-1 inline" size={16} /> Não foi possível agendar
             </button>
           ) : null}
         </div>
@@ -706,11 +720,11 @@ export function ReceptionCenter({
           </button>
           <button
             type="button"
-            disabled={saving || !emailIsValid}
-            onClick={openNotSchedulable}
-            className="min-h-12 rounded-full border border-rose-300 px-5 font-bold text-rose-800 disabled:opacity-50"
+            disabled={saving}
+            onClick={openMarkNotScheduled}
+            className="min-h-11 cursor-pointer rounded-xl bg-rose-700 px-4 text-sm font-bold text-white transition hover:bg-rose-800 disabled:cursor-wait disabled:bg-rose-400"
           >
-            <Ban className="mr-1 inline" size={16} /> Não é possível agendar
+            <X className="mr-1 inline" size={16} /> Não foi possível agendar
           </button>
         </div>
       );
@@ -758,11 +772,11 @@ export function ReceptionCenter({
         {currentUser.canManageScheduling ? (
           <button
             type="button"
-            disabled={saving || !emailIsValid}
-            onClick={openNotSchedulable}
-            className="min-h-11 rounded-full border border-rose-300 px-4 font-bold text-rose-800 disabled:opacity-50"
+            disabled={saving}
+            onClick={openMarkNotScheduled}
+            className="min-h-11 cursor-pointer rounded-xl bg-rose-700 px-4 text-sm font-bold text-white transition hover:bg-rose-800 disabled:cursor-wait disabled:bg-rose-400"
           >
-            <Ban className="mr-1 inline" size={15} /> Não é possível agendar
+            <X className="mr-1 inline" size={15} /> Não foi possível agendar
           </button>
         ) : null}
       </div>
@@ -1048,24 +1062,15 @@ export function ReceptionCenter({
                 {view === "active" &&
                 ownedByAnother &&
                 currentUser.canManageScheduling ? (
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <div className="mt-3">
                     <button
                       type="button"
                       disabled={saving}
                       onClick={() => setModal("take_over")}
-                      className="bg-brand min-h-11 rounded-full px-4 font-bold text-white disabled:opacity-50"
+                      className="bg-brand min-h-11 rounded-xl px-4 text-sm font-bold text-white disabled:opacity-50"
                     >
                       <UserCheck className="mr-1 inline" size={16} /> Assumir
                       agendamento
-                    </button>
-                    <button
-                      type="button"
-                      disabled={saving || !emailIsValid}
-                      onClick={openNotSchedulable}
-                      className="min-h-11 rounded-full border border-rose-300 px-4 font-bold text-rose-800 disabled:opacity-50"
-                    >
-                      <Ban className="mr-1 inline" size={16} /> Não é possível
-                      agendar
                     </button>
                   </div>
                 ) : null}
@@ -1084,6 +1089,15 @@ export function ReceptionCenter({
                         <Trash2 className="mr-1" size={14} /> Excluir
                         agendamento
                       </button>
+                      <button
+                        type="button"
+                        disabled={saving || !emailIsValid}
+                        onClick={openNotSchedulable}
+                        className="ml-2 mt-2 inline-flex min-h-9 items-center rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700 disabled:opacity-50"
+                      >
+                        <Ban className="mr-1" size={14} /> Configurar exame não
+                        agendável
+                      </button>
                     </details>
                   ) : (
                     <button
@@ -1097,6 +1111,24 @@ export function ReceptionCenter({
                   )
                 ) : null}
               </header>
+
+              <section
+                className="border-border-light border-b bg-slate-50/70 p-4 sm:p-5"
+                aria-label="Próxima ação"
+              >
+                <p className="mb-3 text-[.68rem] font-extrabold tracking-wide text-slate-600 uppercase">
+                  Próxima ação
+                </p>
+                {!emailIsValid &&
+                ["AUTORIZADO", "CONCLUIDO"].includes(
+                  selected.workflow_status,
+                ) ? (
+                  <p className="mb-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
+                    Corrija o e-mail antes de concluir ou reenviar a confirmação.
+                  </p>
+                ) : null}
+                {renderNextAction()}
+              </section>
 
               <details open className="border-border-light border-b p-4 sm:p-5">
                 <summary className="cursor-pointer list-none text-[.68rem] font-extrabold tracking-wide text-slate-500 uppercase">
@@ -1514,19 +1546,6 @@ export function ReceptionCenter({
                     ) : null}
                   </div>
                 </details>
-                <section className="p-2" aria-label="Próxima ação">
-                  <p className="py-2 font-bold">Próxima ação</p>
-                  {!emailIsValid &&
-                  ["AUTORIZADO", "CONCLUIDO"].includes(
-                    selected.workflow_status,
-                  ) ? (
-                    <p className="mb-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
-                      Corrija o e-mail antes de concluir ou reenviar a
-                      confirmação.
-                    </p>
-                  ) : null}
-                  {renderNextAction()}
-                </section>
                 <details className="p-2">
                   <summary className="cursor-pointer list-none py-2 font-bold">
                     Comunicações (
@@ -1719,6 +1738,93 @@ export function ReceptionCenter({
           >
             {saving ? "Excluindo..." : "Confirmar exclusão lógica"}
           </button>
+        </ModalShell>
+      ) : null}
+
+      {modal === "mark_not_scheduled" && selected ? (
+        <ModalShell
+          title="Não foi possível agendar"
+          onClose={() => setModal(null)}
+        >
+          <form
+            onSubmit={async (event) => {
+              event.preventDefault();
+              const justification = unscheduledJustification.trim();
+              if (!justification) {
+                setError("Informe uma justificativa para continuar.");
+                return;
+              }
+              await act("mark_not_scheduled", {
+                reason: unscheduledReason,
+                observation: justification,
+              });
+            }}
+            className="mt-5 space-y-4"
+          >
+            <p className="text-sm text-slate-700">
+              Informe o motivo pelo qual não foi possível realizar o
+              agendamento.
+            </p>
+            {error ? (
+              <p
+                role="alert"
+                className="rounded-xl bg-rose-50 p-3 text-sm font-bold text-rose-900"
+              >
+                {error}
+              </p>
+            ) : null}
+            <label className="block text-sm font-bold text-slate-800">
+              Motivo <span className="text-rose-700">*</span>
+              <select
+                required
+                value={unscheduledReason}
+                onChange={(event) =>
+                  setUnscheduledReason(
+                    event.target.value as OperationalOutcomeReason,
+                  )
+                }
+                className="border-border-light mt-1.5 min-h-11 w-full rounded-lg border bg-white px-3 font-normal"
+              >
+                {operationalOutcomeReasons.map((item) => (
+                  <option key={item} value={item}>
+                    {operationalOutcomeReasonLabels[item]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-sm font-bold text-slate-800">
+              Justificativa <span className="text-rose-700">*</span>
+              <textarea
+                required
+                value={unscheduledJustification}
+                onChange={(event) =>
+                  setUnscheduledJustification(event.target.value)
+                }
+                placeholder="Descreva o motivo..."
+                maxLength={1000}
+                rows={4}
+                className="border-border-light mt-1.5 w-full rounded-lg border p-3 font-normal"
+              />
+            </label>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => setModal(null)}
+                className="min-h-10 rounded-lg px-4 text-sm font-bold text-slate-600 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="inline-flex min-h-10 cursor-pointer items-center justify-center rounded-lg bg-rose-700 px-4 text-sm font-bold text-white transition hover:bg-rose-800 disabled:cursor-wait disabled:bg-rose-400"
+              >
+                <X className="mr-1.5" size={15} aria-hidden="true" />
+                {saving ? "Salvando..." : "Confirmar não agendamento"}
+              </button>
+            </div>
+          </form>
         </ModalShell>
       ) : null}
 

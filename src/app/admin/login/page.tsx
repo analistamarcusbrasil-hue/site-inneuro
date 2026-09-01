@@ -8,13 +8,32 @@ import { loginAction } from "@/app/admin/actions";
 export default async function AdminLoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; next?: string }>;
 }) {
   if (!isCmsConfigured) return <ConfigurationPending />;
+  const query = await searchParams;
+  const next = (() => {
+    const candidate = String(query.next ?? "").trim();
+    if (
+      !candidate.startsWith("/admin/") ||
+      candidate.startsWith("//") ||
+      candidate.includes("\\") ||
+      /[\r\n]/.test(candidate)
+    )
+      return null;
+    try {
+      const parsed = new URL(candidate, "https://inneuro.local");
+      return parsed.origin === "https://inneuro.local" &&
+        parsed.pathname.startsWith("/admin/")
+        ? `${parsed.pathname}${parsed.search}${parsed.hash}`
+        : null;
+    } catch {
+      return null;
+    }
+  })();
   const { user, profile } = await getAdminSession();
   if (user && profile?.must_change_password) redirect("/admin/definir-senha");
-  if (user && profile?.active) redirect("/admin");
-  const query = await searchParams;
+  if (user && profile?.active) redirect(next ?? "/admin");
   return (
     <main
       id="main-content"
@@ -44,6 +63,7 @@ export default async function AdminLoginPage({
           </p>
         ) : null}
         <form action={loginAction} className="mt-7 space-y-5">
+          {next ? <input type="hidden" name="next" value={next} /> : null}
           <label className="block text-sm font-bold">
             E-mail
             <input

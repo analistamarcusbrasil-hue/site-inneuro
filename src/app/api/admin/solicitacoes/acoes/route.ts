@@ -477,8 +477,8 @@ export async function POST(request: Request) {
       const observation = sanitizeSchedulingText(body.observation, 1000);
       if (!reason.success)
         return response("Selecione o motivo do não agendamento.", 400);
-      if (reason.data === "other" && !observation)
-        return response("Descreva o motivo em observação.", 400);
+      if (!observation)
+        return response("Informe uma justificativa para continuar.", 400);
       const { error: closureError } = await admin.rpc(
         "close_appointment_unscheduled",
         {
@@ -517,7 +517,7 @@ export async function POST(request: Request) {
       return Response.json({
         ok: true,
         removeFromActive: true,
-        message: "Solicitação registrada como não agendada.",
+        message: "Registro salvo como não agendado.",
       });
     }
     if (action === "not_schedulable") {
@@ -733,7 +733,10 @@ export async function POST(request: Request) {
         authorization_number: number,
         valid_until: validity.data || null,
       });
-      return Response.json({ ok: true, message: "Convênio autorizado." });
+      return Response.json({
+        ok: true,
+        message: "Agendamento autorizado com sucesso.",
+      });
     }
     if (action === "complete") {
       const observation =

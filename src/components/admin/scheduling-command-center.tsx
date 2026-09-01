@@ -465,6 +465,7 @@ export function SchedulingCommandCenter({
             type="button"
             disabled={busy || !canOperate}
             onClick={() => {
+              setError("");
               setUnscheduledReason("no_contact");
               setUnscheduledObservation("");
               setUnscheduledRequest(request);
@@ -1148,16 +1149,20 @@ export function SchedulingCommandCenter({
 
       {unscheduledRequest ? (
         <ModalShell
-          title="Não foi possível realizar o agendamento"
+          title="Não foi possível agendar"
           description={`${unscheduledRequest.patient_name} · ${unscheduledRequest.appointment_request_exams[0]?.exam_name || "Exame"}`}
           onClose={() => setUnscheduledRequest(null)}
         >
           <form
             onSubmit={async (event) => {
               event.preventDefault();
+              if (!unscheduledObservation.trim()) {
+                setError("Informe uma justificativa para continuar.");
+                return;
+              }
               await act(unscheduledRequest, "mark_not_scheduled", {
                 reason: unscheduledReason,
-                observation: unscheduledObservation,
+                observation: unscheduledObservation.trim(),
               });
             }}
             className="space-y-4"
@@ -1181,19 +1186,27 @@ export function SchedulingCommandCenter({
                 ))}
               </select>
             </label>
+            <p className="text-sm text-slate-700">
+              Informe o motivo pelo qual não foi possível realizar o
+              agendamento.
+            </p>
+            {error ? (
+              <p
+                role="alert"
+                className="rounded-xl bg-rose-50 p-3 text-sm font-bold text-rose-900"
+              >
+                {error}
+              </p>
+            ) : null}
             <label className="block text-sm font-bold text-slate-800">
-              Observação complementar{" "}
-              {unscheduledReason === "other" ? (
-                <span className="text-rose-700">*</span>
-              ) : (
-                <span className="text-muted font-normal">(opcional)</span>
-              )}
+              Justificativa <span className="text-rose-700">*</span>
               <textarea
-                required={unscheduledReason === "other"}
+                required
                 value={unscheduledObservation}
                 onChange={(event) =>
                   setUnscheduledObservation(event.target.value)
                 }
+                placeholder="Descreva o motivo..."
                 maxLength={1000}
                 rows={4}
                 className="border-border-light mt-1.5 w-full rounded-lg border p-3 font-normal"
@@ -1217,7 +1230,7 @@ export function SchedulingCommandCenter({
                 ) : (
                   <XCircle className="mr-1.5" size={15} />
                 )}
-                Registrar como não agendado
+                {savingId ? "Salvando..." : "Registrar como não agendado"}
               </button>
             </div>
           </form>

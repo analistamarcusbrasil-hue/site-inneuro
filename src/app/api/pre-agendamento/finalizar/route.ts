@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { getPublicInstitutionalContent } from "@/lib/cms/public-content";
 import { createWhatsAppUrl } from "@/lib/whatsapp";
+import { sendNewSchedulingRequestTelegramNotification } from "@/lib/telegram/notifications";
 import {
   createManifestExpiration,
   deleteSchedulingRequestRecord,
@@ -371,6 +372,39 @@ export async function POST(request: NextRequest) {
     }
 
     const { config } = await getPublicInstitutionalContent();
+    try {
+      const { data: telegramMarker } = await admin
+        .from("appointment_request_history")
+        .select("id")
+        .eq("appointment_request_id", requestId)
+        .eq("action", "TELEGRAM_NEW_REQUEST_NOTIFIED")
+        .limit(1)
+        .maybeSingle();
+      if (!telegramMarker) {
+        await sendNewSchedulingRequestTelegramNotification({
+          requestId,
+          protocol: session.protocol,
+          patientName,
+          phone,
+          email,
+          serviceType: session.serviceType,
+          insuranceName:
+            session.serviceType === "INSURANCE" ? insuranceName : null,
+          exams: exams.map((exam) => exam.description),
+          preferredDates: dates,
+          preferredPeriods: periods,
+          documents,
+          siteUrl: config.url,
+        });
+        await admin.from("appointment_request_history").insert({
+          appointment_request_id: requestId,
+          action: "TELEGRAM_NEW_REQUEST_NOTIFIED",
+          details: { channel: "telegram", notification: "new_request" },
+        });
+      }
+    } catch {
+      console.warn("Telegram scheduling notification failed", { requestId });
+    }
     const protectedUrl = `${config.url.replace(/\/$/, "")}/solicitacao/${session.accessToken}`;
     const documentKinds = new Set(documents.map((document) => document.kind));
     const groupedExamLines = schedulingModalities.flatMap((modality) => {

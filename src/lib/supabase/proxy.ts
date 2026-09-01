@@ -23,6 +23,20 @@ export async function updateSupabaseSession(request: NextRequest) {
     },
   );
 
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user && request.nextUrl.pathname === "/admin/solicitacoes") {
+    const returnPath = `${request.nextUrl.pathname}${request.nextUrl.search}`;
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = "/admin/login";
+    loginUrl.search = "";
+    loginUrl.searchParams.set("next", returnPath);
+    const redirectResponse = NextResponse.redirect(loginUrl);
+    response.cookies
+      .getAll()
+      .forEach((cookie) => redirectResponse.cookies.set(cookie));
+    return redirectResponse;
+  }
   return response;
 }

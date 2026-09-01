@@ -25,17 +25,47 @@ import {
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
+  next: z.string().max(500).optional(),
 });
+
+function safeAdminReturnPath(value: unknown) {
+  const candidate = String(value ?? "").trim();
+  if (
+    !candidate.startsWith("/admin/") ||
+    candidate.startsWith("//") ||
+    candidate.includes("\\") ||
+    /[\r\n]/.test(candidate)
+  )
+    return null;
+  try {
+    const parsed = new URL(candidate, "https://inneuro.local");
+    if (
+      parsed.origin !== "https://inneuro.local" ||
+      !parsed.pathname.startsWith("/admin/")
+    )
+      return null;
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return null;
+  }
+}
+
+function adminLoginErrorUrl(error: string, next: string | null) {
+  const params = new URLSearchParams({ error });
+  if (next) params.set("next", next);
+  return `/admin/login?${params.toString()}`;
+}
 
 export async function loginAction(formData: FormData) {
   if (!isCmsConfigured) redirect("/admin?status=config-pending");
   const parsed = loginSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) redirect("/admin/login?error=invalid");
+  const next = safeAdminReturnPath(formData.get("next"));
+  if (!parsed.success) redirect(adminLoginErrorUrl("invalid", next));
   const supabase = await createSupabaseServerClient();
   const { data: authData, error } = await supabase!.auth.signInWithPassword(
     parsed.data,
   );
-  if (error) redirect("/admin/login?error=credentials");
+  if (error) redirect(adminLoginErrorUrl("credentials", next));
   const { data: profile } = await supabase!
     .from("profiles")
     .select("active, must_change_password")
@@ -43,7 +73,7 @@ export async function loginAction(formData: FormData) {
     .maybeSingle();
   if (!profile?.active) {
     await supabase!.auth.signOut();
-    redirect("/admin/login?error=inactive");
+    redirect(adminLoginErrorUrl("inactive", next));
   }
   const admin = createSupabaseAdminClient();
   await admin
@@ -51,7 +81,7 @@ export async function loginAction(formData: FormData) {
     .update({ last_login_at: new Date().toISOString() })
     .eq("id", authData.user.id);
   if (profile.must_change_password) redirect("/admin/definir-senha");
-  redirect("/admin");
+  redirect(next ?? "/admin");
 }
 
 export async function logoutAction() {
@@ -1225,28 +1255,6 @@ export async function updateAppointmentRequestAction(formData: FormData) {
   });
   revalidatePath("/admin/solicitacoes");
   redirect(`/admin/solicitacoes?id=${parsed.data.id}&success=updated`);
-}
-
-export async function markAppointmentDocumentAction(formData: FormData) {
-  const { supabase, user } = await requireAdminPermission("scheduling.manage");
-  const parsed = z
-    .object({ id: z.string().uuid(), request_id: z.string().uuid() })
-    .safeParse(Object.fromEntries(formData));
-  if (!parsed.success) redirect("/admin/solicitacoes?error=validation");
-  const { error } = await supabase
-    .from("appointment_request_documents")
-    .update({ checked_at: new Date().toISOString(), checked_by: user.id })
-    .eq("id", parsed.data.id);
-  if (error)
-    redirect(`/admin/solicitacoes?id=${parsed.data.request_id}&error=document`);
-  await supabase.from("appointment_request_history").insert({
-    appointment_request_id: parsed.data.request_id,
-    actor_id: user.id,
-    action: "Documento conferido",
-    details: { document_id: parsed.data.id },
-  });
-  revalidatePath("/admin/solicitacoes");
-  redirect(`/admin/solicitacoes?id=${parsed.data.request_id}&success=document`);
 }
 
 const restorableTables = [
