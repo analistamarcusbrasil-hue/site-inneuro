@@ -424,6 +424,76 @@ export default async function ReviewCareerApplicationPage({
                 </fieldset>
               ) : null}
 
+              <fieldset className="border-border-light grid gap-5 rounded-2xl border p-4 sm:p-5">
+                <legend className="font-heading text-brand-dark px-2 text-lg font-semibold">
+                  Disponibilidade profissional
+                </legend>
+                <fieldset>
+                  <legend className="text-sm font-bold">
+                    Em quais turnos você tem disponibilidade?
+                  </legend>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {[
+                      ["morning", "Manhã"],
+                      ["afternoon", "Tarde"],
+                      ["night", "Noite"],
+                      ["flexible", "Flexível"],
+                    ].map(([value, label]) => (
+                      <label
+                        key={value}
+                        className="flex items-center gap-2 text-sm"
+                      >
+                        <input
+                          type="checkbox"
+                          name="availability_shifts"
+                          value={value}
+                        />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+                <label className="grid gap-2 text-sm font-bold sm:max-w-xs">
+                  Disponível para iniciar a partir de
+                  <input
+                    type="date"
+                    name="available_from"
+                    required
+                    className="border-border-light min-h-12 rounded-xl border bg-white px-3 font-normal"
+                  />
+                </label>
+              </fieldset>
+
+              <fieldset className="border-border-light grid gap-4 rounded-2xl border p-4 sm:p-5">
+                <legend className="font-heading text-brand-dark px-2 text-lg font-semibold">
+                  Indicação
+                </legend>
+                <label className="grid gap-2 text-sm font-bold sm:max-w-md">
+                  Você foi indicado(a) para esta vaga?
+                  <select
+                    name="referral_status"
+                    required
+                    defaultValue="no"
+                    className="border-border-light min-h-12 rounded-xl border bg-white px-3 font-normal"
+                  >
+                    <option value="no">Não</option>
+                    <option value="yes">Sim</option>
+                  </select>
+                </label>
+                <label className="grid gap-2 text-sm font-bold sm:max-w-md">
+                  Quem realizou a indicação? (preencha somente se aplicável)
+                  <input
+                    name="referred_by"
+                    maxLength={160}
+                    className="border-border-light min-h-12 rounded-xl border bg-white px-3 font-normal"
+                  />
+                </label>
+                <p className="text-muted text-xs">
+                  A indicação é exibida separadamente e não altera a pontuação
+                  de aderência.
+                </p>
+              </fieldset>
+
               <label className="grid gap-2 text-sm font-bold sm:max-w-md">
                 Como soube desta vaga?
                 <select

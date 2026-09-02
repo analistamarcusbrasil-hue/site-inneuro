@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { z } from "zod";
 import { careerApplicationStatusUpdateSchema } from "@/lib/careers/application-validation";
 import {
   applicationStatusLabels,
@@ -28,6 +29,188 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 function field(formData: FormData, name: string) {
   return String(formData.get(name) ?? "");
+}
+
+export type BulkCareerApplicationsState = {
+  status: "idle" | "success" | "error";
+  message: string;
+  updatedAt?: number;
+};
+
+const bulkCareerApplicationsSchema = z.object({
+  jobId: z.string().uuid(),
+  applicationIds: z.array(z.string().uuid()).min(1).max(100),
+  operation: z.enum([
+    "approve",
+    "not_approve",
+    "add_tag",
+    "remove_tag",
+    "favorite",
+    "unfavorite",
+    "send_communication",
+  ]),
+  expectedStage: z
+    .enum([
+      "resume",
+      "interview",
+      "practical_test",
+      "hiring",
+      "hired",
+      "not_approved",
+    ])
+    .optional(),
+  internalNote: z.string().trim().max(4000).optional(),
+  value: z.string().trim().max(40).optional(),
+});
+
+export async function bulkCareerApplicationsAction(
+  _previousState: BulkCareerApplicationsState,
+  formData: FormData,
+): Promise<BulkCareerApplicationsState> {
+  const { supabase, user } = await requireHrAccess("jobs:manage");
+  let applicationIds: unknown = [];
+  try {
+    applicationIds = JSON.parse(field(formData, "application_ids"));
+  } catch {
+    applicationIds = [];
+  }
+  const parsed = bulkCareerApplicationsSchema.safeParse({
+    jobId: field(formData, "job_id"),
+    applicationIds,
+    operation: field(formData, "operation"),
+    expectedStage: field(formData, "expected_stage") || undefined,
+    internalNote: field(formData, "internal_note") || undefined,
+    value: field(formData, "value") || undefined,
+  });
+  if (!parsed.success) {
+    return {
+      status: "error",
+      message: "Revise a seleção e os dados da operação em lote.",
+      updatedAt: Date.now(),
+    };
+  }
+
+  const data = parsed.data;
+  if (["approve", "not_approve"].includes(data.operation)) {
+    if (
+      !data.expectedStage ||
+      ["hired", "not_approved"].includes(data.expectedStage)
+    ) {
+      return {
+        status: "error",
+        message: "A seleção precisa estar na mesma etapa ativa.",
+        updatedAt: Date.now(),
+      };
+    }
+    const { data: result, error } = await supabase.rpc(
+      "bulk_decide_career_applications",
+      {
+        p_job_id: data.jobId,
+        p_application_ids: data.applicationIds,
+        p_decision: data.operation,
+        p_expected_stage: data.expectedStage,
+        p_internal_note: data.internalNote ?? null,
+      },
+    );
+    if (error) {
+      return {
+        status: "error",
+        message: error.message.includes("candidate_stage_changed")
+          ? "Uma candidatura mudou de etapa. Nada foi alterado; atualize a lista e tente novamente."
+          : "Não foi possível concluir a movimentação. Nenhuma candidatura foi alterada.",
+        updatedAt: Date.now(),
+      };
+    }
+
+    const nextStage =
+      result && typeof result === "object" && "nextStage" in result
+        ? String(result.nextStage)
+        : "";
+    const template = communicationForSelectionStage(nextStage);
+    let communicationFailures = 0;
+    if (template) {
+      const communicationResults = await Promise.allSettled(
+        data.applicationIds.map((applicationId) =>
+          sendApplicationCommunication({
+            applicationId,
+            template,
+            triggeredBy: "admin",
+            createdBy: user.id,
+            idempotencyKey: `application:${applicationId}:stage:${nextStage}`,
+          }),
+        ),
+      );
+      communicationFailures = communicationResults.filter(
+        (item) => item.status === "rejected" || item.value.status !== "SENT",
+      ).length;
+    }
+
+    revalidatePath(`/admin/rh/vagas/${data.jobId}/candidaturas`);
+    revalidatePath("/carreiras/candidaturas");
+    return {
+      status: "success",
+      message: `${data.applicationIds.length} candidatura(s) movimentada(s) em uma transação.${communicationFailures ? ` ${communicationFailures} comunicação(ões) precisa(m) de reenvio.` : " Comunicações processadas."}`,
+      updatedAt: Date.now(),
+    };
+  }
+
+  if (data.operation === "send_communication") {
+    const { data: applications, error } = await supabase
+      .from("career_job_applications")
+      .select("id, candidate_stage")
+      .eq("job_id", data.jobId)
+      .in("id", data.applicationIds);
+    if (error || applications?.length !== data.applicationIds.length) {
+      return {
+        status: "error",
+        message: "Não foi possível validar todas as candidaturas selecionadas.",
+        updatedAt: Date.now(),
+      };
+    }
+    const results = await Promise.allSettled(
+      applications.map((application) => {
+        const template = communicationForSelectionStage(
+          application.candidate_stage,
+        );
+        if (!template) throw new Error("stage_without_template");
+        return sendApplicationCommunication({
+          applicationId: application.id,
+          template,
+          triggeredBy: "admin",
+          createdBy: user.id,
+          idempotencyKey: `application:${application.id}:stage:${application.candidate_stage}:manual`,
+        });
+      }),
+    );
+    const failures = results.filter(
+      (item) => item.status === "rejected" || item.value.status !== "SENT",
+    ).length;
+    return {
+      status: failures === results.length ? "error" : "success",
+      message: `${results.length - failures} comunicação(ões) enviada(s); ${failures} não enviada(s).`,
+      updatedAt: Date.now(),
+    };
+  }
+
+  const { error } = await supabase.rpc("update_career_applications_metadata", {
+    p_job_id: data.jobId,
+    p_application_ids: data.applicationIds,
+    p_operation: data.operation,
+    p_value: data.value ?? null,
+  });
+  if (error) {
+    return {
+      status: "error",
+      message: "Não foi possível atualizar os metadados selecionados.",
+      updatedAt: Date.now(),
+    };
+  }
+  revalidatePath(`/admin/rh/vagas/${data.jobId}/candidaturas`);
+  return {
+    status: "success",
+    message: `${data.applicationIds.length} candidatura(s) atualizada(s).`,
+    updatedAt: Date.now(),
+  };
 }
 
 export async function decideCareerApplicationStageAction(formData: FormData) {

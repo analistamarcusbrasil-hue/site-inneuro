@@ -99,6 +99,15 @@ export async function saveJobMatchMatrixAction(formData: FormData) {
     weights: Object.fromEntries(
       matchCriterionKeys.map((key) => [key, formData.get(`weight_${key}`)]),
     ),
+    active: Object.fromEntries(
+      matchCriterionKeys.map((key) => [key, formData.has(`active_${key}`)]),
+    ),
+    kinds: Object.fromEntries(
+      matchCriterionKeys.map((key) => [key, formData.get(`kind_${key}`)]),
+    ),
+    priorities: Object.fromEntries(
+      matchCriterionKeys.map((key) => [key, formData.get(`priority_${key}`)]),
+    ),
   });
   if (!parsed.success) {
     const jobId = String(formData.get("job_id") ?? "");

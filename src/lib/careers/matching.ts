@@ -7,10 +7,20 @@ export const matchCriterionKeys = [
   "related_experience",
   "technical_skills",
   "education",
+  "specific_course",
+  "specialty",
   "sector_experience",
+  "healthcare_experience",
+  "similar_role_experience",
+  "customer_service_experience",
   "certifications",
+  "professional_registration",
   "availability",
+  "shift_availability",
   "operational_compatibility",
+  "languages",
+  "leadership",
+  "computer_skills",
 ] as const;
 
 export type MatchCriterionKey = (typeof matchCriterionKeys)[number];
@@ -19,10 +29,42 @@ export const matchCriterionLabels: Record<MatchCriterionKey, string> = {
   related_experience: "Experiência relacionada",
   technical_skills: "Competências técnicas",
   education: "Formação",
+  specific_course: "Curso específico",
+  specialty: "Especialidade profissional",
   sector_experience: "Experiência no setor",
+  healthcare_experience: "Experiência em saúde",
+  similar_role_experience: "Experiência em função semelhante",
+  customer_service_experience: "Experiência em atendimento",
   certifications: "Certificações",
+  professional_registration: "Registro profissional",
   availability: "Disponibilidade",
+  shift_availability: "Disponibilidade por turno",
   operational_compatibility: "Compatibilidade operacional",
+  languages: "Idiomas",
+  leadership: "Liderança",
+  computer_skills: "Informática",
+};
+
+export const matchCriterionKinds = ["scoring", "minimum"] as const;
+export type MatchCriterionKind = (typeof matchCriterionKinds)[number];
+export const matchCriterionKindLabels: Record<MatchCriterionKind, string> = {
+  scoring: "Pontuação",
+  minimum: "Requisito mínimo",
+};
+
+export const matchCriterionPriorities = [
+  "required",
+  "important",
+  "differential",
+] as const;
+export type MatchCriterionPriority = (typeof matchCriterionPriorities)[number];
+export const matchCriterionPriorityLabels: Record<
+  MatchCriterionPriority,
+  string
+> = {
+  required: "Obrigatório",
+  important: "Importante",
+  differential: "Diferencial",
 };
 
 export const defaultMatchCriteria = [
@@ -30,35 +72,113 @@ export const defaultMatchCriteria = [
     key: "related_experience",
     label: matchCriterionLabels.related_experience,
     weight: 22,
+    active: true,
+    kind: "scoring",
+    priority: "important",
   },
   {
     key: "technical_skills",
     label: matchCriterionLabels.technical_skills,
     weight: 23,
+    active: true,
+    kind: "scoring",
+    priority: "required",
   },
-  { key: "education", label: matchCriterionLabels.education, weight: 15 },
+  {
+    key: "education",
+    label: matchCriterionLabels.education,
+    weight: 15,
+    active: true,
+    kind: "scoring",
+    priority: "required",
+  },
+  ...(["specific_course", "specialty"] as const).map((key) => ({
+    key,
+    label: matchCriterionLabels[key],
+    weight: 0,
+    active: false,
+    kind: "scoring" as const,
+    priority: "important" as const,
+  })),
   {
     key: "sector_experience",
     label: matchCriterionLabels.sector_experience,
     weight: 10,
+    active: true,
+    kind: "scoring",
+    priority: "important",
   },
+  ...(
+    [
+      "healthcare_experience",
+      "similar_role_experience",
+      "customer_service_experience",
+    ] as const
+  ).map((key) => ({
+    key,
+    label: matchCriterionLabels[key],
+    weight: 0,
+    active: false,
+    kind: "scoring" as const,
+    priority: "important" as const,
+  })),
   {
     key: "certifications",
     label: matchCriterionLabels.certifications,
     weight: 10,
+    active: true,
+    kind: "scoring",
+    priority: "differential",
   },
-  { key: "availability", label: matchCriterionLabels.availability, weight: 10 },
+  {
+    key: "professional_registration",
+    label: matchCriterionLabels.professional_registration,
+    weight: 0,
+    active: false,
+    kind: "minimum",
+    priority: "required",
+  },
+  {
+    key: "availability",
+    label: matchCriterionLabels.availability,
+    weight: 10,
+    active: true,
+    kind: "scoring",
+    priority: "important",
+  },
+  {
+    key: "shift_availability",
+    label: matchCriterionLabels.shift_availability,
+    weight: 0,
+    active: false,
+    kind: "minimum",
+    priority: "required",
+  },
   {
     key: "operational_compatibility",
     label: matchCriterionLabels.operational_compatibility,
     weight: 10,
+    active: true,
+    kind: "scoring",
+    priority: "important",
   },
+  ...(["languages", "leadership", "computer_skills"] as const).map((key) => ({
+    key,
+    label: matchCriterionLabels[key],
+    weight: 0,
+    active: false,
+    kind: "scoring" as const,
+    priority: "differential" as const,
+  })),
 ] satisfies MatchMatrixCriterion[];
 
 export type MatchMatrixCriterion = {
   key: MatchCriterionKey;
   label: string;
   weight: number;
+  active: boolean;
+  kind: MatchCriterionKind;
+  priority: MatchCriterionPriority;
 };
 
 export const matchMatrixCriteriaSchema = z
@@ -67,9 +187,12 @@ export const matchMatrixCriteriaSchema = z
       key: z.enum(matchCriterionKeys),
       label: z.string().trim().min(3).max(120),
       weight: z.number().int().min(0).max(100),
+      active: z.boolean().default(true),
+      kind: z.enum(matchCriterionKinds).default("scoring"),
+      priority: z.enum(matchCriterionPriorities).default("important"),
     }),
   )
-  .min(matchCriterionKeys.length - 1)
+  .min(1)
   .max(matchCriterionKeys.length)
   .superRefine((criteria, context) => {
     if (
@@ -82,11 +205,26 @@ export const matchMatrixCriteriaSchema = z
       });
     }
     if (
-      criteria.reduce((total, criterion) => total + criterion.weight, 0) !== 100
+      criteria
+        .filter((criterion) => criterion.active && criterion.kind === "scoring")
+        .reduce((total, criterion) => total + criterion.weight, 0) !== 100
     ) {
       context.addIssue({
         code: "custom",
         message: "Os pesos devem totalizar 100%.",
+      });
+    }
+    if (
+      criteria.some(
+        (criterion) =>
+          (!criterion.active || criterion.kind === "minimum") &&
+          criterion.weight !== 0,
+      )
+    ) {
+      context.addIssue({
+        code: "custom",
+        message:
+          "Critérios inativos ou mínimos não participam da pontuação e devem ter peso zero.",
       });
     }
   });
@@ -100,6 +238,8 @@ export const matchResultItemSchema = z.object({
   key: z.enum(matchCriterionKeys),
   label: z.string().max(120),
   weight: z.number().int().min(0).max(100),
+  kind: z.enum(matchCriterionKinds).default("scoring"),
+  priority: z.enum(matchCriterionPriorities).default("important"),
   status: z.enum([
     "attended",
     "differential",
@@ -117,10 +257,20 @@ export const matchResultSchema = z.object({
   overallScore: z.number().int().min(0).max(100),
   hardSkillsScore: z.number().int().min(0).max(100),
   informationCoverage: z.number().int().min(0).max(100).default(100),
-  items: z
-    .array(matchResultItemSchema)
-    .min(matchCriterionKeys.length - 1)
-    .max(matchCriterionKeys.length),
+  items: z.array(matchResultItemSchema).min(1).max(matchCriterionKeys.length),
+  minimumRequirements: z
+    .object({
+      confirmed: z.number().int().min(0),
+      requiresValidation: z.number().int().min(0),
+      notIdentified: z.number().int().min(0),
+      notAttended: z.number().int().min(0),
+    })
+    .default({
+      confirmed: 0,
+      requiresValidation: 0,
+      notIdentified: 0,
+      notAttended: 0,
+    }),
   sourcePolicy: z.literal("confirmed_application_snapshot"),
 });
 
@@ -135,11 +285,14 @@ export const matchStatusLabels: Record<MatchResultItem["status"], string> = {
   requires_validation: "INFORMADA — REQUER VALIDAÇÃO",
 };
 
-export type MatchAdherenceBand = "high" | "intermediate" | "review";
+export type MatchAdherenceBand =
+  "excellent" | "high" | "good" | "partial" | "review";
 
 export const matchAdherenceBandLabels: Record<MatchAdherenceBand, string> = {
+  excellent: "Aderência excelente",
   high: "Alta aderência",
-  intermediate: "Aderência intermediária",
+  good: "Boa aderência",
+  partial: "Aderência parcial",
   review: "Requer análise",
 };
 
@@ -149,8 +302,10 @@ export function getMatchAdherenceBand(
 ) {
   if (score === null || score === undefined || informationCoverage < 40)
     return "review";
+  if (score >= 90 && informationCoverage >= 80) return "excellent";
   if (score >= 75 && informationCoverage >= 70) return "high";
-  if (score >= 50) return "intermediate";
+  if (score >= 60) return "good";
+  if (score >= 40) return "partial";
   return "review";
 }
 
@@ -226,25 +381,34 @@ function sourceEntries(
   key: MatchCriterionKey,
 ): SourceEntry[] {
   if (key === "operational_compatibility") return [];
-  if (key === "related_experience" || key === "sector_experience") {
+  if (
+    [
+      "related_experience",
+      "sector_experience",
+      "healthcare_experience",
+      "similar_role_experience",
+      "customer_service_experience",
+      "leadership",
+    ].includes(key)
+  ) {
     return snapshot.experiences.map((item, index) => ({
       source: `Experiência ${index + 1}`,
       text: `${item.job_title} — ${item.company}. ${item.activities}`,
     }));
   }
-  if (key === "technical_skills") {
+  if (["technical_skills", "computer_skills", "languages"].includes(key)) {
     return snapshot.skills.map((skill) => ({
       source: "Habilidade confirmada",
       text: skill,
     }));
   }
-  if (key === "education") {
+  if (["education", "specific_course", "specialty"].includes(key)) {
     return snapshot.education.map((item, index) => ({
       source: `Formação ${index + 1}`,
       text: `${item.education_level} — ${item.course}, ${item.institution}`,
     }));
   }
-  if (key === "certifications") {
+  if (["certifications", "professional_registration"].includes(key)) {
     return snapshot.certifications.map((item, index) => ({
       source: `Certificação ${index + 1}`,
       text: `${item.name} — ${item.institution}`,
@@ -261,14 +425,21 @@ function sourceEntries(
 }
 
 function targetText(job: CareerJob, key: MatchCriterionKey) {
-  if (key === "related_experience")
+  if (["related_experience", "similar_role_experience"].includes(key))
     return `${job.desirable_experience ?? ""} ${job.activities} ${job.required_requirements}`;
-  if (key === "technical_skills")
+  if (["technical_skills", "computer_skills", "languages"].includes(key))
     return `${job.skills} ${job.required_requirements}`;
   if (key === "education") return job.schooling;
-  if (key === "sector_experience")
+  if (["specific_course", "specialty"].includes(key))
+    return `${job.schooling} ${job.required_requirements} ${job.desirable_requirements ?? ""}`;
+  if (["sector_experience", "healthcare_experience"].includes(key))
     return `${job.area?.name ?? ""} ${job.description}`;
-  if (key === "certifications") return job.certifications ?? "";
+  if (key === "customer_service_experience")
+    return `atendimento recepção cliente público ${job.activities}`;
+  if (["certifications", "professional_registration"].includes(key))
+    return `${job.certifications ?? ""} ${job.required_requirements}`;
+  if (key === "leadership")
+    return `liderança gestão coordenação ${job.activities} ${job.desirable_requirements ?? ""}`;
   if (key === "operational_compatibility") return "";
   return `${job.work_schedule ?? ""} ${job.work_mode} ${job.location}`;
 }
@@ -394,15 +565,17 @@ export function calculateExplainableMatch({
   logistics?: ApplicationLogistics | null;
 }): ExplainableMatchResult {
   const hardSkillsScore = calculateHardSkillsScore(job, snapshot);
-  const items = criteria.map((criterion): MatchResultItem => {
+  const activeCriteria = criteria.filter((criterion) => criterion.active);
+  const items = activeCriteria.map((criterion): MatchResultItem => {
     if (criterion.key === "operational_compatibility") {
       const operational = operationalCompatibility(job, logistics);
       return {
         ...criterion,
         ...operational,
-        weightedScore: Number(
-          ((operational.score * criterion.weight) / 100).toFixed(2),
-        ),
+        weightedScore:
+          criterion.kind === "scoring"
+            ? Number(((operational.score * criterion.weight) / 100).toFixed(2))
+            : 0,
       };
     }
     const target = targetText(job, criterion.key);
@@ -412,12 +585,14 @@ export function calculateExplainableMatch({
         ? hardSkillsScore
         : overlapScore(target, sources);
     const evidence = strongestEvidence(target, sources);
-    const requiresOfficialValidation = officialRegistrationPattern.test(target);
+    const requiresOfficialValidation =
+      criterion.key === "professional_registration" ||
+      officialRegistrationPattern.test(target);
     const status: MatchResultItem["status"] = !sources.length
       ? "not_informed"
       : requiresOfficialValidation || score < 60
         ? "requires_validation"
-        : criterion.key === "related_experience"
+        : criterion.priority === "differential"
           ? "differential"
           : "attended";
     const pointsToVerify: string[] = [];
@@ -438,12 +613,17 @@ export function calculateExplainableMatch({
       ...criterion,
       status,
       score,
-      weightedScore: Number(((score * criterion.weight) / 100).toFixed(2)),
+      weightedScore:
+        criterion.kind === "scoring"
+          ? Number(((score * criterion.weight) / 100).toFixed(2))
+          : 0,
       evidence,
       pointsToVerify,
     };
   });
-  const informedItems = items.filter((item) => item.status !== "not_informed");
+  const informedItems = items.filter(
+    (item) => item.kind === "scoring" && item.status !== "not_informed",
+  );
   const informedWeight = informedItems.reduce(
     (total, item) => total + item.weight,
     0,
@@ -456,11 +636,25 @@ export function calculateExplainableMatch({
       )
     : 0;
   const informationCoverage = calculateMatchInformationCoverage(items);
+  const minimumItems = items.filter((item) => item.kind === "minimum");
   return matchResultSchema.parse({
     overallScore,
     hardSkillsScore,
     informationCoverage,
     items,
+    minimumRequirements: {
+      confirmed: minimumItems.filter((item) =>
+        ["attended", "differential"].includes(item.status),
+      ).length,
+      requiresValidation: minimumItems.filter(
+        (item) => item.status === "requires_validation",
+      ).length,
+      notIdentified: minimumItems.filter(
+        (item) => item.status === "not_informed",
+      ).length,
+      notAttended: minimumItems.filter((item) => item.status === "not_attended")
+        .length,
+    },
     sourcePolicy: "confirmed_application_snapshot",
   });
 }

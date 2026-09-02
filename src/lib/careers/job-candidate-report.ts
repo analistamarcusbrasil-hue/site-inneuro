@@ -220,6 +220,13 @@ export function summarizeJobCandidateReport(rows: JobCandidateReportRow[]) {
       summary[row.band] += 1;
       return summary;
     },
-    { total: 0, high: 0, intermediate: 0, review: 0 },
+    {
+      total: 0,
+      excellent: 0,
+      high: 0,
+      good: 0,
+      partial: 0,
+      review: 0,
+    },
   );
 }

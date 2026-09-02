@@ -111,6 +111,27 @@ test("matriz exige sete critérios únicos com pesos totalizando 100%", () => {
   );
 });
 
+test("matriz 2.0 preserva versões antigas e separa mínimos da pontuação", () => {
+  const legacy = defaultMatchCriteria
+    .filter((criterion) => criterion.active)
+    .map(({ key, label, weight }) => ({ key, label, weight }));
+  const parsedLegacy = matchMatrixCriteriaSchema.safeParse(legacy);
+  assert.equal(parsedLegacy.success, true);
+  if (!parsedLegacy.success) return;
+  assert.ok(parsedLegacy.data.every((criterion) => criterion.active));
+  assert.ok(
+    defaultMatchCriteria.some(
+      (criterion) => criterion.kind === "minimum" && !criterion.active,
+    ),
+  );
+  assert.equal(
+    defaultMatchCriteria
+      .filter((criterion) => criterion.active && criterion.kind === "scoring")
+      .reduce((sum, criterion) => sum + criterion.weight, 0),
+    100,
+  );
+});
+
 test("calcula aderência específica à vaga e hard skills separadamente", () => {
   const result = calculateExplainableMatch({
     job,
@@ -191,7 +212,7 @@ test("informação ausente é marcada como não informada sem invenção", () =>
 
 test("faixas do relatório são transparentes e incluem não calculados em análise", () => {
   assert.equal(getMatchAdherenceBand(82), "high");
-  assert.equal(getMatchAdherenceBand(60), "intermediate");
+  assert.equal(getMatchAdherenceBand(60), "good");
   assert.equal(getMatchAdherenceBand(30), "review");
   assert.equal(getMatchAdherenceBand(null), "review");
   assert.equal(getMatchAdherenceBand(95, 20), "review");

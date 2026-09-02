@@ -41,6 +41,13 @@ export const careerApplicationLogisticsSchema = z
       .union([z.enum(transitBenefitOptions), z.literal("")])
       .transform((value) => value || null),
     source: z.enum(applicationSources),
+    availabilityShifts: z
+      .array(z.enum(["morning", "afternoon", "night", "flexible"]))
+      .min(1)
+      .max(4),
+    availableFrom: z.iso.date(),
+    isReferred: z.boolean(),
+    referredBy: z.string().trim().max(160),
     recruitmentConsent: z.literal(true),
     automatedSupportConsent: z.literal(true),
   })
@@ -53,6 +60,13 @@ export const careerApplicationLogisticsSchema = z
         code: "custom",
         path: ["commuteFeasibility"],
         message: "Complete as informações operacionais da vaga.",
+      });
+    }
+    if (data.isReferred && data.referredBy.length < 2) {
+      context.addIssue({
+        code: "custom",
+        path: ["referredBy"],
+        message: "Informe quem realizou a indicação.",
       });
     }
   });

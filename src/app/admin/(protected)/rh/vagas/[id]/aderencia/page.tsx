@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 import { AdminPageHeading } from "@/components/admin/admin-page-heading";
-import { ConfirmCommandForm } from "@/components/admin/confirm-command-form";
+import { MatchMatrixEditor } from "@/components/admin/careers/match-matrix-editor";
 import { HrNavigation } from "@/components/admin/hr-navigation";
 import { requireHrAccess } from "@/lib/careers/hr-auth";
 import {
@@ -12,7 +12,6 @@ import {
   matchMatrixCriteriaSchema,
   type MatchMatrixCriterion,
 } from "@/lib/careers/matching";
-import { saveJobMatchMatrixAction } from "./actions";
 
 type MatrixRow = {
   id: string;
@@ -59,9 +58,11 @@ export default async function JobMatchingMatrixPage({
     ? matchCriterionKeys.map(
         (key) =>
           parsedCurrent.data.find((criterion) => criterion.key === key) ?? {
+            ...(defaultMatchCriteria.find(
+              (criterion) => criterion.key === key,
+            ) ?? defaultMatchCriteria[0]),
             key,
             label: matchCriterionLabels[key],
-            weight: 0,
           },
       )
     : defaultMatchCriteria;
@@ -106,7 +107,7 @@ export default async function JobMatchingMatrixPage({
           className="bg-error/10 text-error mb-6 rounded-2xl p-4 text-sm font-bold"
         >
           {query.error === "weights"
-            ? "A soma dos sete pesos deve ser exatamente 100%."
+            ? "A soma dos critérios ativos de pontuação deve ser exatamente 100%. Critérios mínimos e inativos usam peso zero."
             : query.error === "calculation"
               ? "A matriz foi criada, mas nem todos os cálculos puderam ser gravados. Recalcule a candidatura na tela individual."
               : "Não foi possível salvar a matriz de aderência."}
@@ -128,7 +129,8 @@ export default async function JobMatchingMatrixPage({
                 : "Criar matriz inicial"}
             </h2>
             <p className="text-muted mt-2 max-w-3xl text-sm">
-              Ajuste apenas a importância relativa de critérios profissionais.
+              Ative os critérios aplicáveis, separe requisitos mínimos dos que
+              pontuam e distribua 100% entre os critérios ativos de pontuação.
               Ao salvar, uma nova versão imutável é criada.
             </p>
           </div>
@@ -137,50 +139,7 @@ export default async function JobMatchingMatrixPage({
           </span>
         </div>
 
-        <ConfirmCommandForm
-          action={saveJobMatchMatrixAction}
-          message="Salvar uma nova versão da matriz e recalcular as candidaturas desta vaga? O histórico anterior será preservado."
-        >
-          <input type="hidden" name="job_id" value={id} />
-          <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {currentCriteria.map((criterion) => (
-              <label
-                key={criterion.key}
-                className="border-border-light text-ink rounded-2xl border p-4 text-sm font-bold"
-              >
-                {criterion.label}
-                <span className="text-muted mt-1 block text-xs font-normal">
-                  Peso entre 0% e 100%
-                </span>
-                <div className="mt-3 flex items-center gap-2">
-                  <input
-                    type="number"
-                    name={`weight_${criterion.key}`}
-                    defaultValue={criterion.weight}
-                    min={0}
-                    max={100}
-                    step={1}
-                    required
-                    className="border-border-light focus:border-brand min-h-11 min-w-0 flex-1 rounded-xl border px-4 font-normal outline-none"
-                  />
-                  <span aria-hidden="true">%</span>
-                </div>
-              </label>
-            ))}
-          </div>
-          <div className="border-border-light mt-6 flex flex-wrap items-center justify-between gap-4 border-t pt-6">
-            <p className="text-muted max-w-2xl text-xs leading-relaxed">
-              Fontes usadas: snapshot confirmado do perfil, experiências,
-              formação, habilidades, certificações e disponibilidade. Dados de
-              currículo não confirmados não entram no cálculo. A compatibilidade
-              operacional usa apenas a declaração de deslocamento; meio de
-              transporte e vale-transporte não alteram a pontuação.
-            </p>
-            <button className="bg-brand hover:bg-brand-dark min-h-11 rounded-full px-6 text-sm font-bold text-white">
-              Salvar nova versão
-            </button>
-          </div>
-        </ConfirmCommandForm>
+        <MatchMatrixEditor jobId={id} criteria={currentCriteria} />
       </section>
 
       <section
@@ -220,8 +179,13 @@ export default async function JobMatchingMatrixPage({
                     <ul className="text-muted mt-3 grid gap-1 text-xs sm:grid-cols-2 lg:grid-cols-3">
                       {parsed.data.map((criterion) => (
                         <li key={criterion.key}>
+                          {criterion.active ? "Ativo" : "Inativo"} ·{" "}
                           {criterion.label}:{" "}
-                          <strong>{criterion.weight}%</strong>
+                          <strong>
+                            {criterion.kind === "minimum"
+                              ? "requisito mínimo"
+                              : `${criterion.weight}%`}
+                          </strong>
                         </li>
                       ))}
                     </ul>

@@ -112,8 +112,10 @@ test("relatório filtra por critérios profissionais e resume faixas", () => {
   );
   assert.deepEqual(summarizeJobCandidateReport(rows), {
     total: 1,
+    excellent: 0,
     high: 0,
-    intermediate: 0,
+    good: 0,
+    partial: 0,
     review: 1,
   });
 });
@@ -126,14 +128,21 @@ test("painel expõe relatório explicável, filtros e currículo privado", () =>
     ),
     "utf8",
   );
+  const center = readFileSync(
+    new URL(
+      "../src/components/admin/careers/candidate-operations-center.tsx",
+      import.meta.url,
+    ),
+    "utf8",
+  );
   assert.match(page, /Processo seletivo/);
-  assert.match(page, /1\. Currículo/);
-  assert.match(page, /2\. Entrevista/);
-  assert.match(page, /3\. Teste Prático/);
-  assert.match(page, /4\. Contratação/);
+  assert.match(page, /career_job_pipeline_summary/);
+  assert.match(page, /search_career_job_applications/);
   assert.match(page, /name="escolaridade"/);
-  assert.match(page, /name="atendimento"/);
-  assert.match(page, /name="funcao"/);
-  assert.match(page, /name="etapa"/);
-  assert.match(page, /\/api\/admin\/rh\/curriculos\//);
+  assert.match(page, /\["atendimento", "Atendimento"/);
+  assert.match(page, /\["funcao", "Função semelhante"/);
+  assert.match(page, /queryHref\(query, \{ etapa:/);
+  assert.match(center, /\/api\/admin\/rh\/curriculos\//);
+  assert.match(center, /Avançar etapa/);
+  assert.match(center, /Kanban/);
 });
