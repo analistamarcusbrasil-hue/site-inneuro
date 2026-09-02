@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useActionState, useMemo, useState } from "react";
+import { type FormEvent, useActionState, useMemo, useState } from "react";
 import {
   bulkCareerApplicationsAction,
   type BulkCareerApplicationsState,
@@ -88,13 +88,18 @@ function ScoreBadge({ row }: { row: AtsCandidateRow }) {
   );
 }
 
-function quickApproveLabel(stage: AtsCandidateRow["stage"]) {
-  return stage === "resume" ? "Chamar entrevista" : "Aprovar";
-}
-
 function canQuickDecide(stage: AtsCandidateRow["stage"]) {
   return !["hired", "not_approved"].includes(stage);
 }
+
+const nextStageLabels: Partial<
+  Record<AtsCandidateRow["stage"], string>
+> = {
+  resume: "Entrevista",
+  interview: "Teste prático",
+  practical_test: "Contratação",
+  hiring: "Contratado",
+};
 
 export function CandidateOperationsCenter({
   jobId,
@@ -145,6 +150,20 @@ export function CandidateOperationsCenter({
         ? current.filter((id) => id !== applicationId)
         : [...current, applicationId],
     );
+  }
+
+  function confirmQuickDecision(
+    event: FormEvent<HTMLFormElement>,
+    row: AtsCandidateRow,
+  ) {
+    const submitter = (event.nativeEvent as SubmitEvent)
+      .submitter as HTMLButtonElement | null;
+    if (!submitter?.value) return;
+    const isRejection = submitter.value === "not_approve";
+    const message = isRejection
+      ? `Reprovar candidato?\n\n${row.name} será movido(a) para Não aprovados.`
+      : `Aprovar candidato?\n\n${row.name} avançará para ${nextStageLabels[row.stage] ?? "a próxima etapa"}.`;
+    if (!window.confirm(message)) event.preventDefault();
   }
 
   function exportSelection() {
@@ -263,11 +282,19 @@ export function CandidateOperationsCenter({
         </div>
       ) : (
         <>
-          <div className="border-border-light hidden overflow-x-auto rounded-3xl border bg-white md:block">
-            <table className="w-full min-w-[1120px] table-fixed text-left text-sm">
+          <div className="border-border-light hidden overflow-hidden rounded-3xl border bg-white md:block">
+            <table className="w-full table-fixed text-left text-sm">
+              <colgroup>
+                <col className="w-11" />
+                <col className="w-[25%]" />
+                <col className="w-[18%]" />
+                <col className="w-[10%]" />
+                <col className="w-[9%]" />
+                <col className="w-[290px]" />
+              </colgroup>
               <thead className="bg-surface text-brand-dark text-xs uppercase">
                 <tr>
-                  <th className="w-12 px-4 py-4">
+                  <th className="px-3 py-4">
                     <input
                       aria-label="Selecionar todos os resultados desta página"
                       type="checkbox"
@@ -284,18 +311,17 @@ export function CandidateOperationsCenter({
                       className="accent-brand size-4"
                     />
                   </th>
-                  <th className="w-[23%] px-3 py-4">Candidato</th>
-                  <th className="w-[18%] px-3 py-4">Perfil</th>
-                  <th className="w-[13%] px-3 py-4">Etapa</th>
-                  <th className="w-[12%] px-3 py-4">Aderência</th>
-                  <th className="w-[12%] px-3 py-4">Marcadores</th>
-                  <th className="w-[300px] px-3 py-4 text-right">Ações</th>
+                  <th className="px-3 py-4">Candidato</th>
+                  <th className="px-3 py-4">Perfil</th>
+                  <th className="px-3 py-4">Etapa</th>
+                  <th className="px-3 py-4">Aderência</th>
+                  <th className="px-2 py-4 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-border-light divide-y">
                 {rows.map((row) => (
-                  <tr key={row.applicationId} className="align-top">
-                    <td className="px-4 py-4">
+                  <tr key={row.applicationId} className="h-20 align-middle">
+                    <td className="px-3 py-3 align-middle">
                       <input
                         aria-label={`Selecionar ${row.name}`}
                         type="checkbox"
@@ -304,7 +330,7 @@ export function CandidateOperationsCenter({
                         className="accent-brand size-4"
                       />
                     </td>
-                    <td className="px-3 py-4">
+                    <td className="min-w-0 px-3 py-3 align-middle">
                       <button
                         type="button"
                         className="text-brand block max-w-full truncate text-left font-bold hover:underline"
@@ -316,16 +342,33 @@ export function CandidateOperationsCenter({
                       <span className="text-muted mt-1 block truncate text-xs">
                         {row.objective}
                       </span>
+                      {row.isReferred || row.tags.length ? (
+                        <div className="mt-1.5 flex max-h-5 items-center gap-1 overflow-hidden">
+                          {row.isReferred ? (
+                            <span className="shrink-0 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-900">
+                              Indicação
+                            </span>
+                          ) : null}
+                          {row.tags.slice(0, 2).map((tag) => (
+                            <span
+                              key={tag}
+                              className="bg-surface text-muted max-w-24 truncate rounded-full px-2 py-0.5 text-[10px]"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
                     </td>
-                    <td className="px-3 py-4">
-                      <span className="text-ink line-clamp-2">
+                    <td className="min-w-0 px-3 py-3 align-middle">
+                      <span className="text-ink line-clamp-2 leading-snug">
                         {row.education}
                       </span>
                       <span className="text-muted mt-1 block text-xs">
                         {formatExperience(row.experienceMonths)}
                       </span>
                     </td>
-                    <td className="px-3 py-4">
+                    <td className="px-3 py-3 align-middle">
                       <span className="text-ink font-bold">
                         {candidateStageLabels[row.stage]}
                       </span>
@@ -333,93 +376,78 @@ export function CandidateOperationsCenter({
                         {applicationStatusLabels[row.status]}
                       </span>
                     </td>
-                    <td className="px-3 py-4">
-                      <ScoreBadge row={row} />
-                      <span className="text-muted mt-1 block text-xs">
-                        Cobertura {row.informationCoverage}%
-                      </span>
-                    </td>
-                    <td className="px-3 py-4">
-                      <div className="flex flex-wrap gap-1">
-                        {row.isReferred ? (
-                          <span className="rounded-full bg-violet-100 px-2 py-1 text-xs font-bold text-violet-900">
-                            Indicação
-                          </span>
-                        ) : null}
-                        {row.tags.slice(0, 2).map((tag) => (
-                          <span
-                            key={tag}
-                            className="bg-surface text-muted rounded-full px-2 py-1 text-xs"
-                          >
-                            {tag}
-                          </span>
-                        ))}
+                    <td className="px-3 py-3 align-middle">
+                      <div className="flex flex-col items-start">
+                        <ScoreBadge row={row} />
+                        <span className="text-muted mt-1 block whitespace-nowrap text-xs">
+                          Cobertura {row.informationCoverage}%
+                        </span>
                       </div>
                     </td>
-                    <td className="px-3 py-4">
-                      <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+                    <td className="px-2 py-3 align-middle">
+                      <div className="flex items-center justify-end gap-1 whitespace-nowrap">
                         {row.resumeId ? (
                           <Link
                             href={`/api/admin/rh/curriculos/${row.resumeId}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             title={`Ver currículo — ${row.name}`}
-                            className="border-brand/30 text-brand-dark inline-flex min-h-8 items-center rounded-lg border px-2.5 text-[11px] font-bold hover:bg-surface"
+                            className="border-brand/30 text-brand-dark inline-flex min-h-9 flex-none items-center justify-center rounded-lg border bg-white px-3 text-xs font-bold hover:bg-emerald-50"
                           >
                             Ver currículo
                           </Link>
                         ) : (
-                          <span className="text-muted px-1 text-[11px]">
+                          <span className="border-border-light text-muted inline-flex min-h-9 items-center rounded-lg border px-2 text-[10px]">
                             Sem currículo
                           </span>
                         )}
-                        <form
-                          action={formAction}
-                          onSubmit={(event) => {
-                            const submitter = (event.nativeEvent as SubmitEvent)
-                              .submitter as HTMLButtonElement | null;
-                            const actionLabel = submitter?.textContent?.trim();
-                            if (
-                              actionLabel &&
-                              !window.confirm(
-                                `Confirmar “${actionLabel}” para ${row.name}?`,
-                              )
-                            ) {
-                              event.preventDefault();
+                        {canQuickDecide(row.stage) ? (
+                          <form
+                            action={formAction}
+                            onSubmit={(event) =>
+                              confirmQuickDecision(event, row)
                             }
-                          }}
-                          className="flex gap-1.5"
-                        >
-                          <input type="hidden" name="job_id" value={jobId} />
-                          <input
-                            type="hidden"
-                            name="application_ids"
-                            value={JSON.stringify([row.applicationId])}
-                          />
-                          <input
-                            type="hidden"
-                            name="expected_stage"
-                            value={row.stage}
-                          />
-                          <button
-                            name="operation"
-                            value="approve"
-                            disabled={!canQuickDecide(row.stage) || pending}
-                            title={`${quickApproveLabel(row.stage)} — ${row.name}`}
-                            className="min-h-8 rounded-lg bg-emerald-600 px-2.5 text-[11px] font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                            className="flex flex-none items-center gap-1"
                           >
-                            {quickApproveLabel(row.stage)}
-                          </button>
-                          <button
-                            name="operation"
-                            value="not_approve"
-                            disabled={!canQuickDecide(row.stage) || pending}
-                            title={`Reprovar — ${row.name}`}
-                            className="bg-error hover:bg-error/85 min-h-8 rounded-lg px-2.5 text-[11px] font-bold text-white disabled:opacity-50"
+                            <input type="hidden" name="job_id" value={jobId} />
+                            <input
+                              type="hidden"
+                              name="application_ids"
+                              value={JSON.stringify([row.applicationId])}
+                            />
+                            <input
+                              type="hidden"
+                              name="expected_stage"
+                              value={row.stage}
+                            />
+                            <button
+                              name="operation"
+                              value="approve"
+                              disabled={pending}
+                              title={`Aprovar e avançar para ${nextStageLabels[row.stage]} — ${row.name}`}
+                              className="min-h-9 flex-none rounded-lg bg-emerald-600 px-3 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                            >
+                              {pending ? "Processando…" : "✓ Aprovar"}
+                            </button>
+                            <button
+                              name="operation"
+                              value="not_approve"
+                              disabled={pending}
+                              title={`Reprovar — ${row.name}`}
+                              className="bg-error hover:bg-error/85 min-h-9 flex-none rounded-lg px-3 text-xs font-bold text-white disabled:opacity-50"
+                            >
+                              ✕ Reprovar
+                            </button>
+                          </form>
+                        ) : (
+                          <span
+                            className={`inline-flex min-h-9 items-center rounded-lg px-3 text-xs font-bold ${row.stage === "hired" ? "bg-emerald-100 text-emerald-900" : "bg-red-100 text-red-900"}`}
                           >
-                            Reprovar
-                          </button>
-                        </form>
+                            {row.stage === "hired"
+                              ? "✓ Contratado"
+                              : "✕ Não aprovado"}
+                          </span>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -457,62 +485,81 @@ export function CandidateOperationsCenter({
                   </button>
                   <ScoreBadge row={row} />
                 </div>
-                <div className="mt-3 flex flex-wrap justify-end gap-2">
+                {row.isReferred || row.tags.length ? (
+                  <div className="mt-2 flex flex-wrap gap-1 pl-7">
+                    {row.isReferred ? (
+                      <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-900">
+                        Indicação
+                      </span>
+                    ) : null}
+                    {row.tags.slice(0, 2).map((tag) => (
+                      <span
+                        key={tag}
+                        className="bg-surface text-muted rounded-full px-2 py-0.5 text-[10px]"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+                <div className="mt-3 grid gap-2">
                   {row.resumeId ? (
                     <Link
                       href={`/api/admin/rh/curriculos/${row.resumeId}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="border-brand/30 text-brand-dark inline-flex min-h-9 items-center rounded-lg border px-3 text-xs font-bold"
+                      className="border-brand/30 text-brand-dark inline-flex min-h-9 items-center justify-center rounded-lg border bg-white px-3 text-xs font-bold"
                     >
                       Ver currículo
                     </Link>
-                  ) : null}
+                  ) : (
+                    <span className="border-border-light text-muted inline-flex min-h-9 items-center justify-center rounded-lg border text-xs">
+                      Currículo indisponível
+                    </span>
+                  )}
+                  {canQuickDecide(row.stage) ? (
                     <form
-                    action={formAction}
-                    onSubmit={(event) => {
-                      const submitter = (event.nativeEvent as SubmitEvent)
-                        .submitter as HTMLButtonElement | null;
-                      const actionLabel = submitter?.textContent?.trim();
-                      if (
-                        actionLabel &&
-                        !window.confirm(
-                          `Confirmar “${actionLabel}” para ${row.name}?`,
-                        )
-                      ) {
-                        event.preventDefault();
-                      }
-                    }}
-                    className="flex gap-2"
-                  >
-                    <input type="hidden" name="job_id" value={jobId} />
-                    <input
-                      type="hidden"
-                      name="application_ids"
-                      value={JSON.stringify([row.applicationId])}
-                    />
-                    <input
-                      type="hidden"
-                      name="expected_stage"
-                      value={row.stage}
-                    />
-                    <button
-                      name="operation"
-                      value="approve"
-                      disabled={!canQuickDecide(row.stage) || pending}
-                      className="min-h-9 rounded-lg bg-emerald-600 px-3 text-xs font-bold text-white disabled:opacity-50"
+                      action={formAction}
+                      onSubmit={(event) => confirmQuickDecision(event, row)}
+                      className="grid grid-cols-2 gap-2"
                     >
-                      {quickApproveLabel(row.stage)}
-                    </button>
-                    <button
-                      name="operation"
-                      value="not_approve"
-                      disabled={!canQuickDecide(row.stage) || pending}
-                      className="bg-error min-h-9 rounded-lg px-3 text-xs font-bold text-white disabled:opacity-50"
-                    >
-                      Reprovar
-                    </button>
+                      <input type="hidden" name="job_id" value={jobId} />
+                      <input
+                        type="hidden"
+                        name="application_ids"
+                        value={JSON.stringify([row.applicationId])}
+                      />
+                      <input
+                        type="hidden"
+                        name="expected_stage"
+                        value={row.stage}
+                      />
+                      <button
+                        name="operation"
+                        value="approve"
+                        disabled={pending}
+                        className="min-h-9 rounded-lg bg-emerald-600 px-3 text-xs font-bold text-white disabled:opacity-50"
+                      >
+                        {pending ? "Processando…" : "✓ Aprovar"}
+                      </button>
+                      <button
+                        name="operation"
+                        value="not_approve"
+                        disabled={pending}
+                        className="bg-error min-h-9 rounded-lg px-3 text-xs font-bold text-white disabled:opacity-50"
+                      >
+                        ✕ Reprovar
+                      </button>
                     </form>
+                  ) : (
+                    <span
+                      className={`inline-flex min-h-9 items-center justify-center rounded-lg px-3 text-xs font-bold ${row.stage === "hired" ? "bg-emerald-100 text-emerald-900" : "bg-red-100 text-red-900"}`}
+                    >
+                      {row.stage === "hired"
+                        ? "✓ Contratado"
+                        : "✕ Não aprovado"}
+                    </span>
+                  )}
                 </div>
               </article>
             ))}

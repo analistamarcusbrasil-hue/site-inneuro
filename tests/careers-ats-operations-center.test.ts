@@ -94,10 +94,15 @@ test("melhores currículos aparecem primeiro com evidência suficiente", () => {
 test("cada linha oferece decisão humana rápida e confirmada", () => {
   assert.match(operationsCenter, />\s*Ver currículo\s*</);
   assert.match(operationsCenter, /\/api\/admin\/rh\/curriculos\/\$\{row\.resumeId\}/);
-  assert.match(operationsCenter, /Chamar entrevista/);
-  assert.match(operationsCenter, />\s*Reprovar\s*</);
+  assert.match(operationsCenter, /✓ Aprovar/);
+  assert.match(operationsCenter, /✕ Reprovar/);
   assert.match(operationsCenter, /value="approve"/);
   assert.match(operationsCenter, /value="not_approve"/);
+  assert.match(operationsCenter, /Aprovar e avançar para/);
+  assert.match(operationsCenter, /será movido\(a\) para Não aprovados/);
   assert.match(operationsCenter, /window\.confirm/);
   assert.match(operationsCenter, /row\.name/);
+  assert.match(operationsCenter, /<col className="w-\[290px\]"/);
+  assert.match(operationsCenter, /row\.tags\.slice\(0, 2\)/);
+  assert.doesNotMatch(operationsCenter, />Marcadores</);
 });
