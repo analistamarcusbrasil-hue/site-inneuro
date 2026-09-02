@@ -16,9 +16,30 @@ const rankingMigration = readFileSync(
   ),
   "utf8",
 );
+const exclusiveQueuesMigration = readFileSync(
+  new URL(
+    "../supabase/migrations/20260902093502_enforce_exclusive_career_stage_queues.sql",
+    import.meta.url,
+  ),
+  "utf8",
+);
 const operationsCenter = readFileSync(
   new URL(
     "../src/components/admin/careers/candidate-operations-center.tsx",
+    import.meta.url,
+  ),
+  "utf8",
+);
+const pipelineNav = readFileSync(
+  new URL(
+    "../src/components/admin/careers/candidate-pipeline-nav.tsx",
+    import.meta.url,
+  ),
+  "utf8",
+);
+const operationsAction = readFileSync(
+  new URL(
+    "../src/app/admin/(protected)/rh/vagas/[id]/candidaturas/actions.ts",
     import.meta.url,
   ),
   "utf8",
@@ -105,4 +126,50 @@ test("cada linha oferece decisão humana rápida e confirmada", () => {
   assert.match(operationsCenter, /<col className="w-\[290px\]"/);
   assert.match(operationsCenter, /row\.tags\.slice\(0, 2\)/);
   assert.doesNotMatch(operationsCenter, />Marcadores</);
+});
+
+test("cada fila usa exclusivamente a etapa atual da mesma candidatura", () => {
+  assert.match(
+    exclusiveQueuesMigration,
+    /career_job_applications_candidate_job_unique_idx[\s\S]*candidate_id, job_id/,
+  );
+  assert.match(
+    exclusiveQueuesMigration,
+    /application\.candidate_stage = p_stage[\s\S]*application\.status <> 'withdrawn'/,
+  );
+  assert.match(
+    exclusiveQueuesMigration,
+    /select application\.candidate_stage, count\(\*\)[\s\S]*group by application\.candidate_stage/,
+  );
+  assert.doesNotMatch(
+    exclusiveQueuesMigration,
+    /career_application_stage_history[\s\S]*p_stage/,
+  );
+});
+
+test("aprovação e reprovação atualizam a fila sem F5", () => {
+  assert.match(exclusiveQueuesMigration, /'fromStage', p_expected_stage/);
+  assert.match(exclusiveQueuesMigration, /'nextStage', next_stage/);
+  assert.match(exclusiveQueuesMigration, /'movedCount', moved_count/);
+  assert.match(
+    exclusiveQueuesMigration,
+    /application\.candidate_stage <> p_expected_stage[\s\S]*candidate_stage_changed/,
+  );
+  assert.match(operationsCenter, /setDisplayRows/);
+  assert.match(operationsCenter, /notifyCandidatePipelineMovement/);
+  assert.match(operationsCenter, /router\.refresh\(\)/);
+  assert.match(pipelineNav, /current\[movement\.fromStage\] - movement\.movedCount/);
+  assert.match(pipelineNav, /current\[movement\.toStage\] \+ movement\.movedCount/);
+});
+
+test("ação responde após o banco e processa comunicação sem bloquear a fila", () => {
+  assert.match(operationsAction, /import \{ after \} from "next\/server"/);
+  assert.match(operationsAction, /after\(async \(\) =>/);
+  assert.match(operationsAction, /Candidato movido para Não aprovados/);
+  assert.match(operationsAction, /Candidato aprovado para/);
+  assert.match(
+    operationsAction,
+    /Este candidato já foi movimentado\. A lista será atualizada\./,
+  );
+  assert.match(operationsAction, /refreshRequired: stageChanged/);
 });

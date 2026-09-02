@@ -2,11 +2,17 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type FormEvent, useActionState, useMemo, useState } from "react";
+import {
+  type FormEvent,
+  useActionState,
+  useMemo,
+  useState,
+} from "react";
 import {
   bulkCareerApplicationsAction,
   type BulkCareerApplicationsState,
 } from "@/app/admin/(protected)/rh/vagas/[id]/candidaturas/actions";
+import { notifyCandidatePipelineMovement } from "@/components/admin/careers/candidate-pipeline-nav";
 import {
   applicationStatusLabels,
   candidateStageLabels,
@@ -105,35 +111,94 @@ export function CandidateOperationsCenter({
   jobId,
   rows,
   total,
+  activeStage,
 }: {
   jobId: string;
   rows: AtsCandidateRow[];
   total: number;
+  activeStage: CareerJobApplication["candidate_stage"] | null;
 }) {
   const router = useRouter();
   const [view, setView] = useState<"list" | "kanban">("list");
   const [selected, setSelected] = useState<string[]>([]);
+  const [displayRows, setDisplayRows] = useState(rows);
+  const [displayTotal, setDisplayTotal] = useState(total);
+  const [processing, setProcessing] = useState<{
+    applicationIds: string[];
+    operation: string;
+  } | null>(null);
   const [activeRow, setActiveRow] = useState<AtsCandidateRow | null>(null);
   const [drawerTab, setDrawerTab] = useState<"summary" | "match" | "hiring">(
     "summary",
   );
   const [state, formAction, pending] = useActionState(
     async (previousState: BulkCareerApplicationsState, formData: FormData) => {
-      const nextState = await bulkCareerApplicationsAction(
-        previousState,
-        formData,
-      );
-      if (nextState.status === "success") {
+      let applicationIds: string[] = [];
+      try {
+        applicationIds = JSON.parse(
+          String(formData.get("application_ids") ?? "[]"),
+        ) as string[];
+      } catch {
+        applicationIds = [];
+      }
+      const operation = String(formData.get("operation") ?? "");
+      setProcessing({ applicationIds, operation });
+      let nextState: BulkCareerApplicationsState;
+      try {
+        nextState = await bulkCareerApplicationsAction(previousState, formData);
+      } finally {
+        setProcessing(null);
+      }
+      if (
+        nextState.status === "success" &&
+        nextState.fromStage &&
+        nextState.nextStage &&
+        nextState.movedCount
+      ) {
+        notifyCandidatePipelineMovement({
+          jobId,
+          fromStage: nextState.fromStage,
+          toStage: nextState.nextStage,
+          movedCount: nextState.movedCount,
+        });
+        setDisplayRows((current) =>
+          activeStage
+            ? current.filter(
+                (row) => !applicationIds.includes(row.applicationId),
+              )
+            : current.map((row) =>
+                applicationIds.includes(row.applicationId)
+                  ? {
+                      ...row,
+                      stage: nextState.nextStage!,
+                      status:
+                        nextState.nextStage === "hired" ||
+                        nextState.nextStage === "not_approved"
+                          ? "finalized"
+                          : "in_process",
+                    }
+                  : row,
+              ),
+        );
+        if (activeStage) {
+          setDisplayTotal((current) =>
+            Math.max(0, current - nextState.movedCount!),
+          );
+        }
         setSelected([]);
+        router.refresh();
+      } else if (nextState.refreshRequired) {
         router.refresh();
       }
       return nextState;
     },
     initialState,
   );
+
   const selectedRows = useMemo(
-    () => rows.filter((row) => selected.includes(row.applicationId)),
-    [rows, selected],
+    () =>
+      displayRows.filter((row) => selected.includes(row.applicationId)),
+    [displayRows, selected],
   );
   const selectedStage =
     selectedRows.length &&
@@ -167,7 +232,7 @@ export function CandidateOperationsCenter({
   }
 
   function exportSelection() {
-    const exported = selectedRows.length ? selectedRows : rows;
+    const exported = selectedRows.length ? selectedRows : displayRows;
     const csv = [
       ["Nome", "Etapa", "Status", "Aderência", "Experiência", "Indicação"],
       ...exported.map((row) => [
@@ -203,7 +268,8 @@ export function CandidateOperationsCenter({
     <>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-muted text-sm">
-          {total} resultado(s) · {selected.length} selecionado(s) nesta página
+          {displayTotal} resultado(s) · {selected.length} selecionado(s) nesta
+          página
         </p>
         <div className="border-border-light flex rounded-full border bg-white p-1 text-sm font-bold">
           <button
@@ -237,7 +303,7 @@ export function CandidateOperationsCenter({
       {view === "kanban" ? (
         <div className="grid gap-4 lg:grid-cols-3 2xl:grid-cols-6">
           {stages.map((stage) => {
-            const stageRows = rows.filter((row) => row.stage === stage);
+            const stageRows = displayRows.filter((row) => row.stage === stage);
             return (
               <section
                 key={stage}
@@ -299,12 +365,13 @@ export function CandidateOperationsCenter({
                       aria-label="Selecionar todos os resultados desta página"
                       type="checkbox"
                       checked={
-                        rows.length > 0 && selected.length === rows.length
+                        displayRows.length > 0 &&
+                        selected.length === displayRows.length
                       }
                       onChange={(event) =>
                         setSelected(
                           event.target.checked
-                            ? rows.map((row) => row.applicationId)
+                            ? displayRows.map((row) => row.applicationId)
                             : [],
                         )
                       }
@@ -319,8 +386,11 @@ export function CandidateOperationsCenter({
                 </tr>
               </thead>
               <tbody className="divide-border-light divide-y">
-                {rows.map((row) => (
-                  <tr key={row.applicationId} className="h-20 align-middle">
+                {displayRows.map((row) => (
+                  <tr
+                    key={row.applicationId}
+                    className={`h-20 align-middle transition-opacity ${processing?.applicationIds.includes(row.applicationId) ? "opacity-50" : ""}`}
+                  >
                     <td className="px-3 py-3 align-middle">
                       <input
                         aria-label={`Selecionar ${row.name}`}
@@ -427,7 +497,11 @@ export function CandidateOperationsCenter({
                               title={`Aprovar e avançar para ${nextStageLabels[row.stage]} — ${row.name}`}
                               className="min-h-9 flex-none rounded-lg bg-emerald-600 px-3 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
                             >
-                              {pending ? "Processando…" : "✓ Aprovar"}
+                              {processing?.applicationIds.includes(
+                                row.applicationId,
+                              ) && processing.operation === "approve"
+                                ? "Processando…"
+                                : "✓ Aprovar"}
                             </button>
                             <button
                               name="operation"
@@ -436,7 +510,11 @@ export function CandidateOperationsCenter({
                               title={`Reprovar — ${row.name}`}
                               className="bg-error hover:bg-error/85 min-h-9 flex-none rounded-lg px-3 text-xs font-bold text-white disabled:opacity-50"
                             >
-                              ✕ Reprovar
+                              {processing?.applicationIds.includes(
+                                row.applicationId,
+                              ) && processing.operation === "not_approve"
+                                ? "Processando…"
+                                : "✕ Reprovar"}
                             </button>
                           </form>
                         ) : (
@@ -457,10 +535,10 @@ export function CandidateOperationsCenter({
           </div>
 
           <div className="grid gap-3 md:hidden">
-            {rows.map((row) => (
+            {displayRows.map((row) => (
               <article
                 key={row.applicationId}
-                className="border-border-light rounded-2xl border bg-white p-4"
+                className={`border-border-light rounded-2xl border bg-white p-4 transition-opacity ${processing?.applicationIds.includes(row.applicationId) ? "opacity-50" : ""}`}
               >
                 <div className="flex items-start gap-3">
                   <input
@@ -540,7 +618,11 @@ export function CandidateOperationsCenter({
                         disabled={pending}
                         className="min-h-9 rounded-lg bg-emerald-600 px-3 text-xs font-bold text-white disabled:opacity-50"
                       >
-                        {pending ? "Processando…" : "✓ Aprovar"}
+                        {processing?.applicationIds.includes(
+                          row.applicationId,
+                        ) && processing.operation === "approve"
+                          ? "Processando…"
+                          : "✓ Aprovar"}
                       </button>
                       <button
                         name="operation"
@@ -548,7 +630,11 @@ export function CandidateOperationsCenter({
                         disabled={pending}
                         className="bg-error min-h-9 rounded-lg px-3 text-xs font-bold text-white disabled:opacity-50"
                       >
-                        ✕ Reprovar
+                        {processing?.applicationIds.includes(
+                          row.applicationId,
+                        ) && processing.operation === "not_approve"
+                          ? "Processando…"
+                          : "✕ Reprovar"}
                       </button>
                     </form>
                   ) : (

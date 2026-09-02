@@ -6,6 +6,7 @@ import {
   CandidateOperationsCenter,
   type AtsCandidateRow,
 } from "@/components/admin/careers/candidate-operations-center";
+import { CandidatePipelineNav } from "@/components/admin/careers/candidate-pipeline-nav";
 import { HrNavigation } from "@/components/admin/hr-navigation";
 import {
   applicationStatuses,
@@ -158,7 +159,7 @@ export default async function CareerJobApplicationsPage({
     10,
   );
 
-  const [searchResult, pipelineResult] = await Promise.all([
+  const [searchResult, pipelineResult, allApplicationsResult] = await Promise.all([
     supabase.rpc("search_career_job_applications", {
       p_job_id: id,
       p_search: queryValue(query, "busca") || null,
@@ -183,6 +184,10 @@ export default async function CareerJobApplicationsPage({
       p_offset: (page - 1) * pageSize,
     }),
     supabase.rpc("career_job_pipeline_summary", { p_job_id: id }),
+    supabase
+      .from("career_job_applications")
+      .select("id", { count: "exact", head: true })
+      .eq("job_id", id),
   ]);
 
   const databaseRows = (searchResult.data as SearchRow[] | null) ?? [];
@@ -244,11 +249,25 @@ export default async function CareerJobApplicationsPage({
       Number(item.candidate_count),
     ]),
   );
-  const totalPipeline = [...pipeline.values()].reduce(
-    (sum, value) => sum + value,
-    0,
-  );
-  const hasError = searchResult.error || pipelineResult.error;
+  const pipelineCounts = Object.fromEntries(
+    (
+      Object.keys(
+        candidateStageLabels,
+      ) as CareerJobApplication["candidate_stage"][]
+    ).map((candidateStage) => [candidateStage, pipeline.get(candidateStage) ?? 0]),
+  ) as Record<CareerJobApplication["candidate_stage"], number>;
+  const stageHrefs = Object.fromEntries(
+    (
+      Object.keys(
+        candidateStageLabels,
+      ) as CareerJobApplication["candidate_stage"][]
+    ).map((candidateStage) => [
+      candidateStage,
+      queryHref(query, { etapa: candidateStage, pagina: null }),
+    ]),
+  ) as Record<CareerJobApplication["candidate_stage"], string>;
+  const hasError =
+    searchResult.error || pipelineResult.error || allApplicationsResult.error;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const activeFilters = [
     [
@@ -289,37 +308,17 @@ export default async function CareerJobApplicationsPage({
         </Link>
       </div>
 
-      <nav
-        aria-label="Etapas do processo seletivo"
-        className="border-border-light mb-5 flex gap-2 overflow-x-auto rounded-2xl border bg-white p-2"
-      >
-        <Link
-          href={queryHref(query, { etapa: null, pagina: null })}
-          className={`flex shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold ${!stage ? "bg-brand text-white" : "text-brand-dark hover:bg-surface"}`}
-        >
-          Todos{" "}
-          <span className="rounded-full bg-white/20 px-2 py-0.5">
-            {totalPipeline}
-          </span>
-        </Link>
-        {(
-          Object.entries(candidateStageLabels) as [
-            CareerJobApplication["candidate_stage"],
-            string,
-          ][]
-        ).map(([value, label]) => (
-          <Link
-            key={value}
-            href={queryHref(query, { etapa: value, pagina: null })}
-            className={`flex shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold ${stage === value ? "bg-brand text-white" : "text-brand-dark hover:bg-surface"}`}
-          >
-            {label}
-            <span className="rounded-full bg-black/5 px-2 py-0.5">
-              {pipeline.get(value) ?? 0}
-            </span>
-          </Link>
-        ))}
-      </nav>
+      <CandidatePipelineNav
+        key={Object.entries(pipelineCounts)
+          .map(([candidateStage, count]) => `${candidateStage}:${count}`)
+          .join("|")}
+        jobId={id}
+        activeStage={stage ?? null}
+        initialCounts={pipelineCounts}
+        allCount={allApplicationsResult.count ?? 0}
+        allHref={queryHref(query, { etapa: null, pagina: null })}
+        stageHrefs={stageHrefs}
+      />
 
       <aside className="border-brand/20 bg-mint/60 text-brand-dark mb-5 rounded-2xl border p-4 text-sm">
         A aderência é um apoio explicável à triagem. “Não identificado” não
@@ -536,7 +535,13 @@ export default async function CareerJobApplicationsPage({
           precisa estar disponível neste ambiente.
         </p>
       ) : rows.length ? (
-        <CandidateOperationsCenter jobId={id} rows={rows} total={total} />
+        <CandidateOperationsCenter
+          key={`${stage ?? "all"}:${total}:${rows.map((row) => `${row.applicationId}:${row.stage}`).join("|")}`}
+          jobId={id}
+          rows={rows}
+          total={total}
+          activeStage={stage ?? null}
+        />
       ) : (
         <section className="border-border-light rounded-3xl border bg-white p-8 text-center">
           <h2 className="font-heading text-brand-dark text-xl font-semibold">

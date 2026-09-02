@@ -2,10 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { z } from "zod";
 import { careerApplicationStatusUpdateSchema } from "@/lib/careers/application-validation";
 import {
   applicationStatusLabels,
+  candidateStageLabels,
   canTransitionApplication,
   type CareerJobApplication,
 } from "@/lib/careers/applications";
@@ -35,6 +37,10 @@ export type BulkCareerApplicationsState = {
   status: "idle" | "success" | "error";
   message: string;
   updatedAt?: number;
+  refreshRequired?: boolean;
+  fromStage?: CareerJobApplication["candidate_stage"];
+  nextStage?: CareerJobApplication["candidate_stage"];
+  movedCount?: number;
 };
 
 const bulkCareerApplicationsSchema = z.object({
@@ -113,44 +119,74 @@ export async function bulkCareerApplicationsAction(
       },
     );
     if (error) {
+      const stageChanged = error.message.includes("candidate_stage_changed");
+      if (stageChanged) {
+        revalidatePath(`/admin/rh/vagas/${data.jobId}/candidaturas`);
+      }
       return {
         status: "error",
-        message: error.message.includes("candidate_stage_changed")
-          ? "Uma candidatura mudou de etapa. Nada foi alterado; atualize a lista e tente novamente."
+        message: stageChanged
+          ? "Este candidato já foi movimentado. A lista será atualizada."
           : "Não foi possível concluir a movimentação. Nenhuma candidatura foi alterada.",
         updatedAt: Date.now(),
+        refreshRequired: stageChanged,
       };
     }
 
-    const nextStage =
+    const rawNextStage =
       result && typeof result === "object" && "nextStage" in result
         ? String(result.nextStage)
         : "";
-    const template = communicationForSelectionStage(nextStage);
-    let communicationFailures = 0;
-    if (template) {
-      const communicationResults = await Promise.allSettled(
-        data.applicationIds.map((applicationId) =>
-          sendApplicationCommunication({
-            applicationId,
-            template,
-            triggeredBy: "admin",
-            createdBy: user.id,
-            idempotencyKey: `application:${applicationId}:stage:${nextStage}`,
-          }),
-        ),
-      );
-      communicationFailures = communicationResults.filter(
-        (item) => item.status === "rejected" || item.value.status !== "SENT",
-      ).length;
+    const nextStage = bulkCareerApplicationsSchema.shape.expectedStage.safeParse(
+      rawNextStage,
+    );
+    const movedCount =
+      result && typeof result === "object" && "movedCount" in result
+        ? Number(result.movedCount)
+        : data.applicationIds.length;
+    if (!nextStage.success || !nextStage.data || !Number.isFinite(movedCount)) {
+      return {
+        status: "error",
+        message: "A movimentação foi concluída, mas a lista precisa ser atualizada.",
+        updatedAt: Date.now(),
+        refreshRequired: true,
+      };
     }
+    const confirmedNextStage = nextStage.data;
 
     revalidatePath(`/admin/rh/vagas/${data.jobId}/candidaturas`);
     revalidatePath("/carreiras/candidaturas");
+    const template = communicationForSelectionStage(confirmedNextStage);
+    if (template) {
+      after(async () => {
+        await Promise.allSettled(
+          data.applicationIds.map((applicationId) =>
+            sendApplicationCommunication({
+              applicationId,
+              template,
+              triggeredBy: "admin",
+              createdBy: user.id,
+              idempotencyKey: `application:${applicationId}:stage:${confirmedNextStage}`,
+            }),
+          ),
+        );
+      });
+    }
+    const message =
+      data.operation === "not_approve"
+        ? movedCount === 1
+          ? "Candidato movido para Não aprovados."
+          : `${movedCount} candidatos movidos para Não aprovados.`
+        : movedCount === 1
+          ? `✓ Candidato aprovado para ${candidateStageLabels[confirmedNextStage]}.`
+          : `✓ ${movedCount} candidatos aprovados para ${candidateStageLabels[confirmedNextStage]}.`;
     return {
       status: "success",
-      message: `${data.applicationIds.length} candidatura(s) movimentada(s) em uma transação.${communicationFailures ? ` ${communicationFailures} comunicação(ões) precisa(m) de reenvio.` : " Comunicações processadas."}`,
+      message,
       updatedAt: Date.now(),
+      fromStage: data.expectedStage,
+      nextStage: confirmedNextStage,
+      movedCount,
     };
   }
 
