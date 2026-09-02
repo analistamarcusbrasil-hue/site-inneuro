@@ -357,7 +357,7 @@ export function CandidateOperationsCenter({
                       </div>
                     </td>
                     <td className="px-3 py-4">
-                      <div className="flex items-center justify-end gap-1.5">
+                      <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
                         {row.resumeId ? (
                           <Link
                             href={`/api/admin/rh/curriculos/${row.resumeId}`}
@@ -373,7 +373,6 @@ export function CandidateOperationsCenter({
                             Sem currículo
                           </span>
                         )}
-                        {canQuickDecide(row.stage) ? (
                         <form
                           action={formAction}
                           onSubmit={(event) => {
@@ -405,7 +404,7 @@ export function CandidateOperationsCenter({
                           <button
                             name="operation"
                             value="approve"
-                            disabled={pending}
+                            disabled={!canQuickDecide(row.stage) || pending}
                             title={`${quickApproveLabel(row.stage)} — ${row.name}`}
                             className="min-h-8 rounded-lg bg-emerald-600 px-2.5 text-[11px] font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
                           >
@@ -414,18 +413,13 @@ export function CandidateOperationsCenter({
                           <button
                             name="operation"
                             value="not_approve"
-                            disabled={pending}
+                            disabled={!canQuickDecide(row.stage) || pending}
                             title={`Reprovar — ${row.name}`}
                             className="bg-error hover:bg-error/85 min-h-8 rounded-lg px-2.5 text-[11px] font-bold text-white disabled:opacity-50"
                           >
                             Reprovar
                           </button>
                         </form>
-                      ) : (
-                        <span className="text-muted text-xs">
-                          Finalizado
-                        </span>
-                      )}
                       </div>
                     </td>
                   </tr>
@@ -474,7 +468,6 @@ export function CandidateOperationsCenter({
                       Ver currículo
                     </Link>
                   ) : null}
-                  {canQuickDecide(row.stage) ? (
                     <form
                     action={formAction}
                     onSubmit={(event) => {
@@ -506,7 +499,7 @@ export function CandidateOperationsCenter({
                     <button
                       name="operation"
                       value="approve"
-                      disabled={pending}
+                      disabled={!canQuickDecide(row.stage) || pending}
                       className="min-h-9 rounded-lg bg-emerald-600 px-3 text-xs font-bold text-white disabled:opacity-50"
                     >
                       {quickApproveLabel(row.stage)}
@@ -514,13 +507,12 @@ export function CandidateOperationsCenter({
                     <button
                       name="operation"
                       value="not_approve"
-                      disabled={pending}
+                      disabled={!canQuickDecide(row.stage) || pending}
                       className="bg-error min-h-9 rounded-lg px-3 text-xs font-bold text-white disabled:opacity-50"
                     >
                       Reprovar
                     </button>
                     </form>
-                  ) : null}
                 </div>
               </article>
             ))}
