@@ -9,6 +9,20 @@ const migration = readFileSync(
   ),
   "utf8",
 );
+const rankingMigration = readFileSync(
+  new URL(
+    "../supabase/migrations/20260902032553_ats_candidate_quick_actions_ranking.sql",
+    import.meta.url,
+  ),
+  "utf8",
+);
+const operationsCenter = readFileSync(
+  new URL(
+    "../src/components/admin/careers/candidate-operations-center.tsx",
+    import.meta.url,
+  ),
+  "utf8",
+);
 
 test("central ATS usa busca, paginação e índices no servidor", () => {
   assert.match(migration, /search_career_job_applications/);
@@ -64,4 +78,24 @@ test("matriz 2.0 e candidatura estruturada permanecem compatíveis", () => {
     applicationPage,
     /não\s+altera a pontuação\s+de aderência/i,
   );
+});
+
+test("melhores currículos aparecem primeiro com evidência suficiente", () => {
+  assert.match(rankingMigration, /evidence_weighted_score/);
+  assert.match(rankingMigration, /informationCoverage/);
+  assert.match(
+    rankingMigration,
+    /evidence_weighted_score end desc nulls last[\s\S]*latest_match_score end desc nulls last[\s\S]*latest_match_coverage end desc nulls last[\s\S]*calculated_experience_months end desc/,
+  );
+  assert.match(rankingMigration, /auth\.uid\(\) is null/);
+  assert.match(rankingMigration, /revoke all on function public\.search_career/);
+});
+
+test("cada linha oferece decisão humana rápida e confirmada", () => {
+  assert.match(operationsCenter, /Chamar entrevista/);
+  assert.match(operationsCenter, />\s*Reprovar\s*</);
+  assert.match(operationsCenter, /value="approve"/);
+  assert.match(operationsCenter, /value="not_approve"/);
+  assert.match(operationsCenter, /window\.confirm/);
+  assert.match(operationsCenter, /row\.name/);
 });

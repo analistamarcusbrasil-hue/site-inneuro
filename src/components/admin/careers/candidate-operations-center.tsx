@@ -88,6 +88,14 @@ function ScoreBadge({ row }: { row: AtsCandidateRow }) {
   );
 }
 
+function quickApproveLabel(stage: AtsCandidateRow["stage"]) {
+  return stage === "resume" ? "Chamar entrevista" : "Aprovar";
+}
+
+function canQuickDecide(stage: AtsCandidateRow["stage"]) {
+  return !["hired", "not_approved"].includes(stage);
+}
+
 export function CandidateOperationsCenter({
   jobId,
   rows,
@@ -276,11 +284,12 @@ export function CandidateOperationsCenter({
                       className="accent-brand size-4"
                     />
                   </th>
-                  <th className="w-[27%] px-3 py-4">Candidato</th>
-                  <th className="w-[22%] px-3 py-4">Perfil</th>
-                  <th className="w-[16%] px-3 py-4">Etapa</th>
-                  <th className="w-[13%] px-3 py-4">Aderência</th>
-                  <th className="px-3 py-4">Marcadores</th>
+                  <th className="w-[23%] px-3 py-4">Candidato</th>
+                  <th className="w-[18%] px-3 py-4">Perfil</th>
+                  <th className="w-[13%] px-3 py-4">Etapa</th>
+                  <th className="w-[12%] px-3 py-4">Aderência</th>
+                  <th className="w-[12%] px-3 py-4">Marcadores</th>
+                  <th className="w-[172px] px-3 py-4 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-border-light divide-y">
@@ -347,6 +356,61 @@ export function CandidateOperationsCenter({
                         ))}
                       </div>
                     </td>
+                    <td className="px-3 py-4">
+                      {canQuickDecide(row.stage) ? (
+                        <form
+                          action={formAction}
+                          onSubmit={(event) => {
+                            const submitter = (event.nativeEvent as SubmitEvent)
+                              .submitter as HTMLButtonElement | null;
+                            const actionLabel = submitter?.textContent?.trim();
+                            if (
+                              actionLabel &&
+                              !window.confirm(
+                                `Confirmar “${actionLabel}” para ${row.name}?`,
+                              )
+                            ) {
+                              event.preventDefault();
+                            }
+                          }}
+                          className="flex justify-end gap-1.5"
+                        >
+                          <input type="hidden" name="job_id" value={jobId} />
+                          <input
+                            type="hidden"
+                            name="application_ids"
+                            value={JSON.stringify([row.applicationId])}
+                          />
+                          <input
+                            type="hidden"
+                            name="expected_stage"
+                            value={row.stage}
+                          />
+                          <button
+                            name="operation"
+                            value="approve"
+                            disabled={pending}
+                            title={`${quickApproveLabel(row.stage)} — ${row.name}`}
+                            className="min-h-8 rounded-lg bg-emerald-600 px-2.5 text-[11px] font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                          >
+                            {quickApproveLabel(row.stage)}
+                          </button>
+                          <button
+                            name="operation"
+                            value="not_approve"
+                            disabled={pending}
+                            title={`Reprovar — ${row.name}`}
+                            className="bg-error hover:bg-error/85 min-h-8 rounded-lg px-2.5 text-[11px] font-bold text-white disabled:opacity-50"
+                          >
+                            Reprovar
+                          </button>
+                        </form>
+                      ) : (
+                        <span className="text-muted block text-right text-xs">
+                          Finalizado
+                        </span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -382,6 +446,53 @@ export function CandidateOperationsCenter({
                   </button>
                   <ScoreBadge row={row} />
                 </div>
+                {canQuickDecide(row.stage) ? (
+                  <form
+                    action={formAction}
+                    onSubmit={(event) => {
+                      const submitter = (event.nativeEvent as SubmitEvent)
+                        .submitter as HTMLButtonElement | null;
+                      const actionLabel = submitter?.textContent?.trim();
+                      if (
+                        actionLabel &&
+                        !window.confirm(
+                          `Confirmar “${actionLabel}” para ${row.name}?`,
+                        )
+                      ) {
+                        event.preventDefault();
+                      }
+                    }}
+                    className="mt-3 flex justify-end gap-2"
+                  >
+                    <input type="hidden" name="job_id" value={jobId} />
+                    <input
+                      type="hidden"
+                      name="application_ids"
+                      value={JSON.stringify([row.applicationId])}
+                    />
+                    <input
+                      type="hidden"
+                      name="expected_stage"
+                      value={row.stage}
+                    />
+                    <button
+                      name="operation"
+                      value="approve"
+                      disabled={pending}
+                      className="min-h-9 rounded-lg bg-emerald-600 px-3 text-xs font-bold text-white disabled:opacity-50"
+                    >
+                      {quickApproveLabel(row.stage)}
+                    </button>
+                    <button
+                      name="operation"
+                      value="not_approve"
+                      disabled={pending}
+                      className="bg-error min-h-9 rounded-lg px-3 text-xs font-bold text-white disabled:opacity-50"
+                    >
+                      Reprovar
+                    </button>
+                  </form>
+                ) : null}
               </article>
             ))}
           </div>

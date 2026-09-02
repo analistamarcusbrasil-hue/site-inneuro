@@ -324,7 +324,9 @@ export default async function CareerJobApplicationsPage({
       <aside className="border-brand/20 bg-mint/60 text-brand-dark mb-5 rounded-2xl border p-4 text-sm">
         A aderência é um apoio explicável à triagem. “Não identificado” não
         significa “não atende”; o sistema não aprova, rejeita ou movimenta
-        candidatos automaticamente.
+        candidatos automaticamente. Em “Melhores currículos”, a lista prioriza
+        aderência com boa cobertura de informações e usa experiência como
+        desempate, sempre do maior para o menor.
       </aside>
 
       <form className="border-border-light mb-4 rounded-2xl border bg-white p-4">
@@ -341,7 +343,7 @@ export default async function CareerJobApplicationsPage({
           <label className="text-ink grid gap-1 text-xs font-bold">
             Ordenar por
             <select name="ordem" defaultValue={sort} className={selectClass}>
-              <option value="best_match">Melhor aderência</option>
+              <option value="best_match">Melhores currículos</option>
               <option value="newest">Mais recentes</option>
               <option value="oldest">Mais antigas</option>
               <option value="name">Nome</option>
