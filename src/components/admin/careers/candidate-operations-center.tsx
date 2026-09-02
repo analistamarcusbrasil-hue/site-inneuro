@@ -263,8 +263,8 @@ export function CandidateOperationsCenter({
         </div>
       ) : (
         <>
-          <div className="border-border-light hidden overflow-hidden rounded-3xl border bg-white md:block">
-            <table className="w-full table-fixed text-left text-sm">
+          <div className="border-border-light hidden overflow-x-auto rounded-3xl border bg-white md:block">
+            <table className="w-full min-w-[1120px] table-fixed text-left text-sm">
               <thead className="bg-surface text-brand-dark text-xs uppercase">
                 <tr>
                   <th className="w-12 px-4 py-4">
@@ -289,7 +289,7 @@ export function CandidateOperationsCenter({
                   <th className="w-[13%] px-3 py-4">Etapa</th>
                   <th className="w-[12%] px-3 py-4">Aderência</th>
                   <th className="w-[12%] px-3 py-4">Marcadores</th>
-                  <th className="w-[172px] px-3 py-4 text-right">Ações</th>
+                  <th className="w-[300px] px-3 py-4 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-border-light divide-y">
@@ -357,7 +357,23 @@ export function CandidateOperationsCenter({
                       </div>
                     </td>
                     <td className="px-3 py-4">
-                      {canQuickDecide(row.stage) ? (
+                      <div className="flex items-center justify-end gap-1.5">
+                        {row.resumeId ? (
+                          <Link
+                            href={`/api/admin/rh/curriculos/${row.resumeId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={`Ver currículo — ${row.name}`}
+                            className="border-brand/30 text-brand-dark inline-flex min-h-8 items-center rounded-lg border px-2.5 text-[11px] font-bold hover:bg-surface"
+                          >
+                            Ver currículo
+                          </Link>
+                        ) : (
+                          <span className="text-muted px-1 text-[11px]">
+                            Sem currículo
+                          </span>
+                        )}
+                        {canQuickDecide(row.stage) ? (
                         <form
                           action={formAction}
                           onSubmit={(event) => {
@@ -373,7 +389,7 @@ export function CandidateOperationsCenter({
                               event.preventDefault();
                             }
                           }}
-                          className="flex justify-end gap-1.5"
+                          className="flex gap-1.5"
                         >
                           <input type="hidden" name="job_id" value={jobId} />
                           <input
@@ -406,10 +422,11 @@ export function CandidateOperationsCenter({
                           </button>
                         </form>
                       ) : (
-                        <span className="text-muted block text-right text-xs">
+                        <span className="text-muted text-xs">
                           Finalizado
                         </span>
                       )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -446,8 +463,19 @@ export function CandidateOperationsCenter({
                   </button>
                   <ScoreBadge row={row} />
                 </div>
-                {canQuickDecide(row.stage) ? (
-                  <form
+                <div className="mt-3 flex flex-wrap justify-end gap-2">
+                  {row.resumeId ? (
+                    <Link
+                      href={`/api/admin/rh/curriculos/${row.resumeId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="border-brand/30 text-brand-dark inline-flex min-h-9 items-center rounded-lg border px-3 text-xs font-bold"
+                    >
+                      Ver currículo
+                    </Link>
+                  ) : null}
+                  {canQuickDecide(row.stage) ? (
+                    <form
                     action={formAction}
                     onSubmit={(event) => {
                       const submitter = (event.nativeEvent as SubmitEvent)
@@ -462,7 +490,7 @@ export function CandidateOperationsCenter({
                         event.preventDefault();
                       }
                     }}
-                    className="mt-3 flex justify-end gap-2"
+                    className="flex gap-2"
                   >
                     <input type="hidden" name="job_id" value={jobId} />
                     <input
@@ -491,8 +519,9 @@ export function CandidateOperationsCenter({
                     >
                       Reprovar
                     </button>
-                  </form>
-                ) : null}
+                    </form>
+                  ) : null}
+                </div>
               </article>
             ))}
           </div>

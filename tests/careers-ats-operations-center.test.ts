@@ -92,6 +92,8 @@ test("melhores currículos aparecem primeiro com evidência suficiente", () => {
 });
 
 test("cada linha oferece decisão humana rápida e confirmada", () => {
+  assert.match(operationsCenter, />\s*Ver currículo\s*</);
+  assert.match(operationsCenter, /\/api\/admin\/rh\/curriculos\/\$\{row\.resumeId\}/);
   assert.match(operationsCenter, /Chamar entrevista/);
   assert.match(operationsCenter, />\s*Reprovar\s*</);
   assert.match(operationsCenter, /value="approve"/);
