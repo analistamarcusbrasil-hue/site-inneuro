@@ -44,6 +44,13 @@ const operationsAction = readFileSync(
   ),
   "utf8",
 );
+const applicationsPage = readFileSync(
+  new URL(
+    "../src/app/admin/(protected)/rh/vagas/[id]/candidaturas/page.tsx",
+    import.meta.url,
+  ),
+  "utf8",
+);
 
 test("central ATS usa busca, paginação e índices no servidor", () => {
   assert.match(migration, /search_career_job_applications/);
@@ -156,6 +163,14 @@ test("aprovação e reprovação atualizam a fila sem F5", () => {
     /application\.candidate_stage <> p_expected_stage[\s\S]*candidate_stage_changed/,
   );
   assert.match(operationsCenter, /setDisplayRows/);
+  assert.match(
+    operationsCenter,
+    /activeStage[\s\S]*current\.filter\([\s\S]*!applicationIds\.includes/,
+  );
+  assert.match(
+    operationsCenter,
+    /setDisplayTotal[\s\S]*Math\.max\(0, current - nextState\.movedCount!/,
+  );
   assert.match(operationsCenter, /notifyCandidatePipelineMovement/);
   assert.match(operationsCenter, /router\.refresh\(\)/);
   assert.match(pipelineNav, /current\[movement\.fromStage\] - movement\.movedCount/);
@@ -166,10 +181,35 @@ test("ação responde após o banco e processa comunicação sem bloquear a fila
   assert.match(operationsAction, /import \{ after \} from "next\/server"/);
   assert.match(operationsAction, /after\(async \(\) =>/);
   assert.match(operationsAction, /Candidato movido para Não aprovados/);
-  assert.match(operationsAction, /Candidato aprovado para/);
+  assert.match(operationsAction, /Candidato aprovado e movido para/);
   assert.match(
     operationsAction,
     /Este candidato já foi movimentado\. A lista será atualizada\./,
   );
   assert.match(operationsAction, /refreshRequired: stageChanged/);
+});
+
+test("URL sem etapa abre Currículo e garante p_stage no servidor", () => {
+  assert.match(applicationsPage, /const requestedStage = queryValue\(query, "etapa"\)/);
+  assert.match(applicationsPage, /const isAllView = requestedStage === "all"/);
+  assert.match(
+    applicationsPage,
+    /if \(!isAllView && !stage\)[\s\S]*`\/admin\/rh\/vagas\/\$\{id\}\/candidaturas\$\{queryHref\(query, \{ etapa: "resume", pagina: null \}\)\}`/,
+  );
+  assert.match(applicationsPage, /p_stage: stage \?\? null/);
+  assert.match(
+    applicationsPage,
+    /allHref=\{queryHref\(query, \{ etapa: "all", pagina: null \}\)\}/,
+  );
+  assert.match(pipelineNav, /Todas as candidaturas/);
+});
+
+test("fila vazia comunica conclusão e permite seguir para a próxima etapa", () => {
+  assert.match(operationsCenter, /!displayRows\.length/);
+  assert.match(
+    operationsCenter,
+    /Todos os candidatos desta etapa foram avaliados/,
+  );
+  assert.match(operationsCenter, /Nenhum currículo aguardando análise/);
+  assert.match(operationsCenter, /Ver \{candidateStageLabels\[nextQueueStage\]\}/);
 });

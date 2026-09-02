@@ -41,6 +41,7 @@ const stageDescriptions: Record<CandidateStage, (count: number) => string> = {
 export function CandidatePipelineNav({
   jobId,
   activeStage,
+  allActive,
   initialCounts,
   allCount,
   allHref,
@@ -48,6 +49,7 @@ export function CandidatePipelineNav({
 }: {
   jobId: string;
   activeStage: CandidateStage | null;
+  allActive: boolean;
   initialCounts: Record<CandidateStage, number>;
   allCount: number;
   allHref: string;
@@ -85,10 +87,10 @@ export function CandidatePipelineNav({
     >
       <Link
         href={allHref}
-        className={`flex min-h-14 shrink-0 flex-col justify-center rounded-xl px-3 py-2 text-xs font-bold ${!activeStage ? "bg-brand text-white" : "text-brand-dark hover:bg-surface"}`}
+        className={`flex min-h-14 shrink-0 flex-col justify-center rounded-xl px-3 py-2 text-xs font-bold ${allActive ? "bg-brand text-white" : "text-brand-dark hover:bg-surface"}`}
       >
         <span className="flex items-center justify-between gap-3">
-          Todos
+          Todas as candidaturas
           <span className="rounded-full bg-black/5 px-2 py-0.5">
             {allCount}
           </span>

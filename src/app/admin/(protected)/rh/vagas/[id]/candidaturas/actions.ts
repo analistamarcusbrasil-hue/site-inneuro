@@ -178,8 +178,8 @@ export async function bulkCareerApplicationsAction(
           ? "Candidato movido para Não aprovados."
           : `${movedCount} candidatos movidos para Não aprovados.`
         : movedCount === 1
-          ? `✓ Candidato aprovado para ${candidateStageLabels[confirmedNextStage]}.`
-          : `✓ ${movedCount} candidatos aprovados para ${candidateStageLabels[confirmedNextStage]}.`;
+          ? `✓ Candidato aprovado e movido para ${candidateStageLabels[confirmedNextStage]}.`
+          : `✓ ${movedCount} candidatos aprovados e movidos para ${candidateStageLabels[confirmedNextStage]}.`;
     return {
       status: "success",
       message,

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
 import { AdminPageHeading } from "@/components/admin/admin-page-heading";
 import {
@@ -84,6 +84,21 @@ export default async function CareerJobApplicationsPage({
   const { id } = await params;
   if (!z.string().uuid().safeParse(id).success) notFound();
   const query = await searchParams;
+  const requestedStage = queryValue(query, "etapa");
+  const isAllView = requestedStage === "all";
+  const stage = isAllView
+    ? undefined
+    : oneOf(
+        requestedStage,
+        Object.keys(
+          candidateStageLabels,
+        ) as CareerJobApplication["candidate_stage"][],
+      );
+  if (!isAllView && !stage) {
+    redirect(
+      `/admin/rh/vagas/${id}/candidaturas${queryHref(query, { etapa: "resume", pagina: null })}`,
+    );
+  }
   const { supabase } = await requireHrAccess("jobs:manage");
   const [jobResult, matrixResult] = await Promise.all([
     supabase
@@ -98,12 +113,6 @@ export default async function CareerJobApplicationsPage({
   ]);
   if (jobResult.error || !jobResult.data) notFound();
 
-  const stage = oneOf(
-    queryValue(query, "etapa"),
-    Object.keys(
-      candidateStageLabels,
-    ) as CareerJobApplication["candidate_stage"][],
-  );
   const status = oneOf(queryValue(query, "status"), applicationStatuses);
   const education = oneOf(queryValue(query, "escolaridade"), [
     "informed",
@@ -314,9 +323,10 @@ export default async function CareerJobApplicationsPage({
           .join("|")}
         jobId={id}
         activeStage={stage ?? null}
+        allActive={isAllView}
         initialCounts={pipelineCounts}
         allCount={allApplicationsResult.count ?? 0}
-        allHref={queryHref(query, { etapa: null, pagina: null })}
+        allHref={queryHref(query, { etapa: "all", pagina: null })}
         stageHrefs={stageHrefs}
       />
 
@@ -534,7 +544,7 @@ export default async function CareerJobApplicationsPage({
           Não foi possível carregar a central de candidaturas. A migração do ATS
           precisa estar disponível neste ambiente.
         </p>
-      ) : rows.length ? (
+      ) : (
         <CandidateOperationsCenter
           key={`${stage ?? "all"}:${total}:${rows.map((row) => `${row.applicationId}:${row.stage}`).join("|")}`}
           jobId={id}
@@ -542,15 +552,6 @@ export default async function CareerJobApplicationsPage({
           total={total}
           activeStage={stage ?? null}
         />
-      ) : (
-        <section className="border-border-light rounded-3xl border bg-white p-8 text-center">
-          <h2 className="font-heading text-brand-dark text-xl font-semibold">
-            Nenhum perfil encontrado
-          </h2>
-          <p className="text-muted mt-2 text-sm">
-            Ajuste os filtros ou aguarde novas candidaturas.
-          </p>
-        </section>
       )}
 
       {!hasError && totalPages > 1 ? (

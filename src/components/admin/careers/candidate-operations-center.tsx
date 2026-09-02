@@ -107,6 +107,27 @@ const nextStageLabels: Partial<
   hiring: "Contratado",
 };
 
+const nextQueueStages: Partial<
+  Record<
+    AtsCandidateRow["stage"],
+    AtsCandidateRow["stage"]
+  >
+> = {
+  resume: "interview",
+  interview: "practical_test",
+  practical_test: "hiring",
+  hiring: "hired",
+};
+
+const emptyQueueMessages: Record<AtsCandidateRow["stage"], string> = {
+  resume: "Nenhum currículo aguardando análise.",
+  interview: "Nenhum candidato aguardando decisão de entrevista.",
+  practical_test: "Nenhum candidato aguardando decisão do teste prático.",
+  hiring: "Nenhum candidato aguardando decisão de contratação.",
+  hired: "Nenhum candidato contratado nesta vaga.",
+  not_approved: "Nenhum candidato não aprovado nesta vaga.",
+};
+
 export function CandidateOperationsCenter({
   jobId,
   rows,
@@ -263,6 +284,7 @@ export function CandidateOperationsCenter({
   const stages = Object.keys(
     candidateStageLabels,
   ) as AtsCandidateRow["stage"][];
+  const nextQueueStage = activeStage ? nextQueueStages[activeStage] : undefined;
 
   return (
     <>
@@ -300,7 +322,28 @@ export function CandidateOperationsCenter({
         </p>
       ) : null}
 
-      {view === "kanban" ? (
+      {!displayRows.length ? (
+        <section className="border-border-light rounded-3xl border bg-white p-8 text-center">
+          <h2 className="font-heading text-brand-dark text-xl font-semibold">
+            {activeStage
+              ? "✓ Todos os candidatos desta etapa foram avaliados."
+              : "Nenhuma candidatura encontrada."}
+          </h2>
+          <p className="text-muted mt-2 text-sm">
+            {activeStage
+              ? emptyQueueMessages[activeStage]
+              : "Ajuste os filtros ou aguarde novas candidaturas."}
+          </p>
+          {nextQueueStage ? (
+            <Link
+              href={`/admin/rh/vagas/${jobId}/candidaturas?etapa=${nextQueueStage}`}
+              className="bg-brand hover:bg-brand-dark mt-5 inline-flex min-h-10 items-center rounded-full px-5 text-sm font-bold text-white"
+            >
+              Ver {candidateStageLabels[nextQueueStage]}
+            </Link>
+          ) : null}
+        </section>
+      ) : view === "kanban" ? (
         <div className="grid gap-4 lg:grid-cols-3 2xl:grid-cols-6">
           {stages.map((stage) => {
             const stageRows = displayRows.filter((row) => row.stage === stage);
