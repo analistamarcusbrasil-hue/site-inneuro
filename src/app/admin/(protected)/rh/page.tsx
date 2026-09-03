@@ -10,6 +10,11 @@ import {
 import Link from "next/link";
 import { AdminPageHeading } from "@/components/admin/admin-page-heading";
 import { HrNavigation } from "@/components/admin/hr-navigation";
+import { AdminButton, AdminMetricCard } from "@/components/admin/ui";
+import {
+  candidateStageLabels,
+  type CareerJobApplication,
+} from "@/lib/careers/applications";
 import { requireHrAccess } from "@/lib/careers/hr-auth";
 import type { CompanyUnit } from "@/lib/careers/logistics";
 
@@ -20,22 +25,12 @@ const roleLabels = {
   viewer: "Visualizador",
 } as const;
 
-const stageLabels: Record<string, string> = {
-  registered: "Inscritos",
-  screening: "Triagem",
-  interview: "Entrevista",
-  evaluation: "Avaliação",
-  finalists: "Finalistas",
-  selected: "Selecionados",
-  talent_pool: "Banco de Talentos",
-  not_selected: "Não selecionados",
-};
-
 type JobRow = { id: string; status: string; unit_id: string | null };
 type ApplicationRow = {
   id: string;
   job_id: string;
   candidate_id: string;
+  candidate_stage: CareerJobApplication["candidate_stage"];
   submitted_at: string;
 };
 type ProcessRow = {
@@ -44,32 +39,11 @@ type ProcessRow = {
   status: string;
   closed_at: string | null;
 };
-type ProcessCandidateRow = { process_id: string; stage: string };
 type InterviewRow = {
   application_id: string;
   scheduled_at: string;
   status: string;
 };
-
-function countCard(
-  label: string,
-  value: number,
-  Icon: typeof Users,
-  detail: string,
-) {
-  return (
-    <li className="border-border-light rounded-3xl border bg-white p-6">
-      <span className="bg-mint text-brand grid size-11 place-items-center rounded-2xl">
-        <Icon aria-hidden="true" size={21} />
-      </span>
-      <p className="text-muted mt-6 text-sm">{label}</p>
-      <p className="font-heading text-brand-dark mt-1 text-3xl font-semibold">
-        {value.toLocaleString("pt-BR")}
-      </p>
-      <p className="text-muted mt-2 text-xs">{detail}</p>
-    </li>
-  );
-}
 
 export default async function HrDashboardPage({
   searchParams,
@@ -91,7 +65,6 @@ export default async function HrDashboardPage({
     applicationsResult,
     candidatesResult,
     processesResult,
-    processCandidatesResult,
     interviewsResult,
     talentResult,
   ] = canSeeOverview
@@ -100,14 +73,11 @@ export default async function HrDashboardPage({
         supabase.from("career_jobs").select("id, status, unit_id"),
         supabase
           .from("career_job_applications")
-          .select("id, job_id, candidate_id, submitted_at"),
+          .select("id, job_id, candidate_id, candidate_stage, submitted_at"),
         supabase.from("candidate_accounts").select("id, created_at"),
         supabase
           .from("career_selection_processes")
           .select("id, job_id, status, closed_at"),
-        supabase
-          .from("career_selection_process_candidates")
-          .select("process_id, stage"),
         supabase
           .from("career_candidate_interviews")
           .select("application_id, scheduled_at, status"),
@@ -115,7 +85,7 @@ export default async function HrDashboardPage({
           .from("career_talent_pool_memberships")
           .select("candidate_id, status"),
       ])
-    : Array.from({ length: 8 }, () => ({ data: [], error: null }));
+    : Array.from({ length: 7 }, () => ({ data: [], error: null }));
 
   const units = (unitsResult.data as CompanyUnit[] | null) ?? [];
   const allJobs = (jobsResult.data as JobRow[] | null) ?? [];
@@ -134,10 +104,6 @@ export default async function HrDashboardPage({
   const processes = selectedUnit
     ? allProcesses.filter((process) => jobIds.has(process.job_id))
     : allProcesses;
-  const processIds = new Set(processes.map((item) => item.id));
-  const processCandidates = (
-    (processCandidatesResult.data as ProcessCandidateRow[] | null) ?? []
-  ).filter((item) => !selectedUnit || processIds.has(item.process_id));
   const interviews = (
     (interviewsResult.data as InterviewRow[] | null) ?? []
   ).filter(
@@ -165,9 +131,9 @@ export default async function HrDashboardPage({
       (!selectedUnit || candidateIds.has(item.candidate_id)),
   ).length;
   const stageCounts = Object.fromEntries(
-    Object.keys(stageLabels).map((stage) => [
+    Object.keys(candidateStageLabels).map((stage) => [
       stage,
-      processCandidates.filter((item) => item.stage === stage).length,
+      applications.filter((item) => item.candidate_stage === stage).length,
     ]),
   );
   const hasError = [
@@ -176,7 +142,6 @@ export default async function HrDashboardPage({
     applicationsResult,
     candidatesResult,
     processesResult,
-    processCandidatesResult,
     interviewsResult,
     talentResult,
   ].some((result) => result.error);
@@ -232,9 +197,7 @@ export default async function HrDashboardPage({
                 ))}
               </select>
             </label>
-            <button className="bg-brand min-h-11 rounded-full px-6 text-sm font-bold text-white">
-              Aplicar filtro
-            </button>
+            <AdminButton type="submit">Aplicar filtro</AdminButton>
             {selectedUnit ? (
               <Link
                 href="/admin/rh"
@@ -257,60 +220,71 @@ export default async function HrDashboardPage({
 
         {canSeeOverview ? (
           <ul className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {countCard(
-              "Vagas publicadas",
-              jobs.filter((job) => job.status === "published").length,
-              BriefcaseBusiness,
-              "No recorte selecionado",
-            )}
-            {countCard(
-              "Candidaturas",
-              applications.length,
-              Inbox,
-              "Total no recorte selecionado",
-            )}
-            {countCard(
-              "Novos candidatos",
-              newCandidates,
-              UserPlus,
-              "Registrados ou inscritos nos últimos 30 dias",
-            )}
-            {countCard(
-              "Processos ativos",
-              processes.filter((process) =>
-                ["open", "in_progress"].includes(process.status),
-              ).length,
-              ClipboardList,
-              "Abertos ou em andamento",
-            )}
-            {countCard(
-              "Processos encerrados",
-              processes.filter(
-                (process) =>
-                  process.status === "closed" &&
-                  Boolean(process.closed_at && process.closed_at >= sinceIso),
-              ).length,
-              ClipboardList,
-              "Encerrados nos últimos 30 dias",
-            )}
-            {countCard(
-              "Entrevistas agendadas",
-              interviews.length,
-              CalendarClock,
-              "Agenda futura registrada",
-            )}
-            {countCard(
-              "Selecionados",
-              stageCounts.selected ?? 0,
-              Users,
-              "Etapa atual dos processos",
-            )}
-            {countCard(
-              "Banco de talentos",
-              talentCount,
-              Database,
-              "Participações ativas",
-            )}
+            {[
+              {
+                label: "Vagas publicadas",
+                value: jobs.filter((job) => job.status === "published").length,
+                Icon: BriefcaseBusiness,
+                description: "No recorte selecionado",
+              },
+              {
+                label: "Candidaturas",
+                value: applications.length,
+                Icon: Inbox,
+                description: "Total no recorte selecionado",
+              },
+              {
+                label: "Novos candidatos",
+                value: newCandidates,
+                Icon: UserPlus,
+                description: "Registrados ou inscritos nos últimos 30 dias",
+              },
+              {
+                label: "Processos ativos",
+                value: processes.filter((process) =>
+                  ["open", "in_progress"].includes(process.status),
+                ).length,
+                Icon: ClipboardList,
+                description: "Abertos ou em andamento",
+              },
+              {
+                label: "Processos encerrados",
+                value: processes.filter(
+                  (process) =>
+                    process.status === "closed" &&
+                    Boolean(process.closed_at && process.closed_at >= sinceIso),
+                ).length,
+                Icon: ClipboardList,
+                description: "Encerrados nos últimos 30 dias",
+              },
+              {
+                label: "Entrevistas agendadas",
+                value: interviews.length,
+                Icon: CalendarClock,
+                description: "Agenda futura registrada",
+              },
+              {
+                label: "Selecionados",
+                value: stageCounts.hired ?? 0,
+                Icon: Users,
+                description: "Contratações registradas no ATS",
+              },
+              {
+                label: "Banco de talentos",
+                value: talentCount,
+                Icon: Database,
+                description: "Participações ativas",
+              },
+            ].map(({ label, value, Icon, description }) => (
+              <li key={label}>
+                <AdminMetricCard
+                  label={label}
+                  value={value.toLocaleString("pt-BR")}
+                  description={description}
+                  icon={<Icon aria-hidden="true" size={20} />}
+                />
+              </li>
+            ))}
           </ul>
         ) : (
           <p className="border-border-light mt-5 rounded-3xl border bg-white p-6 text-sm font-bold">
@@ -335,7 +309,7 @@ export default async function HrDashboardPage({
             Contagem real pela etapa atual, sem somar movimentações históricas.
           </p>
           <ul className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {Object.entries(stageLabels).map(([stage, label]) => (
+            {Object.entries(candidateStageLabels).map(([stage, label]) => (
               <li key={stage} className="bg-surface rounded-2xl p-4">
                 <p className="text-muted text-xs">{label}</p>
                 <p className="font-heading text-brand-dark mt-1 text-2xl font-semibold">

@@ -645,3 +645,16 @@ a {
     transform: none;
   }
 }
+
+.admin-scrollbar {
+  scrollbar-color: rgba(8, 122, 77, 0.24) transparent;
+  scrollbar-width: thin;
+}
+.admin-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.admin-scrollbar::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(8, 122, 77, 0.24);
+}

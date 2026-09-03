@@ -5,13 +5,34 @@ import {
   resolveHrAccessRole,
 } from "@/lib/careers/hr-permissions";
 import {
+  applicationStatusLabels,
+  candidateStageLabels,
+} from "@/lib/careers/applications";
+import {
+  applicationSourceLabels,
+  commuteFeasibilityLabels,
+  commuteTimeLabels,
+  transitBenefitLabels,
+} from "@/lib/careers/logistics";
+import {
   buildCareerReportRows,
+  filterAndSortCareerReportDrilldown,
   type CareerReportApplication,
+  type CareerReportDimension,
   type CareerReportFilters,
   type CareerReportJob,
   type CareerReportLogistics,
   type CareerReportProcessCandidate,
 } from "@/lib/careers/reports";
+
+const reportDimensions: CareerReportDimension[] = [
+  "status",
+  "stage",
+  "source",
+  "commute",
+  "commute_time",
+  "transit_benefit",
+];
 
 function csvCell(value: unknown) {
   const text = String(value ?? "").replaceAll('"', '""');
@@ -38,7 +59,9 @@ export async function GET(request: Request) {
     session.supabase.from("career_jobs").select("id, title, area_id, unit_id"),
     session.supabase
       .from("career_job_applications")
-      .select("id, job_id, status, source, submitted_at"),
+      .select(
+        "id, job_id, candidate_id, status, source, profile_snapshot, candidate_stage, submitted_at",
+      ),
     session.supabase
       .from("career_selection_process_candidates")
       .select("application_id, process_id, stage"),
@@ -66,8 +89,27 @@ export async function GET(request: Request) {
     logistics: (logistics.data as CareerReportLogistics[] | null) ?? [],
     filters,
   });
+  const requestedDimension = url.searchParams.get("grupo");
+  const requestedValue = url.searchParams.get("valor");
+  const dimension = reportDimensions.includes(
+    requestedDimension as CareerReportDimension,
+  )
+    ? (requestedDimension as CareerReportDimension)
+    : null;
+  const exportedRows =
+    dimension && requestedValue
+      ? filterAndSortCareerReportDrilldown(rows, {
+          dimension,
+          value: requestedValue,
+        })
+      : rows;
+  const labelFor = (
+    labels: Record<string, string>,
+    value: string | null | undefined,
+  ) => (value ? (labels[value] ?? "Não informado") : "Não informado");
   const header = [
     "candidatura_id",
+    "candidato",
     "vaga",
     "data_envio",
     "status",
@@ -77,17 +119,18 @@ export async function GET(request: Request) {
     "tempo_deslocamento",
     "vale_transporte",
   ];
-  const body = rows.map((row) =>
+  const body = exportedRows.map((row) =>
     [
       row.id,
+      row.candidateName,
       row.job.title,
       row.submitted_at,
-      row.status,
-      row.process?.stage,
-      row.source,
-      row.logistics?.commute_feasibility,
-      row.logistics?.commute_time,
-      row.logistics?.transit_benefit,
+      applicationStatusLabels[row.status],
+      candidateStageLabels[row.currentStage],
+      labelFor(applicationSourceLabels, row.source),
+      labelFor(commuteFeasibilityLabels, row.logistics?.commute_feasibility),
+      labelFor(commuteTimeLabels, row.logistics?.commute_time),
+      labelFor(transitBenefitLabels, row.logistics?.transit_benefit),
     ]
       .map(csvCell)
       .join(";"),
@@ -96,7 +139,12 @@ export async function GET(request: Request) {
     actor_id: session.user.id,
     action: "career_report_exported",
     entity_type: "career_report",
-    after_data: { filters, row_count: rows.length, fields: header },
+    after_data: {
+      filters,
+      drilldown: dimension ? { dimension, value: requestedValue } : null,
+      row_count: exportedRows.length,
+      fields: header,
+    },
   });
   const content = `\uFEFF${header.map(csvCell).join(";")}\r\n${body.join("\r\n")}`;
   return new NextResponse(content, {

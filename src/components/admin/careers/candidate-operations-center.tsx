@@ -2,12 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  type FormEvent,
-  useActionState,
-  useMemo,
-  useState,
-} from "react";
+import { type FormEvent, useActionState, useMemo, useState } from "react";
 import {
   bulkCareerApplicationsAction,
   type BulkCareerApplicationsState,
@@ -25,6 +20,7 @@ import {
   type ExplainableMatchResult,
   type MatchAdherenceBand,
 } from "@/lib/careers/matching";
+import { AdminDrawer } from "@/components/admin/ui";
 
 export type AtsCandidateRow = {
   applicationId: string;
@@ -98,9 +94,7 @@ function canQuickDecide(stage: AtsCandidateRow["stage"]) {
   return !["hired", "not_approved"].includes(stage);
 }
 
-const nextStageLabels: Partial<
-  Record<AtsCandidateRow["stage"], string>
-> = {
+const nextStageLabels: Partial<Record<AtsCandidateRow["stage"], string>> = {
   resume: "Entrevista",
   interview: "Teste prático",
   practical_test: "Contratação",
@@ -108,10 +102,7 @@ const nextStageLabels: Partial<
 };
 
 const nextQueueStages: Partial<
-  Record<
-    AtsCandidateRow["stage"],
-    AtsCandidateRow["stage"]
-  >
+  Record<AtsCandidateRow["stage"], AtsCandidateRow["stage"]>
 > = {
   resume: "interview",
   interview: "practical_test",
@@ -217,8 +208,7 @@ export function CandidateOperationsCenter({
   );
 
   const selectedRows = useMemo(
-    () =>
-      displayRows.filter((row) => selected.includes(row.applicationId)),
+    () => displayRows.filter((row) => selected.includes(row.applicationId)),
     [displayRows, selected],
   );
   const selectedStage =
@@ -391,7 +381,7 @@ export function CandidateOperationsCenter({
         </div>
       ) : (
         <>
-          <div className="border-border-light hidden overflow-hidden rounded-3xl border bg-white md:block">
+          <div className="border-border-light hidden overflow-hidden rounded-2xl border bg-white xl:block">
             <table className="w-full table-fixed text-left text-sm">
               <colgroup>
                 <col className="w-11" />
@@ -492,7 +482,7 @@ export function CandidateOperationsCenter({
                     <td className="px-3 py-3 align-middle">
                       <div className="flex flex-col items-start">
                         <ScoreBadge row={row} />
-                        <span className="text-muted mt-1 block whitespace-nowrap text-xs">
+                        <span className="text-muted mt-1 block text-xs whitespace-nowrap">
                           Cobertura {row.informationCoverage}%
                         </span>
                       </div>
@@ -577,7 +567,7 @@ export function CandidateOperationsCenter({
             </table>
           </div>
 
-          <div className="grid gap-3 md:hidden">
+          <div className="grid gap-3 xl:hidden">
             {displayRows.map((row) => (
               <article
                 key={row.applicationId}
@@ -811,22 +801,28 @@ export function CandidateOperationsCenter({
       ) : null}
 
       {activeRow ? (
-        <div className="fixed inset-0 z-40 bg-black/30" role="presentation">
-          <aside
-            role="dialog"
-            aria-modal="true"
-            aria-label={`Perfil rápido de ${activeRow.name}`}
-            className="absolute top-0 right-0 h-full w-full max-w-xl overflow-y-auto bg-white p-5 shadow-2xl sm:p-7"
-          >
+        <AdminDrawer
+          onClose={() => setActiveRow(null)}
+          labelledBy="candidate-quick-profile-title"
+          describedBy="candidate-quick-profile-description"
+          className="max-w-xl"
+        >
+          <div className="min-h-full p-5 sm:p-7">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-muted text-xs font-bold uppercase">
                   Perfil rápido
                 </p>
-                <h2 className="font-heading text-brand-dark mt-1 text-2xl font-semibold">
+                <h2
+                  id="candidate-quick-profile-title"
+                  className="font-heading text-brand-dark mt-1 text-2xl font-semibold"
+                >
                   {activeRow.name}
                 </h2>
-                <p className="text-muted mt-1 text-sm">
+                <p
+                  id="candidate-quick-profile-description"
+                  className="text-muted mt-1 text-sm"
+                >
                   {candidateStageLabels[activeRow.stage]} · candidatura em{" "}
                   {new Date(activeRow.submittedAt).toLocaleDateString("pt-BR")}
                 </p>
@@ -952,8 +948,8 @@ export function CandidateOperationsCenter({
                 </a>
               ) : null}
             </div>
-          </aside>
-        </div>
+          </div>
+        </AdminDrawer>
       ) : null}
     </>
   );

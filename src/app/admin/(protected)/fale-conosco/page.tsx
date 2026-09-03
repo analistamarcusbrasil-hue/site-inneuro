@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { updateContactMessageAction } from "@/app/admin/actions";
 import { AdminPageHeading } from "@/components/admin/admin-page-heading";
+import {
+  AdminButton,
+  AdminEmptyState,
+  AdminMetricCard,
+  AdminPagination,
+} from "@/components/admin/ui";
 import { hasAdminPermission } from "@/lib/admin/permissions";
 import { requireAdminPermission } from "@/lib/cms/auth";
 
@@ -30,20 +36,24 @@ export default async function ContactMessagesPage({
     status?: string;
     success?: string;
     error?: string;
+    pagina?: string;
   }>;
 }) {
   const query = await searchParams;
   const { supabase, profile } = await requireAdminPermission("contact.view");
+  const pageSize = 25;
+  const page = Math.max(1, Number.parseInt(query.pagina ?? "1", 10) || 1);
   let request = supabase
     .from("contact_messages")
     .select(
       "id, protocol, name, email, phone, category, subject, message, status, created_at",
+      { count: "exact" },
     )
     .order("created_at", { ascending: false })
-    .limit(250);
+    .range((page - 1) * pageSize, page * pageSize - 1);
   if (query.status && Object.hasOwn(statusLabels, query.status))
     request = request.eq("status", query.status);
-  const [{ data = [] }, counts] = await Promise.all([
+  const [messagesResult, counts] = await Promise.all([
     request,
     Promise.all(
       Object.keys(statusLabels).map(async (status) => {
@@ -55,8 +65,19 @@ export default async function ContactMessagesPage({
       }),
     ),
   ]);
+  const data = messagesResult.data ?? [];
+  const totalPages = Math.max(
+    1,
+    Math.ceil((messagesResult.count ?? 0) / pageSize),
+  );
   const selected = data?.find((item) => item.id === query.id) ?? null;
   const canManage = hasAdminPermission(profile, "contact.manage");
+  const pageHref = (targetPage: number) => {
+    const params = new URLSearchParams();
+    if (query.status) params.set("status", query.status);
+    params.set("pagina", String(targetPage));
+    return `/admin/fale-conosco?${params.toString()}`;
+  };
 
   return (
     <>
@@ -83,18 +104,13 @@ export default async function ContactMessagesPage({
       ) : null}
       <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {counts.map(({ status, count }) => (
-          <Link
+          <AdminMetricCard
             key={status}
             href={`/admin/fale-conosco?status=${status}`}
-            className="border-border-light rounded-2xl border bg-white p-4"
-          >
-            <p className="text-muted text-xs font-bold tracking-wide uppercase">
-              {statusLabels[status]}
-            </p>
-            <p className="font-heading text-brand-dark mt-2 text-3xl font-semibold">
-              {count}
-            </p>
-          </Link>
+            label={statusLabels[status]}
+            value={count.toLocaleString("pt-BR")}
+            description="Mensagens neste status"
+          />
         ))}
       </div>
       <div className="grid gap-6 xl:grid-cols-[1.1fr_.9fr]">
@@ -131,6 +147,20 @@ export default async function ContactMessagesPage({
               </li>
             ))}
           </ol>
+          {!data.length ? (
+            <AdminEmptyState
+              className="m-4"
+              title="Nenhuma mensagem encontrada"
+              description="Ajuste o filtro de status ou aguarde novos contatos enviados pelo site."
+            />
+          ) : null}
+          <AdminPagination
+            className="border-border-light border-t p-4"
+            page={page}
+            totalPages={totalPages}
+            previousHref={page > 1 ? pageHref(page - 1) : undefined}
+            nextHref={page < totalPages ? pageHref(page + 1) : undefined}
+          />
         </section>
         <aside className="border-border-light rounded-3xl border bg-white p-5 sm:p-6">
           {selected ? (
@@ -187,9 +217,7 @@ export default async function ContactMessagesPage({
                       </option>
                     ))}
                   </select>
-                  <button className="bg-brand min-h-11 rounded-full px-5 text-sm font-bold text-white">
-                    Salvar
-                  </button>
+                  <AdminButton type="submit">Salvar</AdminButton>
                 </form>
               ) : (
                 <p className="text-muted mt-5 text-sm">

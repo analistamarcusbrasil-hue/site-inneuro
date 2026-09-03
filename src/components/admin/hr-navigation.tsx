@@ -99,8 +99,11 @@ export function HrNavigation({
   canManageSettings?: boolean;
 }) {
   return (
-    <nav aria-label="Módulos de RH" className="mb-8">
-      <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <nav
+      aria-label="Módulos de RH"
+      className="admin-scrollbar border-border-light mb-7 overflow-x-auto border-b pb-3"
+    >
+      <ul className="flex min-w-max gap-1.5">
         {hrNavigationItems.map(({ key, label, icon: Icon, href }) => {
           const allowedHref =
             (key === "candidates" && !canManageCandidates) ||
@@ -112,43 +115,23 @@ export function HrNavigation({
             (key === "settings" && !canManageSettings)
               ? undefined
               : href;
+          if (!allowedHref) return null;
           const active = key === current;
-          const className = `flex min-h-16 items-center gap-3 rounded-2xl border px-4 ${active ? "border-brand bg-brand text-white" : "border-border-light text-muted bg-white"}`;
-          const content = (
-            <>
-              <Icon size={19} aria-hidden="true" />
-              <span className="min-w-0 flex-1 text-sm font-bold">{label}</span>
-              {!allowedHref ? (
-                <span className="text-[0.6rem] font-bold tracking-wide uppercase">
-                  {key === "candidates" ||
-                  key === "jobs" ||
-                  key === "processes" ||
-                  key === "talent" ||
-                  key === "evaluations" ||
-                  key === "reports" ||
-                  key === "settings"
-                    ? "Acesso restrito"
-                    : "Em desenvolvimento"}
-                </span>
-              ) : null}
-            </>
-          );
 
           return (
             <li key={key}>
-              {allowedHref ? (
-                <Link
-                  href={allowedHref}
-                  aria-current={active ? "page" : undefined}
-                  className={className}
-                >
-                  {content}
-                </Link>
-              ) : (
-                <div aria-disabled="true" className={className}>
-                  {content}
-                </div>
-              )}
+              <Link
+                href={allowedHref}
+                aria-current={active ? "page" : undefined}
+                className={`flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-bold transition-colors ${
+                  active
+                    ? "bg-brand text-white shadow-sm"
+                    : "text-muted hover:text-brand-dark hover:bg-white"
+                }`}
+              >
+                <Icon size={16} strokeWidth={1.9} aria-hidden="true" />
+                <span>{label}</span>
+              </Link>
             </li>
           );
         })}

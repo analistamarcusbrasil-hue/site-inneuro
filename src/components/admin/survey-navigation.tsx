@@ -30,13 +30,55 @@ export function surveyNavigationPermissions(profile: AdminProfile) {
 }
 
 const items = [
-  { key: "dashboard", label: "Visão geral", icon: LayoutDashboard, href: "/admin/pesquisas/satisfacao", permission: "view" },
-  { key: "responses", label: "Respostas", icon: ClipboardList, href: "/admin/pesquisas/satisfacao/respostas", permission: "view" },
-  { key: "questions", label: "Perguntas", icon: FileQuestion, href: "/admin/pesquisas/satisfacao/perguntas", permission: "manage" },
-  { key: "qrcode", label: "QR Code", icon: QrCode, href: "/admin/pesquisas/satisfacao/qrcode", permission: "qrcode" },
-  { key: "priorities", label: "Prioridades", icon: Flag, href: "/admin/pesquisas/satisfacao/prioridades", permission: "reports" },
-  { key: "reports", label: "Relatórios", icon: BarChart3, href: "/admin/pesquisas/satisfacao/relatorios", permission: "reports" },
-  { key: "settings", label: "Configurações", icon: Settings, href: "/admin/pesquisas/satisfacao/configuracoes", permission: "manage" },
+  {
+    key: "dashboard",
+    label: "Visão geral",
+    icon: LayoutDashboard,
+    href: "/admin/pesquisas/satisfacao",
+    permission: "view",
+  },
+  {
+    key: "responses",
+    label: "Respostas",
+    icon: ClipboardList,
+    href: "/admin/pesquisas/satisfacao/respostas",
+    permission: "view",
+  },
+  {
+    key: "questions",
+    label: "Perguntas",
+    icon: FileQuestion,
+    href: "/admin/pesquisas/satisfacao/perguntas",
+    permission: "manage",
+  },
+  {
+    key: "qrcode",
+    label: "QR Code",
+    icon: QrCode,
+    href: "/admin/pesquisas/satisfacao/qrcode",
+    permission: "qrcode",
+  },
+  {
+    key: "priorities",
+    label: "Prioridades",
+    icon: Flag,
+    href: "/admin/pesquisas/satisfacao/prioridades",
+    permission: "reports",
+  },
+  {
+    key: "reports",
+    label: "Relatórios",
+    icon: BarChart3,
+    href: "/admin/pesquisas/satisfacao/relatorios",
+    permission: "reports",
+  },
+  {
+    key: "settings",
+    label: "Configurações",
+    icon: Settings,
+    href: "/admin/pesquisas/satisfacao/configuracoes",
+    permission: "manage",
+  },
 ] as const;
 
 export function SurveyNavigation({
@@ -53,8 +95,11 @@ export function SurveyNavigation({
   canQrCode: boolean;
 }) {
   return (
-    <nav aria-label="Satisfação do Cliente" className="mb-8 overflow-x-auto pb-1">
-      <ul className="flex min-w-max gap-2">
+    <nav
+      aria-label="Satisfação do Cliente"
+      className="admin-scrollbar border-border-light mb-7 overflow-x-auto border-b pb-3"
+    >
+      <ul className="flex min-w-max gap-1.5">
         {items.map(({ key, label, icon: Icon, href, permission }) => {
           const allowed =
             (permission === "view" && canView) ||
@@ -68,7 +113,7 @@ export function SurveyNavigation({
               <Link
                 href={href}
                 aria-current={active ? "page" : undefined}
-                className={`flex min-h-11 items-center gap-2 rounded-full border px-4 text-sm font-bold transition ${active ? "border-brand bg-brand text-white" : "border-border-light bg-white text-slate-600 hover:border-emerald-500"}`}
+                className={`flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-bold transition-colors ${active ? "bg-brand text-white shadow-sm" : "text-muted hover:text-brand-dark hover:bg-white"}`}
               >
                 <Icon size={16} aria-hidden="true" /> {label}
               </Link>

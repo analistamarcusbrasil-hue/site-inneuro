@@ -16,6 +16,7 @@ import {
   type AccessProfile,
   type AdminPermission,
 } from "@/lib/admin/permissions";
+import { AdminDrawer } from "@/components/admin/ui";
 
 export type AdminUserRow = {
   id: string;
@@ -160,19 +161,13 @@ function CreateUserDialog({ close }: { close: () => void }) {
     setPermissions(permissionsForProfile(next));
   };
   return (
-    <div
-      className="fixed inset-0 z-[80] flex justify-end bg-black/45"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="new-user-title"
+    <AdminDrawer
+      onClose={close}
+      labelledBy="new-user-title"
+      describedBy="new-user-description"
+      className="max-w-2xl"
     >
-      <button
-        type="button"
-        aria-label="Fechar"
-        onClick={close}
-        className="absolute inset-0"
-      />
-      <section className="relative h-full w-full max-w-2xl overflow-y-auto bg-white p-6 shadow-2xl sm:p-8">
+      <section className="min-h-full p-6 sm:p-8">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-brand text-xs font-bold tracking-widest uppercase">
@@ -185,6 +180,9 @@ function CreateUserDialog({ close }: { close: () => void }) {
               Criar usuário
             </h2>
           </div>
+          <p id="new-user-description" className="sr-only">
+            Formulário para criar um novo acesso administrativo.
+          </p>
           <button
             type="button"
             onClick={close}
@@ -280,7 +278,7 @@ function CreateUserDialog({ close }: { close: () => void }) {
           </button>
         </form>
       </section>
-    </div>
+    </AdminDrawer>
   );
 }
 
@@ -483,9 +481,9 @@ export function AdminUsersManager({
           return (
             <article
               key={user.id}
-              className="border-border-light rounded-3xl border bg-white p-5"
+              className="border-border-light rounded-2xl border bg-white p-5"
             >
-              <div className="grid gap-4 lg:grid-cols-[1.2fr_1.3fr_1fr_1.5fr_.7fr_1fr_auto] lg:items-center">
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-[1.2fr_1.3fr_1fr_1.5fr_.7fr_1fr_auto] 2xl:items-center">
                 <div>
                   <h2 className="font-heading font-semibold">
                     {user.full_name || "Sem nome"}

@@ -1,9 +1,16 @@
 import { Download } from "lucide-react";
 import { AdminPageHeading } from "@/components/admin/admin-page-heading";
+import { ReportBreakdown } from "@/components/admin/careers/report-breakdown";
+import {
+  ReportDrilldownDrawer,
+  reportDimensionTitles,
+  reportNotInformedLabel,
+} from "@/components/admin/careers/report-drilldown-drawer";
 import { HrNavigation } from "@/components/admin/hr-navigation";
 import {
   applicationStatusLabels,
   applicationStatuses,
+  candidateStageLabels,
 } from "@/lib/careers/applications";
 import { requireHrAccess } from "@/lib/careers/hr-auth";
 import {
@@ -11,65 +18,71 @@ import {
   commuteFeasibilityLabels,
   commuteTimeLabels,
   transitBenefitLabels,
-  type ApplicationSource,
-  type CommuteFeasibility,
-  type CommuteTime,
-  type TransitBenefit,
 } from "@/lib/careers/logistics";
 import {
   buildCareerReportRows,
-  countBy,
+  countCareerReportDimension,
+  filterAndSortCareerReportDrilldown,
+  reportNotInformedValue,
   type CareerReportApplication,
+  type CareerReportDimension,
   type CareerReportFilters,
   type CareerReportJob,
   type CareerReportLogistics,
   type CareerReportProcessCandidate,
+  type CareerReportSort,
 } from "@/lib/careers/reports";
 
-const stageLabels: Record<string, string> = {
-  registered: "Inscritos",
-  screening: "Triagem",
-  interview: "Entrevista",
-  evaluation: "Avaliação",
-  finalists: "Finalistas",
-  selected: "Selecionados",
-  talent_pool: "Banco de Talentos",
-  not_selected: "Não selecionados",
-};
+const reportDimensions: CareerReportDimension[] = [
+  "status",
+  "stage",
+  "source",
+  "commute",
+  "commute_time",
+  "transit_benefit",
+];
 
-function Breakdown({
-  title,
-  counts,
-  labels,
-}: {
-  title: string;
-  counts: Record<string, number>;
-  labels: Record<string, string>;
-}) {
-  return (
-    <section className="border-border-light rounded-3xl border bg-white p-5">
-      <h2 className="font-heading text-brand-dark text-lg font-semibold">
-        {title}
-      </h2>
-      {Object.keys(counts).length ? (
-        <ul className="mt-4 grid gap-2 text-sm">
-          {Object.entries(counts)
-            .sort((a, b) => b[1] - a[1])
-            .map(([key, value]) => (
-              <li key={key} className="flex justify-between gap-4">
-                <span className="text-muted">
-                  {labels[key] ?? "Não informado"}
-                </span>
-                <strong>{value.toLocaleString("pt-BR")}</strong>
-              </li>
-            ))}
-        </ul>
-      ) : (
-        <p className="text-muted mt-4 text-sm">Sem dados no período.</p>
-      )}
-    </section>
-  );
+const mainFilterKeys = [
+  "inicio",
+  "fim",
+  "unidade",
+  "area",
+  "vaga",
+  "processo",
+  "status",
+  "etapa",
+] as const;
+
+function isReportDimension(
+  value: string | undefined,
+): value is CareerReportDimension {
+  return reportDimensions.includes(value as CareerReportDimension);
 }
+
+function isReportSort(value: string | undefined): value is CareerReportSort {
+  return ["recent", "oldest", "name"].includes(value ?? "");
+}
+
+function queryFromFilters(filters: CareerReportFilters) {
+  const query: Record<string, string> = {};
+  for (const key of mainFilterKeys) {
+    const value = filters[key];
+    if (value) query[key] = value;
+  }
+  return query;
+}
+
+const labelsByDimension: Record<
+  CareerReportDimension,
+  Record<string, string>
+> = {
+  status: { ...applicationStatusLabels, ...reportNotInformedLabel },
+  stage: { ...candidateStageLabels, ...reportNotInformedLabel },
+  source: { ...applicationSourceLabels, ...reportNotInformedLabel },
+  commute: { ...commuteFeasibilityLabels, ...reportNotInformedLabel },
+  commute_time: { ...commuteTimeLabels, ...reportNotInformedLabel },
+  transit_benefit: { ...transitBenefitLabels, ...reportNotInformedLabel },
+};
 
 export default async function CareersReportsPage({
   searchParams,
@@ -99,7 +112,9 @@ export default async function CareersReportsPage({
       .order("created_at", { ascending: false }),
     supabase
       .from("career_job_applications")
-      .select("id, job_id, status, source, submitted_at"),
+      .select(
+        "id, job_id, candidate_id, status, source, profile_snapshot, candidate_stage, submitted_at",
+      ),
     supabase
       .from("career_selection_process_candidates")
       .select("application_id, process_id, stage"),
@@ -117,11 +132,56 @@ export default async function CareersReportsPage({
     logistics: (logistics.data as CareerReportLogistics[] | null) ?? [],
     filters,
   });
-  const exportQuery = new URLSearchParams(
-    Object.entries(filters).filter((entry): entry is [string, string] =>
-      Boolean(entry[1]),
-    ),
-  ).toString();
+  const baseFilters = queryFromFilters(filters);
+  const exportQuery = new URLSearchParams(baseFilters).toString();
+  const countsByDimension = Object.fromEntries(
+    reportDimensions.map((dimension) => [
+      dimension,
+      countCareerReportDimension(rows, dimension),
+    ]),
+  ) as Record<CareerReportDimension, Record<string, number>>;
+  const selectedDimension = isReportDimension(filters.grupo)
+    ? filters.grupo
+    : null;
+  const selectedValue =
+    selectedDimension && filters.valor ? filters.valor : null;
+  const selectedSort = isReportSort(filters.ordem) ? filters.ordem : "recent";
+  const pageSize = 25;
+  const drilldownRows =
+    selectedDimension && selectedValue
+      ? filterAndSortCareerReportDrilldown(rows, {
+          dimension: selectedDimension,
+          value: selectedValue,
+          search: filters.busca,
+          sort: selectedSort,
+        })
+      : [];
+  const requestedPage = Math.max(1, Number(filters.pagina_drill) || 1);
+  const drilldownPages = Math.max(
+    1,
+    Math.ceil(drilldownRows.length / pageSize),
+  );
+  const drilldownPage = Math.min(requestedPage, drilldownPages);
+  const visibleDrilldownRows = drilldownRows.slice(
+    (drilldownPage - 1) * pageSize,
+    drilldownPage * pageSize,
+  );
+  const drilldownQuery =
+    selectedDimension && selectedValue
+      ? {
+          ...baseFilters,
+          grupo: selectedDimension,
+          valor: selectedValue,
+          ...(filters.busca ? { busca: filters.busca } : {}),
+          ...(selectedSort !== "recent" ? { ordem: selectedSort } : {}),
+        }
+      : baseFilters;
+  const dataError = [
+    jobsResult,
+    applications,
+    processCandidates,
+    logistics,
+  ].some((result) => result.error);
 
   return (
     <>
@@ -240,7 +300,7 @@ export default async function CareersReportsPage({
             className="border-border-light mt-2 min-h-11 w-full rounded-xl border px-3 font-normal"
           >
             <option value="">Todas</option>
-            {Object.entries(stageLabels).map(([value, label]) => (
+            {Object.entries(candidateStageLabels).map(([value, label]) => (
               <option key={value} value={value}>
                 {label}
               </option>
@@ -270,7 +330,7 @@ export default async function CareersReportsPage({
           ["Em processos", rows.filter((row) => row.process).length],
           [
             "Selecionados",
-            rows.filter((row) => row.process?.stage === "hired").length,
+            rows.filter((row) => row.currentStage === "hired").length,
           ],
         ].map(([label, value]) => (
           <article
@@ -285,47 +345,55 @@ export default async function CareersReportsPage({
         ))}
       </section>
 
-      <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <Breakdown
-          title="Status das candidaturas"
-          counts={countBy(rows.map((row) => row.status))}
-          labels={applicationStatusLabels}
-        />
-        <Breakdown
-          title="Etapa atual"
-          counts={countBy(rows.map((row) => row.process?.stage))}
-          labels={stageLabels}
-        />
-        <Breakdown
-          title="Origem"
-          counts={countBy(rows.map((row) => row.source))}
-          labels={applicationSourceLabels as Record<ApplicationSource, string>}
-        />
-        <Breakdown
-          title="Deslocamento"
-          counts={countBy(
-            rows.map((row) => row.logistics?.commute_feasibility),
-          )}
-          labels={
-            commuteFeasibilityLabels as Record<CommuteFeasibility, string>
-          }
-        />
-        <Breakdown
-          title="Tempo de deslocamento"
-          counts={countBy(rows.map((row) => row.logistics?.commute_time))}
-          labels={commuteTimeLabels as Record<CommuteTime, string>}
-        />
-        <Breakdown
-          title="Vale-transporte"
-          counts={countBy(rows.map((row) => row.logistics?.transit_benefit))}
-          labels={transitBenefitLabels as Record<TransitBenefit, string>}
-        />
-      </div>
+      {dataError ? (
+        <p className="border-danger/20 bg-danger/5 text-danger mt-6 rounded-2xl border p-4 text-sm">
+          {selectedDimension
+            ? "Não foi possível carregar os candidatos deste agrupamento."
+            : "Não foi possível carregar os candidatos deste relatório."}
+        </p>
+      ) : (
+        <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {reportDimensions.map((dimension) => (
+            <ReportBreakdown
+              key={dimension}
+              title={reportDimensionTitles[dimension]}
+              dimension={dimension}
+              counts={countsByDimension[dimension]}
+              labels={labelsByDimension[dimension]}
+              filters={baseFilters}
+            />
+          ))}
+        </div>
+      )}
 
       <p className="border-brand/15 bg-mint/60 text-brand-dark mt-6 rounded-2xl border p-4 text-sm">
         Indicadores logísticos são operacionais e não representam valor
         profissional. Meio de transporte não é usado para ranquear candidatos.
       </p>
+
+      {!dataError && selectedDimension && selectedValue ? (
+        <ReportDrilldownDrawer
+          dimension={selectedDimension}
+          valueLabel={
+            labelsByDimension[selectedDimension][selectedValue] ??
+            labelsByDimension[selectedDimension][reportNotInformedValue]
+          }
+          groupTotal={countsByDimension[selectedDimension][selectedValue] ?? 0}
+          filteredTotal={drilldownRows.length}
+          rows={visibleDrilldownRows}
+          search={filters.busca ?? ""}
+          sort={selectedSort}
+          page={drilldownPage}
+          pageSize={pageSize}
+          query={drilldownQuery}
+          closeHref={`/admin/rh/relatorios${exportQuery ? `?${exportQuery}` : ""}`}
+          exportHref={`/api/admin/rh/relatorios/csv?${new URLSearchParams({
+            ...baseFilters,
+            grupo: selectedDimension,
+            valor: selectedValue,
+          }).toString()}`}
+        />
+      ) : null}
     </>
   );
 }

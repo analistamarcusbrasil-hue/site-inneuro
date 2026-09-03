@@ -124,8 +124,11 @@ export async function AdminModuleView({
                 : "Não foi possível concluir esta ação. Tente novamente ou peça ajuda ao administrador."}
         </p>
       ) : null}
-      <div className="grid gap-8 xl:grid-cols-[minmax(0,1.05fr)_minmax(25rem,.95fr)]">
-        <section aria-labelledby="records-title">
+      <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.05fr)_minmax(25rem,.95fr)]">
+        <section
+          aria-labelledby="records-title"
+          className="border-border-light rounded-2xl border bg-white p-5 shadow-[0_1px_2px_rgba(3,37,27,.03)] sm:p-6"
+        >
           <h2 id="records-title" className="font-heading text-xl font-semibold">
             Conteúdos cadastrados
           </h2>
@@ -134,12 +137,12 @@ export async function AdminModuleView({
               name="q"
               defaultValue={query.q}
               placeholder={`Buscar ${module.singular}`}
-              className="border-border-light min-h-11 min-w-0 rounded-full border bg-white px-4 text-sm"
+              className="border-border-light min-h-11 min-w-0 rounded-lg border bg-white px-4 text-sm"
             />
             <select
               name="status"
               defaultValue={query.status}
-              className="border-border-light min-h-11 rounded-full border bg-white px-3 text-sm"
+              className="border-border-light min-h-11 rounded-lg border bg-white px-3 text-sm"
             >
               <option value="">Todos os status</option>
               <option value="draft">Rascunhos</option>
@@ -147,7 +150,7 @@ export async function AdminModuleView({
               <option value="published">Publicados</option>
               <option value="archived">Arquivados</option>
             </select>
-            <button className="bg-brand-dark min-h-11 rounded-full px-4 text-sm font-bold text-white">
+            <button className="bg-brand-dark min-h-11 rounded-lg px-4 text-sm font-bold text-white">
               Filtrar
             </button>
           </form>
@@ -156,7 +159,7 @@ export async function AdminModuleView({
               data.map((item) => (
                 <article
                   key={item.id}
-                  className="border-border-light rounded-2xl border bg-white p-4"
+                  className="border-border-light hover:border-brand/30 rounded-xl border bg-white p-4 transition-colors"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
@@ -232,13 +235,13 @@ export async function AdminModuleView({
                 </article>
               ))
             ) : (
-              <div className="border-border-light text-muted rounded-2xl border border-dashed bg-white p-6">
+              <div className="border-border-light text-muted rounded-xl border border-dashed bg-white p-6 text-center">
                 Nenhum conteúdo cadastrado no CMS.
               </div>
             )}
           </div>
         </section>
-        <section aria-labelledby="form-title">
+        <section aria-labelledby="form-title" className="min-w-0">
           <div className="mb-4 flex items-center justify-between">
             <h2 id="form-title" className="font-heading text-xl font-semibold">
               {selected

@@ -62,6 +62,16 @@ test("currículos permanecem privados e o acesso administrativo é auditado", ()
 });
 
 test("relatório aplica filtros sem incluir contato ou currículo", () => {
+  const snapshot = (fullName: string) => ({
+    captured_at: "2026-08-01T00:00:00.000Z",
+    candidate: { full_name: fullName, email: null },
+    profile: null,
+    experiences: [],
+    education: [],
+    certifications: [],
+    skills: [],
+    resume: null,
+  });
   const jobs: CareerReportJob[] = [
     { id: "job-1", title: "Vaga 1", area_id: "area-1", unit_id: "unit-1" },
     { id: "job-2", title: "Vaga 2", area_id: "area-2", unit_id: null },
@@ -70,15 +80,21 @@ test("relatório aplica filtros sem incluir contato ou currículo", () => {
     {
       id: "app-1",
       job_id: "job-1",
+      candidate_id: "candidate-1",
       status: "submitted",
       source: "site_inneuro",
+      profile_snapshot: snapshot("Ana Souza"),
+      candidate_stage: "resume",
       submitted_at: "2026-08-15T12:00:00.000Z",
     },
     {
       id: "app-2",
       job_id: "job-2",
+      candidate_id: "candidate-2",
       status: "screening",
       source: "referral",
+      profile_snapshot: snapshot("Bruno Lima"),
+      candidate_stage: "interview",
       submitted_at: "2026-08-10T12:00:00.000Z",
     },
   ];
@@ -93,7 +109,7 @@ test("relatório aplica filtros sem incluir contato ou currículo", () => {
   assert.equal(rows[0]?.id, "app-1");
   assert.doesNotMatch(
     JSON.stringify(rows),
-    /email|phone|whatsapp|resume|curriculo/i,
+    /profile_snapshot|email|phone|whatsapp|curriculo/i,
   );
 });
 

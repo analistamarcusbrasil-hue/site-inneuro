@@ -11,14 +11,16 @@ import { AdminPageHeading } from "@/components/admin/admin-page-heading";
 import { SurveyNavigation } from "@/components/admin/survey-navigation";
 import { SurveyOverviewCharts } from "@/components/admin/survey-charts";
 import {
+  AdminButton,
+  AdminEmptyState,
+  AdminMetricCard,
+} from "@/components/admin/ui";
+import {
   previousSurveyRange,
   surveyCategoryLabels,
   surveyDateRange,
 } from "@/lib/surveys/logic";
-import {
-  getSurveyAdminContext,
-  getSurveyMetrics,
-} from "@/lib/surveys/server";
+import { getSurveyAdminContext, getSurveyMetrics } from "@/lib/surveys/server";
 import type { SurveyPeriodPreset } from "@/lib/surveys/types";
 import { requireAdminPermission } from "@/lib/cms/auth";
 import { hasAdminPermission } from "@/lib/admin/permissions";
@@ -39,29 +41,6 @@ function variation(current: number | null, previous: number | null) {
   return `${value > 0 ? "↑" : value < 0 ? "↓" : "→"} ${Math.abs(value).toLocaleString("pt-BR")} vs período anterior`;
 }
 
-function metricCard(
-  label: string,
-  value: string,
-  detail: string,
-  icon: typeof Star,
-) {
-  const Icon = icon;
-  return (
-    <li className="border-border-light rounded-3xl border bg-white p-5 shadow-sm">
-      <span className="bg-mint text-brand grid size-10 place-items-center rounded-2xl">
-        <Icon size={19} aria-hidden="true" />
-      </span>
-      <p className="text-muted mt-5 text-xs font-extrabold tracking-wide uppercase">
-        {label}
-      </p>
-      <p className="font-heading text-brand-dark mt-1 text-3xl font-semibold">
-        {value}
-      </p>
-      <p className="text-muted mt-2 text-xs">{detail}</p>
-    </li>
-  );
-}
-
 export default async function SurveyDashboardPage({
   searchParams,
 }: {
@@ -76,7 +55,9 @@ export default async function SurveyDashboardPage({
   const context = await getSurveyAdminContext(user.id);
   if (!context)
     return (
-      <p className="rounded-3xl bg-white p-8">O acesso à organização ainda não foi configurado.</p>
+      <p className="rounded-3xl bg-white p-8">
+        O acesso à organização ainda não foi configurado.
+      </p>
     );
   const query = await searchParams;
   const preset = presets.some(([value]) => value === query.periodo)
@@ -124,51 +105,136 @@ export default async function SurveyDashboardPage({
               className="border-border-light mt-2 min-h-11 w-full rounded-xl border bg-white px-3 font-normal"
             >
               {presets.map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
+                <option key={value} value={value}>
+                  {label}
+                </option>
               ))}
             </select>
           </label>
           <label className="text-sm font-bold">
             Data inicial
-            <input name="inicio" type="date" defaultValue={query.inicio} className="border-border-light mt-2 block min-h-11 rounded-xl border px-3 font-normal" />
+            <input
+              name="inicio"
+              type="date"
+              defaultValue={query.inicio}
+              className="border-border-light mt-2 block min-h-11 rounded-xl border px-3 font-normal"
+            />
           </label>
           <label className="text-sm font-bold">
             Data final
-            <input name="fim" type="date" defaultValue={query.fim} className="border-border-light mt-2 block min-h-11 rounded-xl border px-3 font-normal" />
+            <input
+              name="fim"
+              type="date"
+              defaultValue={query.fim}
+              className="border-border-light mt-2 block min-h-11 rounded-xl border px-3 font-normal"
+            />
           </label>
           <label className="flex min-h-11 items-center gap-2 rounded-xl bg-slate-50 px-3 text-sm font-bold">
-            <input type="checkbox" name="comparar" value="1" defaultChecked={compare} />
+            <input
+              type="checkbox"
+              name="comparar"
+              value="1"
+              defaultChecked={compare}
+            />
             Comparar período anterior
           </label>
-          <button className="bg-brand min-h-11 rounded-full px-6 text-sm font-bold text-white">Aplicar filtros</button>
+          <AdminButton type="submit">Aplicar filtros</AdminButton>
         </div>
       </form>
 
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-emerald-950 px-5 py-4 text-white">
         <div>
-          <p className="text-xs font-bold tracking-widest text-emerald-200 uppercase">Recorte ativo</p>
-          <p className="mt-1 font-bold">{context.organization.name} · {context.unit?.name ?? "Todas as unidades"}</p>
+          <p className="text-xs font-bold tracking-widest text-emerald-200 uppercase">
+            Recorte ativo
+          </p>
+          <p className="mt-1 font-bold">
+            {context.organization.name} ·{" "}
+            {context.unit?.name ?? "Todas as unidades"}
+          </p>
         </div>
         <span className="rounded-full bg-white/10 px-4 py-2 text-xs font-bold">
-          {range.start.toLocaleDateString("pt-BR")} — {range.end.toLocaleDateString("pt-BR")}
+          {range.start.toLocaleDateString("pt-BR")} —{" "}
+          {range.end.toLocaleDateString("pt-BR")}
         </span>
       </div>
 
       <ul className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
-        {metricCard("Nota geral", metrics.overallScore === null ? "—" : `${Number(metrics.overallScore).toLocaleString("pt-BR")}/5`, compare ? variation(metrics.overallScore, previous.overallScore) : "Média das dimensões", Star)}
-        {metricCard("NPS", metrics.nps === null ? "—" : String(metrics.nps), compare ? variation(metrics.nps, previous.nps) : "Promotores menos detratores", Gauge)}
-        {metricCard("Respostas", metrics.responseCount.toLocaleString("pt-BR"), compare ? variation(metrics.responseCount, previous.responseCount) : "Avaliações concluídas", MessageSquareText)}
-        {metricCard("Satisfação positiva", metrics.positiveRate === null ? "—" : `${metrics.positiveRate}%`, compare ? variation(metrics.positiveRate, previous.positiveRate) : "Notas 4 e 5", CheckCircle2)}
-        {metricCard("Avaliações críticas", metrics.criticalCount.toLocaleString("pt-BR"), "Regra objetiva de atenção", AlertTriangle)}
-        {metricCard("Taxa de conclusão", metrics.completion.rate === null ? "—" : `${metrics.completion.rate}%`, `${metrics.completion.completions} de ${metrics.completion.starts} inícios`, ClipboardCheck)}
+        {[
+          {
+            label: "Nota geral",
+            value:
+              metrics.overallScore === null
+                ? "—"
+                : `${Number(metrics.overallScore).toLocaleString("pt-BR")}/5`,
+            description: compare
+              ? variation(metrics.overallScore, previous.overallScore)
+              : "Média das dimensões",
+            Icon: Star,
+          },
+          {
+            label: "NPS",
+            value: metrics.nps === null ? "—" : String(metrics.nps),
+            description: compare
+              ? variation(metrics.nps, previous.nps)
+              : "Promotores menos detratores",
+            Icon: Gauge,
+          },
+          {
+            label: "Respostas",
+            value: metrics.responseCount.toLocaleString("pt-BR"),
+            description: compare
+              ? variation(metrics.responseCount, previous.responseCount)
+              : "Avaliações concluídas",
+            Icon: MessageSquareText,
+          },
+          {
+            label: "Satisfação positiva",
+            value:
+              metrics.positiveRate === null ? "—" : `${metrics.positiveRate}%`,
+            description: compare
+              ? variation(metrics.positiveRate, previous.positiveRate)
+              : "Notas 4 e 5",
+            Icon: CheckCircle2,
+          },
+          {
+            label: "Avaliações críticas",
+            value: metrics.criticalCount.toLocaleString("pt-BR"),
+            description: "Regra objetiva de atenção",
+            Icon: AlertTriangle,
+          },
+          {
+            label: "Taxa de conclusão",
+            value:
+              metrics.completion.rate === null
+                ? "—"
+                : `${metrics.completion.rate}%`,
+            description: `${metrics.completion.completions} de ${metrics.completion.starts} inícios`,
+            Icon: ClipboardCheck,
+          },
+        ].map(({ label, value, description, Icon }) => (
+          <li key={label}>
+            <AdminMetricCard
+              label={label}
+              value={value}
+              description={description}
+              icon={<Icon aria-hidden="true" size={19} />}
+            />
+          </li>
+        ))}
       </ul>
 
       {!metrics.responseCount ? (
-        <section className="border-border-light rounded-3xl border bg-white p-8 text-center">
-          <h2 className="font-heading text-brand-dark text-2xl font-semibold">Ainda não recebemos avaliações neste período.</h2>
-          <p className="text-muted mt-3">O dashboard será preenchido automaticamente após as primeiras respostas pelo QR Code.</p>
-          {nav.canQrCode ? <Link href="/admin/pesquisas/satisfacao/qrcode" className="bg-brand mt-6 inline-flex min-h-11 items-center rounded-full px-6 font-bold text-white">Ver QR Code</Link> : null}
-        </section>
+        <AdminEmptyState
+          title="Ainda não recebemos avaliações neste período"
+          description="O dashboard será preenchido automaticamente após as primeiras respostas pelo QR Code."
+          action={
+            nav.canQrCode ? (
+              <AdminButton href="/admin/pesquisas/satisfacao/qrcode">
+                Ver QR Code
+              </AdminButton>
+            ) : undefined
+          }
+        />
       ) : (
         <>
           <SurveyOverviewCharts metrics={metrics} />
@@ -179,13 +245,29 @@ export default async function SurveyDashboardPage({
                 href={`/admin/pesquisas/satisfacao/relatorios?dimensao=${dimension.category}&periodo=${preset}`}
                 className="border-border-light rounded-2xl border bg-white p-5 transition hover:-translate-y-0.5 hover:border-emerald-500"
               >
-                <p className="text-sm font-bold text-slate-700">{surveyCategoryLabels[dimension.category] ?? dimension.category}</p>
+                <p className="text-sm font-bold text-slate-700">
+                  {surveyCategoryLabels[dimension.category] ??
+                    dimension.category}
+                </p>
                 <div className="mt-3 flex items-end justify-between">
-                  <p className="font-heading text-brand-dark text-3xl font-semibold">{Number(dimension.average).toLocaleString("pt-BR")}</p>
-                  <span className="text-xs text-slate-500">{dimension.response_count} respostas</span>
+                  <p className="font-heading text-brand-dark text-3xl font-semibold">
+                    {Number(dimension.average).toLocaleString("pt-BR")}
+                  </p>
+                  <span className="text-xs text-slate-500">
+                    {dimension.response_count} respostas
+                  </span>
                 </div>
-                <div className="mt-3 h-2 rounded-full bg-slate-100"><div className="h-full rounded-full bg-emerald-600" style={{ width: `${(Number(dimension.average) / 5) * 100}%` }} /></div>
-                <span className="text-brand mt-4 inline-block text-xs font-bold">Analisar dimensão →</span>
+                <div className="mt-3 h-2 rounded-full bg-slate-100">
+                  <div
+                    className="h-full rounded-full bg-emerald-600"
+                    style={{
+                      width: `${(Number(dimension.average) / 5) * 100}%`,
+                    }}
+                  />
+                </div>
+                <span className="text-brand mt-4 inline-block text-xs font-bold">
+                  Analisar dimensão →
+                </span>
               </Link>
             ))}
           </section>
