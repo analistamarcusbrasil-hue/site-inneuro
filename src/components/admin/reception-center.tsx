@@ -73,6 +73,16 @@ type DocumentRow = {
   checked_by: string | null;
   source: string;
   created_at: string;
+  purged_at: string | null;
+  purge_status: "ACTIVE" | "CLAIMED" | "PURGED" | "FAILED";
+  purge_reason: string | null;
+  storage_integrity_status:
+    | "AVAILABLE"
+    | "MISSING_ORIGINAL"
+    | "MISSING_PREVIEW"
+    | "MISSING_BOTH"
+    | "PURGED";
+  storage_integrity_checked_at: string | null;
 };
 type HistoryRow = {
   id: string;
@@ -125,6 +135,8 @@ export type ReceptionRequest = {
   assigned: ProfileRelation;
   completed_by: string | null;
   completed_at: string | null;
+  documents_purge_due_at: string | null;
+  auto_closed_at: string | null;
   completed: ProfileRelation;
   insurer_reference: string | null;
   authorization_number: string | null;
@@ -613,13 +625,25 @@ export function ReceptionCenter({
     if (view === "attended")
       return (
         <div className="rounded-2xl bg-emerald-50 p-4 text-emerald-900">
-          <p className="font-bold">
-            {selected.workflow_status === "NAO_AGENDAVEL"
-              ? "Solicitação não agendável"
-              : "Atendimento finalizado"}
-          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-bold">
+              {selected.workflow_status === "NAO_AGENDAVEL"
+                ? "Não agendado"
+                : "Atendimento finalizado"}
+            </p>
+            {selected.auto_closed_at ? (
+              <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-bold text-amber-900">
+                Encerrado automaticamente
+              </span>
+            ) : null}
+          </div>
           <p className="mt-1 text-sm">
-            {selected.workflow_status === "NAO_AGENDAVEL" ? (
+            {selected.auto_closed_at ? (
+              <>
+                Prazo operacional excedido. Encerrado automaticamente pelo
+                Portal Guardian após 20 dias sem finalização.
+              </>
+            ) : selected.workflow_status === "NAO_AGENDAVEL" ? (
               selected.not_schedulable_detail ||
               (selected.not_schedulable_reason
                 ? notSchedulableReasonLabels[selected.not_schedulable_reason]
@@ -1093,7 +1117,7 @@ export function ReceptionCenter({
                         type="button"
                         disabled={saving || !emailIsValid}
                         onClick={openNotSchedulable}
-                        className="ml-2 mt-2 inline-flex min-h-9 items-center rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700 disabled:opacity-50"
+                        className="mt-2 ml-2 inline-flex min-h-9 items-center rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700 disabled:opacity-50"
                       >
                         <Ban className="mr-1" size={14} /> Configurar exame não
                         agendável
@@ -1124,7 +1148,8 @@ export function ReceptionCenter({
                   selected.workflow_status,
                 ) ? (
                   <p className="mb-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
-                    Corrija o e-mail antes de concluir ou reenviar a confirmação.
+                    Corrija o e-mail antes de concluir ou reenviar a
+                    confirmação.
                   </p>
                 ) : null}
                 {renderNextAction()}
@@ -1465,6 +1490,15 @@ export function ReceptionCenter({
                       : `Documentos · ${checkedDocumentCount}/${selected.appointment_request_documents.length} conferidos`}
                   </summary>
                   <div className="space-y-2 pb-2">
+                    {selected.documents_purge_due_at &&
+                    selected.appointment_request_documents.some(
+                      (document) => !document.purged_at,
+                    ) ? (
+                      <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-950">
+                        Os anexos serão removidos automaticamente em{" "}
+                        {formatReceptionDate(selected.documents_purge_due_at)}.
+                      </p>
+                    ) : null}
                     {selected.appointment_request_documents.map((document) => (
                       <div
                         key={document.id}
@@ -1484,58 +1518,86 @@ export function ReceptionCenter({
                               {formatReceptionDate(document.checked_at)}
                             </p>
                           ) : null}
+                          {document.purged_at ? (
+                            <p className="mt-1 text-xs font-bold text-slate-600">
+                              Arquivos removidos automaticamente em{" "}
+                              {formatReceptionDate(document.purged_at)} conforme
+                              a política de retenção.
+                            </p>
+                          ) : null}
+                          {!document.purged_at &&
+                          (document.storage_integrity_status ===
+                            "MISSING_ORIGINAL" ||
+                            document.storage_integrity_status ===
+                              "MISSING_BOTH") ? (
+                            <p
+                              role="status"
+                              className="mt-1 text-xs font-bold text-rose-700"
+                            >
+                              Arquivo original indisponível. Solicite o reenvio
+                              ao paciente.
+                            </p>
+                          ) : null}
                         </div>
                         <div className="flex shrink-0 flex-wrap items-center gap-2">
-                          <a
-                            href={`/api/admin/solicitacoes/${selected.id}/documentos/${document.id}/visualizar`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex min-h-9 items-center rounded-full bg-white px-3 text-xs font-bold ring-1 ring-slate-200"
-                            aria-label={`Visualizar ${document.file_name}`}
-                          >
-                            <Eye
-                              className="mr-1"
-                              size={14}
-                              aria-hidden="true"
-                            />
-                            Visualizar
-                          </a>
-                          <a
-                            href={`/api/admin/solicitacoes/${selected.id}/documentos/${document.id}/download`}
-                            className="inline-flex min-h-9 items-center justify-center rounded-full bg-white px-3 text-xs font-bold ring-1 ring-slate-200"
-                            aria-label={`Baixar documento ${document.file_name}`}
-                            title="Baixar documento"
-                          >
-                            <Download
-                              className="mr-1"
-                              size={15}
-                              aria-hidden="true"
-                            />
-                            Download
-                          </a>
-                          <button
-                            type="button"
-                            disabled={
-                              saving ||
-                              lockedByAnother ||
-                              Boolean(document.checked_at)
-                            }
-                            onClick={() =>
-                              act("check_document", {
-                                documentId: document.id,
-                              })
-                            }
-                            className="inline-flex min-h-9 items-center rounded-full bg-emerald-700 px-3 text-xs font-bold text-white disabled:bg-emerald-100 disabled:text-emerald-800"
-                          >
-                            <CheckCircle2
-                              className="mr-1"
-                              size={14}
-                              aria-hidden="true"
-                            />
-                            {document.checked_at
-                              ? "Documento conferido"
-                              : "Confirmar documento"}
-                          </button>
+                          {document.purged_at ||
+                          document.storage_integrity_status ===
+                            "MISSING_ORIGINAL" ||
+                          document.storage_integrity_status ===
+                            "MISSING_BOTH" ? null : (
+                            <>
+                              <a
+                                href={`/api/admin/solicitacoes/${selected.id}/documentos/${document.id}/visualizar`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex min-h-9 items-center rounded-full bg-white px-3 text-xs font-bold ring-1 ring-slate-200"
+                                aria-label={`Visualizar ${document.file_name}`}
+                              >
+                                <Eye
+                                  className="mr-1"
+                                  size={14}
+                                  aria-hidden="true"
+                                />
+                                Visualizar
+                              </a>
+                              <a
+                                href={`/api/admin/solicitacoes/${selected.id}/documentos/${document.id}/download`}
+                                className="inline-flex min-h-9 items-center justify-center rounded-full bg-white px-3 text-xs font-bold ring-1 ring-slate-200"
+                                aria-label={`Baixar documento ${document.file_name}`}
+                                title="Baixar documento"
+                              >
+                                <Download
+                                  className="mr-1"
+                                  size={15}
+                                  aria-hidden="true"
+                                />
+                                Download
+                              </a>
+                              <button
+                                type="button"
+                                disabled={
+                                  saving ||
+                                  lockedByAnother ||
+                                  Boolean(document.checked_at)
+                                }
+                                onClick={() =>
+                                  act("check_document", {
+                                    documentId: document.id,
+                                  })
+                                }
+                                className="inline-flex min-h-9 items-center rounded-full bg-emerald-700 px-3 text-xs font-bold text-white disabled:bg-emerald-100 disabled:text-emerald-800"
+                              >
+                                <CheckCircle2
+                                  className="mr-1"
+                                  size={14}
+                                  aria-hidden="true"
+                                />
+                                {document.checked_at
+                                  ? "Documento conferido"
+                                  : "Confirmar documento"}
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
                     ))}

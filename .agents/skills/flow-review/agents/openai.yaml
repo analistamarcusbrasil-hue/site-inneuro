@@ -1,0 +1,4 @@
+interface:
+  display_name: "INNEURO Process & Flow Architect"
+  short_description: "Valida fluxos operacionais antes da implementação"
+  default_prompt: "Use $flow-review para revisar este fluxo do INNEURO antes de qualquer implementação."

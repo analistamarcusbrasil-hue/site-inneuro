@@ -68,7 +68,8 @@ export function isAttendedRequest(
   return (
     (workflowStatus === "CONCLUIDO" &&
       !isConfirmationPending(workflowStatus, confirmationStatus)) ||
-    (workflowStatus === "NAO_AGENDAVEL" && confirmationStatus === "SENT") ||
+    (workflowStatus === "NAO_AGENDAVEL" &&
+      ["SENT", "NOT_REQUIRED"].includes(confirmationStatus)) ||
     workflowStatus === "CANCELADO"
   );
 }
@@ -124,7 +125,8 @@ export const notSchedulableReasons = [
   "contract_not_covered",
   "other",
 ] as const;
-export type NotSchedulableReason = (typeof notSchedulableReasons)[number];
+export type NotSchedulableReason =
+  (typeof notSchedulableReasons)[number] | "service_team_timeout";
 
 export const notSchedulableReasonLabels: Record<NotSchedulableReason, string> =
   {
@@ -132,6 +134,7 @@ export const notSchedulableReasonLabels: Record<NotSchedulableReason, string> =
     insurance_not_covered: "O convênio não possui cobertura para este exame",
     insurance_not_authorized: "O convênio não autorizou o procedimento",
     contract_not_covered: "Exame fora da cobertura contratual",
+    service_team_timeout: "Prazo operacional excedido",
     other: "Outro motivo",
   };
 
@@ -144,6 +147,8 @@ export const notSchedulableGuidance: Record<NotSchedulableReason, string> = {
     "Orientamos entrar em contato com a operadora para verificar a autorização do procedimento.",
   contract_not_covered:
     "Orientamos consultar a operadora sobre alternativas previstas no contrato.",
+  service_team_timeout:
+    "O atendimento foi encerrado automaticamente após 20 dias sem finalização.",
   other:
     "Nossa equipe permanece disponível para orientar sobre os próximos passos.",
 };
@@ -161,7 +166,7 @@ export const operationalOutcomeReasons = [
   "other",
 ] as const;
 export type OperationalOutcomeReason =
-  (typeof operationalOutcomeReasons)[number];
+  (typeof operationalOutcomeReasons)[number] | "service_team_timeout";
 
 export const operationalOutcomeReasonLabels: Record<
   OperationalOutcomeReason,
@@ -176,6 +181,7 @@ export const operationalOutcomeReasonLabels: Record<
   insurance_not_authorized: "Convênio não autorizado",
   exam_unavailable: "Exame indisponível",
   duplicate_request: "Solicitação duplicada",
+  service_team_timeout: "Prazo operacional excedido",
   other: "Outro",
 };
 

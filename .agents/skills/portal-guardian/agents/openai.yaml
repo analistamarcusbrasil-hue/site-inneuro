@@ -1,0 +1,4 @@
+interface:
+  display_name: "INNEURO Portal Guardian"
+  short_description: "Governa Storage, retenção e saúde operacional."
+  default_prompt: "Audite e evolua o Portal Guardian com decisões determinísticas, dry run e preservação de dados."

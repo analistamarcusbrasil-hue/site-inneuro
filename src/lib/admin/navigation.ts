@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import {
+  Activity,
   BarChart3,
   BriefcaseBusiness,
   CalendarDays,
@@ -284,6 +285,12 @@ export function getAdminNavigation(
     });
   }
   if (hasAdminPermission(profile, "settings.manage")) {
+    systemItems.push({
+      id: "portal-guardian",
+      href: "/admin/monitoramento/portal-guardian",
+      label: "Portal Guardian",
+      icon: Activity,
+    });
     systemItems.push({
       id: "settings",
       href: "/admin/informacoes",

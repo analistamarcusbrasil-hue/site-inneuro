@@ -86,7 +86,7 @@ export async function serveAppointmentDocument(
   const { data: document, error: documentError } = await admin
     .from("appointment_request_documents")
     .select(
-      "id,appointment_request_id,storage_path,file_name,mime_type,preview_storage_path,preview_mime_type",
+      "id,appointment_request_id,storage_path,file_name,mime_type,preview_storage_path,preview_mime_type,purged_at,storage_integrity_status",
     )
     .eq("id", documentId)
     .eq("appointment_request_id", requestId)
@@ -97,6 +97,18 @@ export async function serveAppointmentDocument(
       "Documento não encontrado para esta solicitação.",
       404,
     );
+  }
+  if (document.purged_at) {
+    return errorResponse(
+      "Arquivo removido conforme a política de retenção.",
+      410,
+    );
+  }
+  if (
+    document.storage_integrity_status === "MISSING_ORIGINAL" ||
+    document.storage_integrity_status === "MISSING_BOTH"
+  ) {
+    return missingFileResponse();
   }
 
   const preferredPath =
