@@ -3,11 +3,16 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { Container } from "@/components/layout/container";
 import { InternalHero } from "@/components/layout/internal-hero";
-import { getPublicNewsBySlug } from "@/lib/cms/public-content";
+import { getPublicNews, getPublicNewsBySlug } from "@/lib/cms/public-content";
 import { createPageMetadata } from "@/lib/metadata";
 import { SimpleRichText } from "@/components/content/simple-rich-text";
 
 type PageProps = { params: Promise<{ slug: string }> };
+
+export async function generateStaticParams() {
+  const news = await getPublicNews(500);
+  return news.map(({ slug }) => ({ slug }));
+}
 
 function contentParagraphs(content: unknown) {
   if (!Array.isArray(content)) return [];

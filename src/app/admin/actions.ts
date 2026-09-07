@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { isCmsConfigured } from "@/lib/cms/config";
@@ -9,7 +9,11 @@ import {
   requireAdmin,
   requireAdminPermission,
 } from "@/lib/cms/auth";
-import { getCmsModule, type CmsModuleKey } from "@/lib/cms/modules";
+import { cmsModules, getCmsModule, type CmsModuleKey } from "@/lib/cms/modules";
+import {
+  publicContentCacheTags,
+  publicContentTagsForModule,
+} from "@/lib/cms/public-cache";
 import { moduleSchemas } from "@/lib/cms/schemas";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -101,6 +105,14 @@ function nonEmptyLines(value: unknown) {
     .split(/\r?\n/)
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function invalidatePublicContent(tags: readonly string[]) {
+  for (const tag of tags) updateTag(tag);
+}
+
+function invalidatePublicContentForModule(moduleKey: CmsModuleKey) {
+  invalidatePublicContent(publicContentTagsForModule(moduleKey));
 }
 
 function parseSchedules(value: unknown) {
@@ -407,13 +419,15 @@ export async function saveContentAction(
             sort_order: 999,
             created_by: user.id,
           });
-      if (carouselError)
+      if (carouselError) {
+        invalidatePublicContentForModule(moduleKey);
         return failure(
           "save",
           "A notícia foi salva, mas não foi possível atualizar o carrossel.",
           carouselError,
           "carousel-link",
         );
+      }
     } else {
       await supabase
         .from("carousel_slides")
@@ -430,6 +444,7 @@ export async function saveContentAction(
     savedId,
     payload,
   );
+  invalidatePublicContentForModule(moduleKey);
   revalidatePath("/");
   revalidatePath("/convenios");
   revalidatePath("/noticias");
@@ -530,6 +545,7 @@ export async function contentCommandAction(formData: FormData) {
   }
 
   await audit(supabase, user.id, command, cmsModule.table, id);
+  invalidatePublicContentForModule(moduleKey);
   revalidatePath("/");
   revalidatePath("/convenios");
   revalidatePath("/noticias");
@@ -1055,6 +1071,11 @@ export async function updateMediaMetadataAction(formData: FormData) {
     id,
     metadata,
   );
+  invalidatePublicContent([
+    publicContentCacheTags.news,
+    publicContentCacheTags.partners,
+    publicContentCacheTags.social,
+  ]);
   revalidatePath("/admin/midias");
   redirect("/admin/midias?success=updated");
 }
@@ -1125,6 +1146,7 @@ export async function saveInstitutionalSettingsAction(formData: FormData) {
     "institutional",
     parsed.data,
   );
+  invalidatePublicContent([publicContentCacheTags.institutional]);
   for (const path of [
     "/",
     "/contato",
@@ -1188,6 +1210,7 @@ export async function saveSchedulingSettingsAction(formData: FormData) {
     "scheduling",
     value,
   );
+  invalidatePublicContent([publicContentCacheTags.scheduling]);
   for (const path of [
     "/",
     "/contato",
@@ -1290,6 +1313,8 @@ export async function trashCommandAction(formData: FormData) {
     if (error) redirect("/admin/lixeira?error=restore");
   }
   await audit(supabase, user.id, command, table, id);
+  const restoredModule = cmsModules.find((module) => module.table === table);
+  if (restoredModule) invalidatePublicContentForModule(restoredModule.key);
   revalidatePath("/admin/lixeira");
 }
 

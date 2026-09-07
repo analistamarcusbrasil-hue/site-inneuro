@@ -1,4 +1,4 @@
-import { connection } from "next/server";
+import { unstable_cache } from "next/cache";
 import { companyHighlights } from "@/data/company-highlights";
 import { convenios } from "@/data/convenios";
 import { exames } from "@/data/exames";
@@ -6,6 +6,10 @@ import { modalities } from "@/data/modalidades";
 import { clinicalServices } from "@/data/clinical-services";
 import { siteConfig, type SiteConfig } from "@/config/site";
 import { isCmsConfigured } from "@/lib/cms/config";
+import {
+  PUBLIC_CONTENT_REVALIDATE_SECONDS,
+  publicContentCacheTags,
+} from "@/lib/cms/public-cache";
 import { createSupabasePublicClient } from "@/lib/supabase/server";
 import type { CompanyHighlight } from "@/types/company-highlight";
 import type { Convenio } from "@/types/convenio";
@@ -25,7 +29,7 @@ export type SchedulingExamOption = {
   modality: string;
 };
 
-export async function getPublicSchedulingSettings(): Promise<SchedulingSettings> {
+async function loadPublicSchedulingSettings(): Promise<SchedulingSettings> {
   const supabase = await publicClient();
   if (!supabase) return defaultSchedulingSettings;
   const { data, error } = await supabase
@@ -38,9 +42,7 @@ export async function getPublicSchedulingSettings(): Promise<SchedulingSettings>
     : parseSchedulingSettings(data?.value);
 }
 
-export async function getPublicSchedulingExams(): Promise<
-  SchedulingExamOption[]
-> {
+async function loadPublicSchedulingExams(): Promise<SchedulingExamOption[]> {
   const supabase = await publicClient();
   if (!supabase) return [];
   const { data, error } = await supabase
@@ -115,7 +117,6 @@ function publicMediaUrl(
 
 async function publicClient() {
   if (!isCmsConfigured) return null;
-  await connection();
   return createSupabasePublicClient();
 }
 
@@ -130,7 +131,7 @@ async function hasCompleteCms(
   return Boolean(data);
 }
 
-export async function getPublicCarousel(): Promise<CompanyHighlight[]> {
+async function loadPublicCarousel(): Promise<CompanyHighlight[]> {
   const supabase = await publicClient();
   if (!supabase) return companyHighlights.filter((item) => item.published);
   const { data, error } = await supabase
@@ -170,7 +171,7 @@ export async function getPublicCarousel(): Promise<CompanyHighlight[]> {
   });
 }
 
-export async function getPublicPartners(): Promise<Convenio[]> {
+async function loadPublicPartners(): Promise<Convenio[]> {
   const supabase = await publicClient();
   if (!supabase) return convenios.filter((item) => item.active);
   const { data, error } = await supabase
@@ -205,7 +206,7 @@ export async function getPublicPartners(): Promise<Convenio[]> {
   });
 }
 
-export async function getPublicNewsAndSocial(): Promise<{
+async function loadPublicNewsAndSocial(): Promise<{
   news: PublicNews[];
   social: PublicSocial[];
 }> {
@@ -256,7 +257,7 @@ export async function getPublicNewsAndSocial(): Promise<{
   };
 }
 
-export async function getPublicNews(limit = 24): Promise<PublicNews[]> {
+async function loadPublicNews(limit = 24): Promise<PublicNews[]> {
   const supabase = await publicClient();
   if (!supabase) return [];
   const { data, error } = await supabase
@@ -283,7 +284,7 @@ export async function getPublicNews(limit = 24): Promise<PublicNews[]> {
   }));
 }
 
-export async function getPublicNewsBySlug(slug: string) {
+async function loadPublicNewsBySlug(slug: string) {
   const supabase = await publicClient();
   if (!supabase) return null;
   const { data, error } = await supabase
@@ -310,7 +311,7 @@ export async function getPublicNewsBySlug(slug: string) {
   } satisfies PublicNews;
 }
 
-export async function getPublicEquipment(): Promise<PublicEquipment[]> {
+async function loadPublicEquipment(): Promise<PublicEquipment[]> {
   const supabase = await publicClient();
   if (!supabase) return [];
   const { data } = await supabase
@@ -321,7 +322,7 @@ export async function getPublicEquipment(): Promise<PublicEquipment[]> {
   return (data ?? []) as PublicEquipment[];
 }
 
-export async function getPublicExams(): Promise<{
+async function loadPublicExams(): Promise<{
   exams: Exame[];
   modalities: Modality[];
 }> {
@@ -363,7 +364,7 @@ export async function getPublicExamBySlug(slug: string) {
   };
 }
 
-export async function getPublicPreparations(): Promise<ClinicalService[]> {
+async function loadPublicPreparations(): Promise<ClinicalService[]> {
   const supabase = await publicClient();
   if (!supabase) return clinicalServices;
   const { data, error } = await supabase
@@ -449,7 +450,7 @@ function publicServiceText(value: string, fallback: string) {
     : value;
 }
 
-export async function getPublicInstitutionalContent(): Promise<PublicInstitutionalContent> {
+async function loadPublicInstitutionalContent(): Promise<PublicInstitutionalContent> {
   const fallback = {
     config: siteConfig,
     about: {
@@ -575,3 +576,102 @@ export async function getPublicInstitutionalContent(): Promise<PublicInstitution
     },
   };
 }
+
+export const getPublicSchedulingSettings = unstable_cache(
+  loadPublicSchedulingSettings,
+  ["inneuro:public:scheduling:settings"],
+  {
+    revalidate: PUBLIC_CONTENT_REVALIDATE_SECONDS,
+    tags: [publicContentCacheTags.scheduling],
+  },
+);
+
+export const getPublicSchedulingExams = unstable_cache(
+  loadPublicSchedulingExams,
+  ["inneuro:public:scheduling:exams"],
+  {
+    revalidate: PUBLIC_CONTENT_REVALIDATE_SECONDS,
+    tags: [publicContentCacheTags.scheduling, publicContentCacheTags.exams],
+  },
+);
+
+export const getPublicCarousel = unstable_cache(
+  loadPublicCarousel,
+  ["inneuro:public:carousel"],
+  {
+    revalidate: PUBLIC_CONTENT_REVALIDATE_SECONDS,
+    tags: [publicContentCacheTags.carousel],
+  },
+);
+
+export const getPublicPartners = unstable_cache(
+  loadPublicPartners,
+  ["inneuro:public:partners"],
+  {
+    revalidate: PUBLIC_CONTENT_REVALIDATE_SECONDS,
+    tags: [publicContentCacheTags.partners],
+  },
+);
+
+export const getPublicNewsAndSocial = unstable_cache(
+  loadPublicNewsAndSocial,
+  ["inneuro:public:news-and-social"],
+  {
+    revalidate: PUBLIC_CONTENT_REVALIDATE_SECONDS,
+    tags: [publicContentCacheTags.news, publicContentCacheTags.social],
+  },
+);
+
+export const getPublicNews = unstable_cache(
+  loadPublicNews,
+  ["inneuro:public:news"],
+  {
+    revalidate: PUBLIC_CONTENT_REVALIDATE_SECONDS,
+    tags: [publicContentCacheTags.news],
+  },
+);
+
+export const getPublicNewsBySlug = unstable_cache(
+  loadPublicNewsBySlug,
+  ["inneuro:public:news:slug"],
+  {
+    revalidate: PUBLIC_CONTENT_REVALIDATE_SECONDS,
+    tags: [publicContentCacheTags.news],
+  },
+);
+
+export const getPublicEquipment = unstable_cache(
+  loadPublicEquipment,
+  ["inneuro:public:equipment"],
+  {
+    revalidate: PUBLIC_CONTENT_REVALIDATE_SECONDS,
+    tags: [publicContentCacheTags.equipment],
+  },
+);
+
+export const getPublicExams = unstable_cache(
+  loadPublicExams,
+  ["inneuro:public:exams"],
+  {
+    revalidate: PUBLIC_CONTENT_REVALIDATE_SECONDS,
+    tags: [publicContentCacheTags.exams],
+  },
+);
+
+export const getPublicPreparations = unstable_cache(
+  loadPublicPreparations,
+  ["inneuro:public:preparations"],
+  {
+    revalidate: PUBLIC_CONTENT_REVALIDATE_SECONDS,
+    tags: [publicContentCacheTags.preparations],
+  },
+);
+
+export const getPublicInstitutionalContent = unstable_cache(
+  loadPublicInstitutionalContent,
+  ["inneuro:public:institutional"],
+  {
+    revalidate: PUBLIC_CONTENT_REVALIDATE_SECONDS,
+    tags: [publicContentCacheTags.institutional],
+  },
+);

@@ -20,15 +20,7 @@ export const metadata = createPageMetadata({
   path: "/contato",
 });
 
-type ContactPageProps = {
-  searchParams: Promise<{ exame?: string | string[] }>;
-};
-
-export default async function ContactPage({ searchParams }: ContactPageProps) {
-  const requestedExam = (await searchParams).exame;
-  const initialExam = (
-    Array.isArray(requestedExam) ? requestedExam[0] : (requestedExam ?? "")
-  ).slice(0, 160);
+export default async function ContactPage() {
   const [institutional, exams, partners, schedulingSettings] =
     await Promise.all([
       getPublicInstitutionalContent(),
@@ -41,7 +33,6 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
   return (
     <main id="main-content" tabIndex={-1}>
       <Scheduling
-        initialExam={initialExam}
         exams={exams}
         partners={partners}
         settings={schedulingSettings}

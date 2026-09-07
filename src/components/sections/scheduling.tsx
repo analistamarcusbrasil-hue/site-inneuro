@@ -169,6 +169,7 @@ export function Scheduling({
   partners: Convenio[];
   settings: SchedulingSettings;
 }) {
+  const [requestedExam, setRequestedExam] = useState(initialExam);
   const [step, setStep] = useState(0);
   const [selectedModalities, setSelectedModalities] = useState<
     SchedulingModality[]
@@ -225,6 +226,11 @@ export function Scheduling({
   );
 
   useEffect(() => {
+    const exam = new URLSearchParams(window.location.search).get("exame");
+    if (exam) window.queueMicrotask(() => setRequestedExam(exam.slice(0, 160)));
+  }, []);
+
+  useEffect(() => {
     let storedModalities: SchedulingModality[] = [];
     try {
       const currentStored = window.sessionStorage.getItem(schedulingSessionKey);
@@ -244,19 +250,20 @@ export function Scheduling({
     }
     const initialOfficial = exams.find(
       (exam) =>
-        exam.id === initialExam ||
+        exam.id === requestedExam ||
         exam.name.toLocaleLowerCase("pt-BR") ===
-          initialExam.toLocaleLowerCase("pt-BR"),
+          requestedExam.toLocaleLowerCase("pt-BR"),
     );
     const initialModality = inferSchedulingModality(
-      initialOfficial?.modality || initialExam,
+      initialOfficial?.modality || requestedExam,
     );
-    if (initialExam && initialModality) storedModalities.push(initialModality);
+    if (requestedExam && initialModality)
+      storedModalities.push(initialModality);
     window.queueMicrotask(() => {
       setSelectedModalities([...new Set(storedModalities)]);
       window.sessionStorage.removeItem(legacySchedulingSessionKey);
     });
-  }, [exams, initialExam]);
+  }, [exams, requestedExam]);
 
   useEffect(() => {
     window.sessionStorage.setItem(

@@ -13,5 +13,6 @@
 - Preservar o padrão visual da INNEURO.
 - Não criar portal próprio do paciente; o Portal de Exames será um link externo para o Image2Doc.
 - Registrar novas solicitações digitais de agendamento exclusivamente pelo Portal em `/contato#pre-agendamento`, usando `appointment_requests` como fonte única de verdade. O WhatsApp institucional pode ser usado para contato geral e continuidade operacional, mas não como entrada paralela de agendamento.
+- Conteúdo institucional público não deve usar APIs dinâmicas sem justificativa documentada; leituras públicas do CMS exigem cache compartilhado e invalidação explícita.
 - Não publicar automaticamente.
 - Não criar commits nem enviar alterações para repositórios remotos sem autorização expressa.
