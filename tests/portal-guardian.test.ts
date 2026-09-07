@@ -106,6 +106,16 @@ test("purge ignora referências já ausentes do Storage", () => {
   assert.doesNotMatch(sql, /delete\s+from\s+storage\.objects/i);
 });
 
+test("claim de currículo qualifica colunas que também são parâmetros de saída", () => {
+  const sql = readFileSync(
+    "supabase/migrations/20260904214238_portal_guardian_resume_claim_qualification.sql",
+    "utf8",
+  );
+  assert.match(sql, /coalesce\(r\.original_size_bytes,r\.size_bytes\)/i);
+  assert.match(sql, /optimization_attempts=r\.optimization_attempts\+1/i);
+  assert.match(sql, /for update of r skip locked/i);
+});
+
 test("scanner não classifica arquivos do plano de controle como órfãos", () => {
   const source = readFileSync(
     "supabase/functions/portal-guardian/index.ts",

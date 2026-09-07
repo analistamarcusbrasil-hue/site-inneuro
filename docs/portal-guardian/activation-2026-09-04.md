@@ -19,13 +19,20 @@ caminho de arquivo, token ou credencial é registrado neste documento.
    Supabase Storage API; 11.477.685 bytes liberados; 0 falhas e 0 claims presos.
 3. Integridade: 10 documentos vencidos cujo original já estava ausente foram
    preservados como referências quebradas, sem purge lógico.
-4. Currículos: 22 PDFs continuam elegíveis. A primeira execução do otimizador
-   aguarda autorização operacional explícita para substituir arquivos validados.
-5. Órfãos: limpeza automática permanece desligada; não havia órfão confirmado.
+4. Currículos: a primeira tentativa revelou uma ambiguidade entre o parâmetro de
+   saída `size_bytes` e a coluna homônima. A execução parou antes de criar claims
+   ou alterar arquivos; a RPC foi corrigida pela migração
+   `20260904214238_portal_guardian_resume_claim_qualification.sql`.
+5. Após a correção, 23 PDFs elegíveis foram processados e preservados como
+   `SKIPPED_ENCRYPTED`; 353 currículos pequenos foram classificados como
+   `SKIPPED_ALREADY_SMALL`; 0 arquivos substituídos, 0 falhas e 0 claims presos.
+6. Ao término, as filas de auto fechamento, purge acionável e otimização de
+   currículos estavam zeradas.
+7. Órfãos: limpeza automática permanece desligada; não havia órfão confirmado.
 
 ## Estado do agendador
 
-O cron diário está instalado, mas o modo global da Vercel continua em dry run.
-Auto fechamento e purge foram validados por execuções manuais isoladas. A mudança
-do modo global para `active` deve ocorrer somente após a primeira validação do
-otimizador de currículos, conforme o runbook.
+O cron diário está instalado e o modo global da Vercel foi definido como
+`active` após a validação isolada das três capacidades. Auto fechamento, purge e
+otimização continuam individualmente controlados pelos switches do banco. A
+limpeza automática de órfãos permanece desligada por desenho.
