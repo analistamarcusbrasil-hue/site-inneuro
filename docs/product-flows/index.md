@@ -4,13 +4,13 @@ Este diretório é a fonte persistente dos contratos de fluxo. Toda mudança de 
 
 ## Fluxos críticos
 
-| Domínio               | Escopo inventariado                                                                                              | Estado da documentação                              | Documento                                                         |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- | ----------------------------------------------------------------- |
-| Agendamento           | Solicitação, convênio, pendência, agendamento, impossibilidade, anexos e filas                                   | Contrato do Guardian aprovado com condições         | [Portal Guardian](portal-guardian.md)                             |
-| RH / Recrutamento     | Candidatura, currículo, entrevista, teste prático, contratação, contratado, não aprovado, lote, fila e aderência | Primeiro contrato documentado                       | [Decisão de etapa da candidatura](rh-candidate-stage-decision.md) |
-| Pesquisas             | Satisfação, perguntas, respostas, prioridades, relatórios e configuração                                         | Inventariado; documentar no próximo ajuste de fluxo | —                                                                 |
-| CMS                   | Criação, edição, publicação, despublicação, exclusão e restauração de conteúdo                                   | Inventariado; documentar no próximo ajuste de fluxo | —                                                                 |
-| Usuários e permissões | Convite/criação, papel, escopo, ativação, desativação e auditoria                                                | Inventariado; documentar no próximo ajuste de fluxo | —                                                                 |
+| Domínio               | Escopo inventariado                                                                                              | Estado da documentação                              | Documento                                                              |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- | ---------------------------------------------------------------------- |
+| Agendamento           | Entrada única pelo Portal, solicitação, convênio, pendência, agendamento, impossibilidade, anexos e filas        | Entrada única e Guardian aprovados com condições    | [Entrada única](scheduling.md) · [Portal Guardian](portal-guardian.md) |
+| RH / Recrutamento     | Candidatura, currículo, entrevista, teste prático, contratação, contratado, não aprovado, lote, fila e aderência | Primeiro contrato documentado                       | [Decisão de etapa da candidatura](rh-candidate-stage-decision.md)      |
+| Pesquisas             | Satisfação, perguntas, respostas, prioridades, relatórios e configuração                                         | Inventariado; documentar no próximo ajuste de fluxo | —                                                                      |
+| CMS                   | Criação, edição, publicação, despublicação, exclusão e restauração de conteúdo                                   | Inventariado; documentar no próximo ajuste de fluxo | —                                                                      |
+| Usuários e permissões | Convite/criação, papel, escopo, ativação, desativação e auditoria                                                | Inventariado; documentar no próximo ajuste de fluxo | —                                                                      |
 
 ## Regra de manutenção
 

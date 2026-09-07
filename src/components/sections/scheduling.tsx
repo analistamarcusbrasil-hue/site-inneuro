@@ -7,7 +7,6 @@ import {
   ChevronLeft,
   ChevronRight,
   LockKeyhole,
-  MessageCircle,
   Plus,
   ShieldCheck,
 } from "lucide-react";
@@ -18,7 +17,6 @@ import {
   type SelectedSchedulingFile,
 } from "@/components/scheduling/multi-document-upload-field";
 import { Badge } from "@/components/ui/badge";
-import type { SiteConfig } from "@/config/site";
 import type { SchedulingExamOption } from "@/lib/cms/public-content";
 import type { SchedulingSettings } from "@/lib/scheduling/settings";
 import { createSchedulingImagePreview } from "@/lib/scheduling/image-optimization";
@@ -41,7 +39,6 @@ import {
   type ServiceType,
   validateFileDescriptor,
 } from "@/lib/scheduling/shared";
-import { normalizeWhatsAppNumber } from "@/lib/whatsapp";
 import type { Convenio } from "@/types/convenio";
 
 type SubmitPhase = "idle" | "optimizing" | "uploading" | "saving";
@@ -163,13 +160,11 @@ function uploadFileToSignedUrl(
 
 export function Scheduling({
   initialExam = "",
-  whatsapp,
   exams,
   partners,
   settings,
 }: {
   initialExam?: string;
-  whatsapp: SiteConfig["whatsapp"];
   exams: SchedulingExamOption[];
   partners: Convenio[];
   settings: SchedulingSettings;
@@ -397,7 +392,7 @@ export function Scheduling({
       else if (birthDate > new Date().toISOString().slice(0, 10))
         next.push("A data de nascimento não pode estar no futuro.");
       if (!normalizeSchedulingPhone(phone))
-        next.push("Informe um WhatsApp válido com DDD.");
+        next.push("Informe um telefone ou WhatsApp válido com DDD.");
       if (!normalizeSchedulingEmail(email))
         next.push("Informe um e-mail válido para receber as orientações.");
       if (!serviceType) next.push("Escolha como será o atendimento.");
@@ -569,7 +564,6 @@ export function Scheduling({
           preferredDates: dates.filter(Boolean),
           preferredPeriods: periods,
           observations,
-          channel: "primary",
         }),
       }).then((response) =>
         readJsonResponse<FinalizeSchedulingResponse>(response),
@@ -609,25 +603,25 @@ export function Scheduling({
               id="scheduling-success-title"
               className="font-heading text-ink mt-5 text-3xl font-semibold"
             >
-              Solicitação recebida!
+              Solicitação enviada com sucesso.
             </h1>
             <p className="text-muted mt-3 leading-relaxed">
-              Recebemos sua solicitação. Nossa equipe analisará os exames e
-              documentos enviados e entrará em contato pelo WhatsApp para
-              confirmar a data e o horário.
+              Sua solicitação foi recebida pela INNEURO e será analisada pela
+              nossa equipe de atendimento.
+            </p>
+            <p className="text-ink mt-2 text-sm font-semibold">
+              Não é necessário enviar seus dados novamente pelo WhatsApp.
             </p>
             <p className="text-brand mt-6 rounded-2xl bg-white p-4 font-bold">
               Protocolo: {success.protocol}
             </p>
             <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <a
-                href={success.whatsappUrl}
-                target="_blank"
-                rel="noopener noreferrer"
+                href={success.protectedUrl}
                 className="bg-brand hover:bg-brand-dark focus-visible:ring-tech inline-flex min-h-12 items-center justify-center gap-2 rounded-full px-7 font-bold text-white focus-visible:ring-2 focus-visible:outline-none"
               >
-                <MessageCircle aria-hidden="true" size={18} /> Falar com a
-                INNEURO pelo WhatsApp
+                <LockKeyhole aria-hidden="true" size={18} /> Acompanhar
+                solicitação
               </a>
               <Link
                 href="/"
@@ -662,7 +656,7 @@ export function Scheduling({
             </h1>
             <p className="text-muted mt-3 leading-relaxed">
               Informe somente o necessário. A equipe da INNEURO conferirá os
-              detalhes e confirmará o atendimento pelo WhatsApp.
+              detalhes e entrará em contato para confirmar o atendimento.
             </p>
             <div className="bg-mint mt-5 rounded-3xl p-4">
               <CalendarCheck
@@ -678,8 +672,8 @@ export function Scheduling({
               </p>
               <p className="text-muted text-sm">Domingo: 07h às 19h.</p>
               <p className="text-muted mt-2 text-sm">
-                A data e o horário serão confirmados pela equipe da INNEURO pelo
-                WhatsApp.
+                A data e o horário serão confirmados pela equipe da INNEURO por
+                um dos contatos informados.
               </p>
             </div>
           </div>
@@ -812,7 +806,7 @@ export function Scheduling({
                   />
                 </label>
                 <label className="text-ink text-sm font-semibold">
-                  WhatsApp <span className="text-error">*</span>
+                  Telefone/WhatsApp <span className="text-error">*</span>
                   <input
                     type="tel"
                     value={phone}
@@ -1236,7 +1230,9 @@ export function Scheduling({
                     </section>
                     <section className="rounded-2xl bg-white p-4">
                       <h3 className="text-brand font-bold">CONTATO</h3>
-                      <p className="text-ink mt-2">WhatsApp: {phone}</p>
+                      <p className="text-ink mt-2">
+                        Telefone/WhatsApp: {phone}
+                      </p>
                       <p className="text-muted">E-mail: {email}</p>
                       <p className="text-muted mt-2 text-xs">
                         Confira seus dados. A INNEURO usará estes contatos para
@@ -1330,11 +1326,7 @@ export function Scheduling({
               )}
               <button
                 type="submit"
-                disabled={
-                  isSubmitting ||
-                  (reviewing &&
-                    !normalizeWhatsAppNumber(whatsapp.primary.number))
-                }
+                disabled={isSubmitting}
                 className="bg-brand hover:bg-brand-dark focus-visible:ring-tech inline-flex min-h-12 items-center gap-2 rounded-full px-6 font-bold text-white focus-visible:ring-2 focus-visible:outline-none disabled:opacity-50"
               >
                 {step < 2 ? (

@@ -94,7 +94,7 @@ export function ServiceDetails({
       {service.documents?.length ? (
         <section className="border-border-light rounded-3xl border bg-white p-7">
           <h2 className="font-heading text-ink text-2xl font-semibold">
-            Documentos para agendamentos feitos por telefone
+            Documentos necessários para o atendimento
           </h2>
           <ul className="text-muted mt-5 list-disc space-y-2 pl-5">
             {service.documents.map((item) => (

@@ -1,5 +1,6 @@
 # Ciclo de vida dos agendamentos
 
+- Entrada monitorada: somente solicitações registradas pelo Portal em `appointment_requests`; conversas de WhatsApp não criam fila paralela nem registro de agendamento.
 - Fonte de idade: `appointment_requests.created_at`; nunca `updated_at`.
 - Elegível: não excluída, sem `completed_at`, estado operacional aberto e idade de 20 dias.
 - Transição: `workflow_status=NAO_AGENDAVEL`, `status=CANCELLED`.

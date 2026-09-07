@@ -128,7 +128,6 @@ export type PrepareUploadResponse = {
 export type FinalizeSchedulingResponse = {
   protocol: string;
   protectedUrl: string;
-  whatsappUrl: string;
 };
 
 export const serviceTypes = ["PARTICULAR", "INSURANCE", "SUS"] as const;

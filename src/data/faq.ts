@@ -5,7 +5,7 @@ export const faqItems: FaqItem[] = [
     id: "agendamento",
     question: "Como faço para agendar um exame?",
     answer:
-      "Entre em contato com nossa equipe para enviar seu pedido e consultar disponibilidade. As etapas podem variar conforme o exame.",
+      "Acesse o Portal de Agendamento da INNEURO, informe seus dados, anexe o pedido médico e indique os melhores dias e períodos. Esse é o canal oficial para registrar uma nova solicitação.",
   },
   {
     id: "pedido-medico",
@@ -47,6 +47,6 @@ export const faqItems: FaqItem[] = [
     id: "pedido-whatsapp",
     question: "Posso enviar meu pedido pelo WhatsApp?",
     answer:
-      "Confirme com nossa equipe pelo canal oficial de atendimento. As orientações podem variar conforme o exame solicitado.",
+      "Não. Para garantir mais segurança, organização e continuidade do atendimento, os agendamentos são solicitados exclusivamente pelo nosso Portal de Agendamento. Acesse o Portal, informe seus dados e anexe o pedido médico. Após o envio, nossa equipe dará continuidade ao atendimento.",
   },
 ];

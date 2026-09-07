@@ -24,7 +24,7 @@ export default function PrivacyPolicyPage() {
         {
           title: "Finalidade e tratamento",
           paragraphs: [
-            "Os dados e documentos são utilizados para analisar e organizar a solicitação, gerar um protocolo protegido e permitir o contato pela equipe da INNEURO. O usuário pode enviar a notificação também pelo WhatsApp; a solicitação não representa confirmação automática de agendamento.",
+            "Os dados e documentos são utilizados para analisar e organizar a solicitação, gerar um protocolo protegido e permitir o contato pela equipe da INNEURO. As novas solicitações de agendamento são registradas exclusivamente no Portal de Agendamento; não é necessário reenviar dados ou documentos pelo WhatsApp. A solicitação não representa confirmação automática de agendamento.",
             "Os arquivos são mantidos em armazenamento privado, com acesso temporário e restrito à equipe autorizada. O acesso aos documentos expira em 48 horas e os arquivos entram no fluxo de remoção automática.",
           ],
         },

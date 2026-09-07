@@ -1,6 +1,5 @@
 import type { NextRequest } from "next/server";
 import { getPublicInstitutionalContent } from "@/lib/cms/public-content";
-import { createWhatsAppUrl } from "@/lib/whatsapp";
 import { sendNewSchedulingRequestTelegramNotification } from "@/lib/telegram/notifications";
 import {
   createManifestExpiration,
@@ -17,7 +16,6 @@ import {
   type SchedulingManifest,
 } from "@/lib/scheduling/server";
 import {
-  documentLabels,
   inferSchedulingModality,
   isValidCpf,
   normalizeSchedulingEmail,
@@ -70,11 +68,6 @@ function isValidDate(value: string, allowFuture: boolean) {
   return allowFuture
     ? parsed >= new Date(new Date().toISOString().slice(0, 10))
     : parsed <= today;
-}
-
-function formatDate(value: string) {
-  const [year, month, day] = value.split("-");
-  return `${day}/${month}/${year}`;
 }
 
 function sanitizeArray(value: unknown, maxItems: number, maxLength: number) {
@@ -164,7 +157,6 @@ export async function POST(request: NextRequest) {
     const exams = parseExams(body.exams);
     const dates = sanitizeArray(body.preferredDates, 2, 10);
     const periods = sanitizeArray(body.preferredPeriods, 4, 20);
-    const channel = body.channel;
 
     if (patientName.length < 2)
       return json({ error: "Informe o nome do paciente." }, 400);
@@ -173,7 +165,10 @@ export async function POST(request: NextRequest) {
     if (!isValidDate(birthDate, false))
       return json({ error: "Informe uma data de nascimento válida." }, 400);
     if (!phone)
-      return json({ error: "Informe um WhatsApp válido com DDD." }, 400);
+      return json(
+        { error: "Informe um telefone ou WhatsApp válido com DDD." },
+        400,
+      );
     if (!exams)
       return json(
         { error: "Informe pelo menos um exame e sua modalidade." },
@@ -194,9 +189,6 @@ export async function POST(request: NextRequest) {
         { error: "Escolha períodos específicos ou marque sem preferência." },
         400,
       );
-    if (channel !== "primary" && channel !== "secondary")
-      return json({ error: "Selecione um canal de WhatsApp válido." }, 400);
-
     const admin = getSchedulingAdminClient();
     await ensureSchedulingBucket(admin);
 
@@ -406,55 +398,7 @@ export async function POST(request: NextRequest) {
       console.warn("Telegram scheduling notification failed", { requestId });
     }
     const protectedUrl = `${config.url.replace(/\/$/, "")}/solicitacao/${session.accessToken}`;
-    const documentKinds = new Set(documents.map((document) => document.kind));
-    const groupedExamLines = schedulingModalities.flatMap((modality) => {
-      const items = exams.filter((exam) => exam.modality === modality.id);
-      return items.length
-        ? [
-            `*${modality.label.toLocaleUpperCase("pt-BR")}*`,
-            ...items.map((exam) => `- ${exam.description}`),
-          ]
-        : [];
-    });
-    const message = [
-      "*NOVA SOLICITAÇÃO DE AGENDAMENTO*",
-      "",
-      `Protocolo: ${session.protocol}`,
-      "",
-      "*PACIENTE*",
-      `Nome: ${patientName}`,
-      `CPF: ${cpf}`,
-      `Nascimento: ${formatDate(birthDate)}`,
-      `WhatsApp: ${phone}`,
-      "",
-      `*FORMA DE ATENDIMENTO:* ${attendance}`,
-      session.serviceType === "INSURANCE" ? `Convênio: ${insuranceName}` : null,
-      "",
-      "*EXAMES*",
-      ...groupedExamLines,
-      "",
-      "*DOCUMENTOS*",
-      `- ${documentLabels.medicalOrder}: ${documentKinds.has("medicalOrder") ? "anexado" : "pendente"}`,
-      `- ${documentLabels.photoId}: ${documentKinds.has("photoId") ? "anexado" : "pendente"}`,
-      `- Carteirinha do convênio: ${session.serviceType === "INSURANCE" ? (documentKinds.has("insuranceCardFront") ? "anexada" : "pendente") : "não aplicável"}`,
-      `- Guia do convênio: ${session.serviceType === "INSURANCE" ? (documentKinds.has("insuranceAuthorization") ? "anexada" : "não anexada") : "não aplicável"}`,
-      `- Regulação SUS: ${session.serviceType === "SUS" ? (documentKinds.has("susAuthorization") ? "anexada" : "pendente") : "não aplicável"}`,
-      `- Cartão SUS: ${session.serviceType === "SUS" ? (documentKinds.has("susCard") ? "anexado" : "não anexado") : "não aplicável"}`,
-      "",
-      `Data preferencial: ${dates.map(formatDate).join("; ")}`,
-      `Períodos: ${periods.map((period) => periodLabels[period as PreferredPeriod]).join(", ")}`,
-      `Observação: ${observations || "Não informada"}`,
-      "",
-      "Acesso seguro aos dados e documentos:",
-      protectedUrl,
-    ]
-      .filter((line): line is string => line !== null)
-      .join("\n");
-    const whatsappUrl = createWhatsAppUrl(
-      config.whatsapp[channel].number,
-      message,
-    );
-    return json({ protocol: session.protocol, protectedUrl, whatsappUrl });
+    return json({ protocol: session.protocol, protectedUrl });
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     if (message && !message.startsWith("SCHEDULING_") && message.length <= 180)

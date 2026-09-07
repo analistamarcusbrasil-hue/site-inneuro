@@ -42,7 +42,6 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
     <main id="main-content" tabIndex={-1}>
       <Scheduling
         initialExam={initialExam}
-        whatsapp={config.whatsapp}
         exams={exams}
         partners={partners}
         settings={schedulingSettings}

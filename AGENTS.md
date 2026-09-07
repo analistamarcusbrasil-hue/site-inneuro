@@ -12,5 +12,6 @@
 - Toda funcionalidade que armazene arquivo, crie upload/preview, processe PDF ou gere mídia temporária deve consultar `docs/portal-guardian/storage-retention.md` e executar o Storage & Retention Review da skill `.agents/skills/portal-guardian/`; nenhuma exclusão física pode usar SQL direto em `storage.objects`.
 - Preservar o padrão visual da INNEURO.
 - Não criar portal próprio do paciente; o Portal de Exames será um link externo para o Image2Doc.
+- Registrar novas solicitações digitais de agendamento exclusivamente pelo Portal em `/contato#pre-agendamento`, usando `appointment_requests` como fonte única de verdade. O WhatsApp institucional pode ser usado para contato geral e continuidade operacional, mas não como entrada paralela de agendamento.
 - Não publicar automaticamente.
 - Não criar commits nem enviar alterações para repositórios remotos sem autorização expressa.

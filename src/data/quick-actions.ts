@@ -5,7 +5,7 @@ export const quickActions: QuickAction[] = [
   {
     id: "schedule",
     title: "Agendar exame",
-    description: "Envie seu pedido e fale com nossa equipe.",
+    description: "Envie sua solicitação pelo Portal da INNEURO.",
     icon: "calendar",
     disabled: false,
     href: "/contato#pre-agendamento",
