@@ -1,6 +1,7 @@
 export { AdminBadge } from "./admin-badge";
 export { AdminButton } from "./admin-button";
 export { AdminDrawer } from "./admin-drawer";
+export { AdminDialog } from "./admin-dialog";
 export { AdminEmptyState } from "./admin-empty-state";
 export { AdminIconButton } from "./admin-icon-button";
 export { AdminMetricCard } from "./admin-metric-card";

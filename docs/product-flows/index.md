@@ -10,7 +10,7 @@ Este diretório é a fonte persistente dos contratos de fluxo. Toda mudança de 
 | RH / Recrutamento     | Candidatura, currículo, entrevista, teste prático, contratação, contratado, não aprovado, lote, fila e aderência | Primeiro contrato documentado                       | [Decisão de etapa da candidatura](rh-candidate-stage-decision.md)      |
 | Pesquisas             | Satisfação, perguntas, respostas, prioridades, relatórios e configuração                                         | Inventariado; documentar no próximo ajuste de fluxo | —                                                                      |
 | CMS                   | Criação, edição, publicação, despublicação, exclusão e restauração de conteúdo                                   | Inventariado; documentar no próximo ajuste de fluxo | —                                                                      |
-| Usuários e permissões | Convite/criação, papel, escopo, ativação, desativação e auditoria                                                | Inventariado; documentar no próximo ajuste de fluxo | —                                                                      |
+| Usuários e permissões | Convite/criação, papel, escopo, ativação, desativação, exclusão lógica e auditoria                               | Gate 0 aprovado com condições                       | [Gestão de usuários e acessos](admin-user-access-management.md)        |
 
 ## Regra de manutenção
 

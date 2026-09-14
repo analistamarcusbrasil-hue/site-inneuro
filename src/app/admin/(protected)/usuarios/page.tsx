@@ -17,45 +17,78 @@ export default async function UsersPage({
   const { user, profile } = await requireAdminPermission("users.manage");
   if (profile.role !== "super_admin") redirect("/admin?error=permission");
   const admin = createSupabaseAdminClient();
-  const { data = [] } = admin
+  const profilesResult = admin
     ? await admin
         .from("profiles")
         .select(
-          "id, full_name, email, role, access_profile, permissions, active, must_change_password, last_login_at, created_at",
+          "id, full_name, email, role, access_profile, permissions, active, must_change_password, last_login_at, created_at, updated_at, access_updated_at, access_updated_by",
         )
-        .order("created_at", { ascending: false })
-    : { data: [] };
+        .is("deleted_at", null)
+        .order("access_updated_at", { ascending: false })
+    : { data: [], error: new Error("Admin não configurado") };
+  const profileRows = profilesResult.data ?? [];
+  const actorIds = [
+    ...new Set(
+      profileRows.flatMap((row) =>
+        row.access_updated_by ? [row.access_updated_by] : [],
+      ),
+    ),
+  ];
+  const actorsResult =
+    admin && actorIds.length
+      ? await admin.from("profiles").select("id, full_name").in("id", actorIds)
+      : { data: [], error: null };
+  const actorNames = new Map(
+    (actorsResult.data ?? []).map((actor) => [actor.id, actor.full_name]),
+  );
+  const users = profileRows.map((row) => ({
+    ...row,
+    last_updated_at: row.access_updated_at ?? row.created_at,
+    last_updated_by: row.access_updated_by
+      ? (actorNames.get(row.access_updated_by) ?? "Usuário administrativo")
+      : "Sistema",
+  }));
+  const loadError = Boolean(profilesResult.error || actorsResult.error);
+  const successMessages: Record<string, string> = {
+    created: "Usuário criado com sucesso.",
+    password: "Senha temporária redefinida com sucesso.",
+    updated: "Usuário atualizado com sucesso.",
+    activated: "Usuário ativado com sucesso.",
+    deactivated: "Usuário desativado com sucesso.",
+    deleted: "Usuário excluído com sucesso.",
+  };
+  const errorMessages: Record<string, string> = {
+    "last-super-admin":
+      "O último superadministrador ativo não pode ser desativado, excluído ou rebaixado.",
+    self: "Sua própria conta não pode alterar perfil, permissões ou status.",
+    exists: "Já existe uma conta com este e-mail.",
+    "candidate-email":
+      "Este e-mail pertence a uma conta de candidato e não pode ser utilizado como acesso administrativo.",
+    concurrent:
+      "Este usuário foi alterado por outra pessoa. A lista foi atualizada; tente novamente.",
+    audit:
+      "O usuário foi atualizado, mas não foi possível confirmar o registro de auditoria.",
+    "not-found": "O usuário não existe mais ou já foi excluído.",
+    "status-command":
+      "Use as ações Ativar ou Desativar para mudar o status com segurança.",
+    command: "Não foi possível realizar a operação. Tente novamente.",
+  };
+  const feedback = query.success
+    ? { type: "success" as const, message: successMessages[query.success] }
+    : query.error
+      ? {
+          type: "error" as const,
+          message:
+            errorMessages[query.error] ??
+            "Não foi possível concluir a operação. Revise os dados e tente novamente.",
+        }
+      : undefined;
   return (
     <>
       <AdminPageHeading
         title="Usuários e acessos"
         description="Crie funcionários, escolha um perfil simples e libere somente as áreas necessárias."
       />
-      {query.success ? (
-        <p
-          role="status"
-          className="bg-mint text-brand mb-6 rounded-xl p-4 font-bold"
-        >
-          {query.success === "created"
-            ? "Usuário criado. A conta já pode entrar com a senha inicial."
-            : query.success === "password"
-              ? "Senha temporária redefinida. A troca será exigida no próximo acesso."
-              : "Usuário atualizado."}
-        </p>
-      ) : null}
-      {query.error ? (
-        <p role="alert" className="bg-error/10 text-error mb-6 rounded-xl p-4">
-          {query.error === "last-super-admin"
-            ? "O último superadministrador ativo não pode ser desativado ou rebaixado."
-            : query.error === "self"
-              ? "Sua própria conta não pode alterar perfil, permissões ou status."
-              : query.error === "exists"
-                ? "Já existe uma conta com este e-mail."
-                : query.error === "candidate-email"
-                  ? "Este e-mail pertence a uma conta de candidato e não pode ser utilizado como acesso administrativo."
-                  : "Não foi possível concluir a operação. Revise os dados e tente novamente."}
-        </p>
-      ) : null}
       {!isCmsAdminConfigured ? (
         <p
           role="status"
@@ -67,8 +100,10 @@ export default async function UsersPage({
       ) : null}
       {isCmsAdminConfigured ? (
         <AdminUsersManager
-          users={(data ?? []) as AdminUserRow[]}
+          users={users as AdminUserRow[]}
           currentUserId={user.id}
+          loadError={loadError}
+          feedback={feedback?.message ? feedback : undefined}
         />
       ) : null}
     </>

@@ -180,10 +180,16 @@ test("usuário inativo não possui permissão e legado permanece compatível", (
 });
 
 test("criação e redefinição usam Supabase Auth server-side sem persistir senha", async () => {
-  const actions = await readFile(
-    new URL("../src/app/admin/actions.ts", import.meta.url),
-    "utf8",
-  );
+  const [actions, userManagementMigration] = await Promise.all([
+    readFile(new URL("../src/app/admin/actions.ts", import.meta.url), "utf8"),
+    readFile(
+      new URL(
+        "../supabase/migrations/20260914193357_admin_user_access_management.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  ]);
   assert.match(actions, /auth\.admin\.createUser\(/);
   assert.doesNotMatch(actions, /inviteUserByEmail/);
   assert.match(actions, /email_confirm:\s*true/);
@@ -194,7 +200,7 @@ test("criação e redefinição usam Supabase Auth server-side sem persistir sen
     /after_data:\s*\{[^}]*\bpassword\s*:|before_data:\s*\{[^}]*\bpassword\s*:/,
   );
   assert.match(actions, /USER_CREATED/);
-  assert.match(actions, /USER_PERMISSIONS_CHANGED/);
+  assert.match(userManagementMigration, /USER_PERMISSIONS_CHANGED/);
   assert.match(actions, /USER_PASSWORD_RESET/);
 });
 

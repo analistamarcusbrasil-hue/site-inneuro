@@ -821,6 +821,8 @@ export async function createAdminUserAction(formData: FormData) {
     access_profile: parsed.data.access_profile,
     permissions,
     must_change_password: parsed.data.must_change_password,
+    access_updated_at: new Date().toISOString(),
+    access_updated_by: user.id,
   };
   const { error: profileError } = await admin
     .from("profiles")
@@ -829,7 +831,7 @@ export async function createAdminUserAction(formData: FormData) {
     await admin.auth.admin.deleteUser(data.user.id);
     redirect("/admin/usuarios?error=profile");
   }
-  await admin.from("audit_logs").insert({
+  const { error: auditError } = await admin.from("audit_logs").insert({
     actor_id: user.id,
     action: "USER_CREATED",
     entity_type: "profiles",
@@ -843,24 +845,30 @@ export async function createAdminUserAction(formData: FormData) {
       must_change_password: parsed.data.must_change_password,
     },
   });
+  if (auditError) {
+    await admin.auth.admin.deleteUser(data.user.id);
+    redirect("/admin/usuarios?error=audit");
+  }
   revalidatePath("/admin/usuarios");
   redirect("/admin/usuarios?success=created");
 }
 
 export async function updateAdminUserAction(formData: FormData) {
-  const { user } = await requireSuperAdministrator();
+  const { user, supabase } = await requireSuperAdministrator();
   const parsed = z
     .object({
       id: z.string().uuid(),
       full_name: z.string().trim().min(2).max(120),
       access_profile: accessProfileSchema,
       active: z.boolean(),
+      expected_updated_at: z.string().datetime({ offset: true }),
     })
     .safeParse({
       id: formData.get("id"),
       full_name: formData.get("full_name"),
       access_profile: formData.get("access_profile"),
       active: formData.get("active") !== "inactive",
+      expected_updated_at: formData.get("expected_updated_at"),
     });
   if (!parsed.success || parsed.data.id === user.id)
     redirect("/admin/usuarios?error=self");
@@ -868,10 +876,15 @@ export async function updateAdminUserAction(formData: FormData) {
   if (!admin) redirect("/admin/usuarios?error=config");
   const { data: current } = await admin
     .from("profiles")
-    .select("id, full_name, email, role, access_profile, permissions, active")
+    .select(
+      "id, full_name, email, role, access_profile, permissions, active, updated_at, deleted_at",
+    )
     .eq("id", parsed.data.id)
+    .is("deleted_at", null)
     .single();
   if (!current) redirect("/admin/usuarios?error=not-found");
+  if (current.active !== parsed.data.active)
+    redirect("/admin/usuarios?error=status-command");
   const { data: candidateAccount } = await admin
     .from("candidate_accounts")
     .select("id")
@@ -909,11 +922,30 @@ export async function updateAdminUserAction(formData: FormData) {
     permissions,
     active: parsed.data.active,
   };
-  const { error } = await admin
-    .from("profiles")
-    .update(next)
-    .eq("id", parsed.data.id);
-  if (error) redirect("/admin/usuarios?error=update");
+  const { error } = await supabase.rpc("update_admin_user_access", {
+    p_target_id: parsed.data.id,
+    p_full_name: next.full_name,
+    p_role: next.role,
+    p_hr_role: next.hr_role,
+    p_access_profile: next.access_profile,
+    p_permissions: next.permissions,
+    p_active: next.active,
+    p_expected_updated_at: parsed.data.expected_updated_at,
+  });
+  if (error) {
+    const knownError = error.message.includes("admin_user_concurrent_update")
+      ? "concurrent"
+      : error.message.includes("last_super_admin")
+        ? "last-super-admin"
+        : error.message.includes("self_user_change_forbidden")
+          ? "self"
+          : error.message.includes("admin_user_not_found")
+            ? "not-found"
+            : error.message.includes("use_status_command")
+              ? "status-command"
+              : "update";
+    redirect(`/admin/usuarios?error=${knownError}`);
+  }
   await admin.auth.admin.updateUserById(parsed.data.id, {
     user_metadata: {
       full_name: parsed.data.full_name,
@@ -921,30 +953,47 @@ export async function updateAdminUserAction(formData: FormData) {
     },
     app_metadata: { account_type: "staff" },
   });
-  const action =
-    current.active !== next.active
-      ? next.active
-        ? "USER_ACTIVATED"
-        : "USER_DEACTIVATED"
-      : JSON.stringify(current.permissions ?? []) !==
-          JSON.stringify(permissions)
-        ? "USER_PERMISSIONS_CHANGED"
-        : "USER_UPDATED";
-  await admin.from("audit_logs").insert({
-    actor_id: user.id,
-    action,
-    entity_type: "profiles",
-    entity_id: parsed.data.id,
-    before_data: {
-      full_name: current.full_name,
-      access_profile: current.access_profile,
-      permissions: current.permissions,
-      active: current.active,
-    },
-    after_data: next,
-  });
   revalidatePath("/admin/usuarios");
   redirect("/admin/usuarios?success=updated");
+}
+
+export async function adminUserCommandAction(formData: FormData) {
+  const { supabase } = await requireSuperAdministrator();
+  const parsed = z
+    .object({
+      id: z.string().uuid(),
+      command: z.enum(["activate", "deactivate", "delete"]),
+      expected_updated_at: z.string().datetime({ offset: true }),
+    })
+    .safeParse({
+      id: formData.get("id"),
+      command: formData.get("command"),
+      expected_updated_at: formData.get("expected_updated_at"),
+    });
+  if (!parsed.success) redirect("/admin/usuarios?error=validation");
+
+  const { error } = await supabase.rpc("manage_admin_user_status", {
+    p_target_id: parsed.data.id,
+    p_command: parsed.data.command,
+    p_expected_updated_at: parsed.data.expected_updated_at,
+  });
+  if (error) {
+    const knownError = error.message.includes("self_user_change_forbidden")
+      ? "self"
+      : error.message.includes("last_super_admin")
+        ? "last-super-admin"
+        : error.message.includes("admin_user_concurrent_update")
+          ? "concurrent"
+          : error.message.includes("admin_user_not_found")
+            ? "not-found"
+            : error.message.includes("candidate_account_forbidden")
+              ? "candidate-email"
+              : "command";
+    redirect(`/admin/usuarios?error=${knownError}`);
+  }
+
+  revalidatePath("/admin/usuarios");
+  redirect(`/admin/usuarios?success=${parsed.data.command}d`);
 }
 
 export async function resetAdminUserPasswordAction(formData: FormData) {
