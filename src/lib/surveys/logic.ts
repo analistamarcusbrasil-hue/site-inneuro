@@ -16,6 +16,9 @@ export const surveyCategoryLabels: Record<string, string> = {
   SEGURANCA_CONFORTO: "Segurança e conforto",
   COMUNICACAO: "Informações e orientações",
   INFRAESTRUTURA: "Infraestrutura",
+  LIMPEZA: "Limpeza",
+  ENFERMAGEM: "Enfermagem",
+  ATENDIMENTO_EXAME: "Atendimento durante o exame",
   RESOLUCAO: "Resolução",
   NPS: "NPS",
   DIAGNOSTICO: "Oportunidades de melhoria",
@@ -60,7 +63,9 @@ export function ruleMatches(
 ) {
   const expected = Number(rule.comparison_value);
   if (rule.operator === "ANY_DIMENSION_LTE")
-    return numericAnswers(questions, answers).some((value) => value <= expected);
+    return numericAnswers(questions, answers).some(
+      (value) => value <= expected,
+    );
   if (rule.operator === "AVERAGE_GTE") {
     const values = numericAnswers(questions, answers);
     return (
@@ -130,7 +135,9 @@ export function surveyDateRange(
   if (preset === "month") start.setDate(1);
   if (preset === "previous-month") {
     start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    end.setTime(new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999).getTime());
+    end.setTime(
+      new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999).getTime(),
+    );
   }
   if (preset === "year") start = new Date(now.getFullYear(), 0, 1);
   if (preset === "custom" && customStart && customEnd) {
