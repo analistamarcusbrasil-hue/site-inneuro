@@ -11,7 +11,10 @@ import {
   Star,
   Trash2,
 } from "lucide-react";
-import { visibleSurveyQuestions } from "@/lib/surveys/logic";
+import {
+  surveyCategoryLabels,
+  visibleSurveyQuestions,
+} from "@/lib/surveys/logic";
 import type {
   SurveyAnswerValue,
   SurveyPublicDefinition,
@@ -28,7 +31,8 @@ function questionAnswered(
   if (answer?.notApplicable && question.version.allow_na) return true;
   if (typeof answer?.numericValue === "number") return true;
   if (answer?.textValue?.trim()) return true;
-  if (typeof answer?.optionValue === "string") return Boolean(answer.optionValue);
+  if (typeof answer?.optionValue === "string")
+    return Boolean(answer.optionValue);
   return Array.isArray(answer?.optionValue) && answer.optionValue.length > 0;
 }
 
@@ -46,7 +50,7 @@ function QuestionField({
     return (
       <div>
         <div
-          className="mt-7 flex justify-center gap-2 sm:gap-4"
+          className="mt-7 grid grid-cols-5 gap-2"
           role="radiogroup"
           aria-label={version.title}
         >
@@ -58,30 +62,35 @@ function QuestionField({
                 type="button"
                 role="radio"
                 aria-checked={selected}
-                aria-label={`${score} ${score === 1 ? "estrela" : "estrelas"}`}
+                aria-label={`${score} — ${["Muito ruim", "Ruim", "Regular", "Bom", "Muito bom"][score - 1]}`}
                 onClick={() => onChange({ numericValue: score })}
-                className={`grid size-12 place-items-center rounded-2xl transition sm:size-16 ${selected ? "bg-[#087a4d] text-white shadow-lg shadow-emerald-900/15" : "bg-emerald-50 text-emerald-700 hover:-translate-y-0.5 hover:bg-emerald-100"}`}
+                className={`flex min-h-24 min-w-0 flex-col items-center justify-center gap-1 rounded-2xl px-1 py-2 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-800 ${selected ? "bg-[#087a4d] text-white shadow-lg shadow-emerald-900/15" : "bg-emerald-50 text-emerald-700 hover:-translate-y-0.5 hover:bg-emerald-100"}`}
               >
                 <Star
                   size={selected ? 31 : 28}
                   fill={selected ? "currentColor" : "none"}
                   aria-hidden="true"
                 />
+                <span className="text-sm font-bold">{score}</span>
+                <span className="text-center text-[11px] leading-tight sm:text-xs">
+                  {
+                    ["Muito ruim", "Ruim", "Regular", "Bom", "Muito bom"][
+                      score - 1
+                    ]
+                  }
+                </span>
               </button>
             );
           })}
         </div>
-        <div className="mt-3 flex justify-between text-xs text-slate-500">
-          <span>Precisa melhorar</span>
-          <span>Excelente</span>
-        </div>
         {version.allow_na ? (
           <button
             type="button"
+            aria-pressed={Boolean(value?.notApplicable)}
             onClick={() => onChange({ notApplicable: true })}
-            className={`mx-auto mt-5 block rounded-full px-5 py-2 text-sm font-bold ${value?.notApplicable ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-600"}`}
+            className={`mx-auto mt-5 block min-h-12 rounded-full px-5 py-2 text-sm font-bold ${value?.notApplicable ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-600"}`}
           >
-            Não se aplica
+            Não utilizei / Não se aplica
           </button>
         ) : null}
       </div>
@@ -95,7 +104,7 @@ function QuestionField({
               key={score}
               type="button"
               onClick={() => onChange({ numericValue: score })}
-              className={`aspect-square rounded-xl text-sm font-extrabold transition ${value?.numericValue === score ? "bg-[#087a4d] text-white shadow-md" : "bg-emerald-50 text-emerald-900 hover:bg-emerald-100"}`}
+              className={`min-h-11 rounded-xl text-sm font-extrabold transition ${value?.numericValue === score ? "bg-[#087a4d] text-white shadow-md" : "bg-emerald-50 text-emerald-900 hover:bg-emerald-100"}`}
               aria-pressed={value?.numericValue === score}
             >
               {score}
@@ -104,7 +113,7 @@ function QuestionField({
         </div>
         <div className="mt-3 flex justify-between text-xs text-slate-500">
           <span>Nada provável</span>
-          <span>Muito provável</span>
+          <span>Extremamente provável</span>
         </div>
       </div>
     );
@@ -158,6 +167,7 @@ function QuestionField({
 }
 
 export function PublicSurvey({ survey }: { survey: SurveyPublicDefinition }) {
+  const compact = survey.campaign.settings.flow_version === "short_2026_09";
   const [stage, setStage] = useState<Stage>("intro");
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, SurveyAnswerValue>>({});
@@ -231,6 +241,7 @@ export function PublicSurvey({ survey }: { survey: SurveyPublicDefinition }) {
     }
     setError("");
     if (index + 1 < visible.length) setIndex(index + 1);
+    else if (compact) void finishSurvey();
     else setStage("feedback");
   }
 
@@ -287,7 +298,8 @@ export function PublicSurvey({ survey }: { survey: SurveyPublicDefinition }) {
     if (!responseSession || saving) return;
     if (
       wantsContact &&
-      (contactName.trim().length < 2 || contactPhone.replace(/\D/g, "").length < 10)
+      (contactName.trim().length < 2 ||
+        contactPhone.replace(/\D/g, "").length < 10)
     ) {
       setError("Informe seu nome e um WhatsApp válido.");
       return;
@@ -295,8 +307,7 @@ export function PublicSurvey({ survey }: { survey: SurveyPublicDefinition }) {
     setSaving(true);
     setError("");
     let uploaded:
-      | { path: string; mimeType: string; duration: number }
-      | undefined;
+      { path: string; mimeType: string; duration: number } | undefined;
     try {
       if (feedbackMode === "AUDIO") {
         if (!audioBlob) throw new Error("Grave o áudio antes de enviar.");
@@ -304,11 +315,14 @@ export function PublicSurvey({ survey }: { survey: SurveyPublicDefinition }) {
         form.set("responseId", responseSession.responseId);
         form.set("responseToken", responseSession.responseToken);
         form.set("duration", String(Math.max(1, recordingSeconds)));
-        form.set("audio", new File([audioBlob], "experiencia.webm", { type: "audio/webm" }));
-        const audioResponse = await fetch(
-          "/api/pesquisas/satisfacao/audio",
-          { method: "POST", body: form },
+        form.set(
+          "audio",
+          new File([audioBlob], "experiencia.webm", { type: "audio/webm" }),
         );
+        const audioResponse = await fetch("/api/pesquisas/satisfacao/audio", {
+          method: "POST",
+          body: form,
+        });
         const audioResult = await audioResponse.json();
         if (!audioResponse.ok) throw new Error(audioResult.error);
         uploaded = audioResult;
@@ -326,7 +340,8 @@ export function PublicSurvey({ survey }: { survey: SurveyPublicDefinition }) {
           })),
           feedback: {
             mode: feedbackMode,
-            textContent: feedbackMode === "TEXT" ? feedbackText.trim() : undefined,
+            textContent:
+              feedbackMode === "TEXT" ? feedbackText.trim() : undefined,
             audioStoragePath: uploaded?.path,
             audioMimeType: uploaded?.mimeType,
             audioDurationSeconds: uploaded?.duration,
@@ -354,7 +369,7 @@ export function PublicSurvey({ survey }: { survey: SurveyPublicDefinition }) {
 
   const progress =
     stage === "questions" && visible.length
-      ? Math.round(((index + 1) / visible.length) * 78)
+      ? Math.round(((index + 1) / visible.length) * (compact ? 100 : 78))
       : stage === "feedback"
         ? 86
         : stage === "contact"
@@ -391,14 +406,17 @@ export function PublicSurvey({ survey }: { survey: SurveyPublicDefinition }) {
                 Como foi sua experiência conosco?
               </h1>
               <p className="mx-auto mt-4 max-w-md leading-relaxed text-slate-600">
-                Sua opinião nos ajuda a melhorar continuamente cada etapa da sua jornada.
+                Sua opinião nos ajuda a melhorar continuamente cada etapa da sua
+                jornada.
               </p>
               <p className="mt-5 text-sm font-bold text-emerald-800">
-                Leva menos de 1 minuto.
+                {compact
+                  ? "6 perguntas rápidas. Não precisa se identificar."
+                  : "Leva menos de 1 minuto."}
               </p>
               <button
                 type="button"
-                disabled={saving}
+                disabled={saving || !visible.length}
                 onClick={startSurvey}
                 className="mt-7 min-h-14 w-full rounded-full bg-[#087a4d] px-6 font-extrabold text-white shadow-lg shadow-emerald-900/15 transition hover:-translate-y-0.5 disabled:opacity-60"
               >
@@ -411,8 +429,35 @@ export function PublicSurvey({ survey }: { survey: SurveyPublicDefinition }) {
           {stage === "questions" && question ? (
             <div className="rounded-[2rem] border border-white/80 bg-white/95 p-5 shadow-xl shadow-emerald-950/5 sm:p-9">
               <p className="text-xs font-extrabold tracking-[0.12em] text-emerald-700 uppercase">
-                {question.version.category.replaceAll("_", " ")}
+                {compact ? `${index + 1} de ${visible.length} · ` : ""}
+                {surveyCategoryLabels[question.version.category] ??
+                  question.version.category.replaceAll("_", " ")}
               </p>
+              {compact && question.version.question_type === "NPS_10" ? (
+                <details className="mt-5 rounded-2xl border border-emerald-100 p-4">
+                  <summary className="min-h-7 cursor-pointer text-sm font-bold text-emerald-900">
+                    Quer deixar um comentário?{" "}
+                    <span className="font-normal">(opcional)</span>
+                  </summary>
+                  <label className="mt-3 block text-sm font-bold">
+                    Seu comentário
+                    <textarea
+                      value={feedbackText}
+                      onChange={(event) => {
+                        const text = event.target.value;
+                        setFeedbackText(text);
+                        setFeedbackMode(text.trim() ? "TEXT" : "NONE");
+                      }}
+                      maxLength={1500}
+                      rows={3}
+                      className="mt-2 w-full rounded-xl border border-emerald-100 p-3 font-normal focus:border-emerald-600"
+                    />
+                  </label>
+                  <p className="mt-2 text-xs text-slate-500">
+                    Evite informar diagnósticos ou resultados de exames.
+                  </p>
+                </details>
+              ) : null}
               {question.version.description ? (
                 <p className="mt-3 font-bold text-emerald-900">
                   {question.version.description}
@@ -425,14 +470,17 @@ export function PublicSurvey({ survey }: { survey: SurveyPublicDefinition }) {
                 question={question}
                 value={answers[question.id]}
                 onChange={(value) => {
-                  setAnswers((current) => ({ ...current, [question.id]: value }));
+                  setAnswers((current) => ({
+                    ...current,
+                    [question.id]: value,
+                  }));
                   setError("");
                 }}
               />
               <div className="mt-8 flex items-center justify-between gap-3">
                 <button
                   type="button"
-                  disabled={index === 0}
+                  disabled={index === 0 || saving}
                   onClick={() => setIndex(Math.max(0, index - 1))}
                   className="min-h-12 rounded-full px-4 text-sm font-bold text-slate-600 disabled:opacity-30"
                 >
@@ -441,9 +489,17 @@ export function PublicSurvey({ survey }: { survey: SurveyPublicDefinition }) {
                 <button
                   type="button"
                   onClick={advance}
-                  className="min-h-12 rounded-full bg-[#087a4d] px-6 font-bold text-white"
+                  disabled={saving}
+                  className="min-h-12 rounded-full bg-[#087a4d] px-6 font-bold text-white disabled:opacity-60"
                 >
-                  Continuar <ChevronRight className="ml-1 inline" size={18} />
+                  {saving
+                    ? "Enviando..."
+                    : compact && index === visible.length - 1
+                      ? "Enviar avaliação"
+                      : "Continuar"}
+                  {!saving && index < visible.length - 1 ? (
+                    <ChevronRight className="ml-1 inline" size={18} />
+                  ) : null}
                 </button>
               </div>
             </div>
@@ -458,7 +514,8 @@ export function PublicSurvey({ survey }: { survey: SurveyPublicDefinition }) {
                 Quer contar mais sobre sua experiência?
               </h1>
               <p className="mt-3 text-sm text-slate-600">
-                Evite compartilhar diagnósticos, resultados de exames ou outras informações clínicas.
+                Evite compartilhar diagnósticos, resultados de exames ou outras
+                informações clínicas.
               </p>
               <div className="mt-6 grid gap-3 sm:grid-cols-3">
                 {[
@@ -503,7 +560,8 @@ export function PublicSurvey({ survey }: { survey: SurveyPublicDefinition }) {
                         onClick={stopRecording}
                         className="mt-4 rounded-full bg-rose-700 px-6 py-3 font-bold text-white"
                       >
-                        <Pause className="mr-1 inline" size={17} /> Parar gravação
+                        <Pause className="mr-1 inline" size={17} /> Parar
+                        gravação
                       </button>
                     </>
                   ) : audioUrl ? (
@@ -518,7 +576,8 @@ export function PublicSurvey({ survey }: { survey: SurveyPublicDefinition }) {
                           }}
                           className="rounded-full bg-white px-4 py-2 text-sm font-bold text-emerald-800"
                         >
-                          <RotateCcw className="mr-1 inline" size={15} /> Gravar novamente
+                          <RotateCcw className="mr-1 inline" size={15} /> Gravar
+                          novamente
                         </button>
                         <button
                           type="button"
@@ -568,7 +627,8 @@ export function PublicSurvey({ survey }: { survey: SurveyPublicDefinition }) {
           {stage === "contact" ? (
             <div className="rounded-[2rem] bg-white p-6 shadow-xl shadow-emerald-950/5 sm:p-9">
               <h1 className="font-heading text-3xl font-semibold text-[#063f2e]">
-                Gostaria que nossa equipe entrasse em contato sobre sua experiência?
+                Gostaria que nossa equipe entrasse em contato sobre sua
+                experiência?
               </h1>
               <div className="mt-6 grid grid-cols-2 gap-3">
                 <button
@@ -610,7 +670,8 @@ export function PublicSurvey({ survey }: { survey: SurveyPublicDefinition }) {
                     />
                   </label>
                   <p className="text-xs text-slate-500">
-                    Ao enviar, você concorda que a INNEURO use estes dados somente para retornar sobre esta experiência.
+                    Ao enviar, você concorda que a INNEURO use estes dados
+                    somente para retornar sobre esta experiência.
                   </p>
                 </div>
               ) : null}
@@ -636,21 +697,27 @@ export function PublicSurvey({ survey }: { survey: SurveyPublicDefinition }) {
               <p className="mt-4 leading-relaxed text-slate-600">
                 Muito obrigado por compartilhar sua experiência.
                 <br />
-                Sua opinião nos ajuda a melhorar continuamente a qualidade dos nossos serviços.
+                Sua opinião nos ajuda a melhorar continuamente a qualidade dos
+                nossos serviços.
               </p>
-              <p className="mt-8 font-heading text-xl font-extrabold tracking-widest text-emerald-900">
+              <p className="font-heading mt-8 text-xl font-extrabold tracking-widest text-emerald-900">
                 INNEURO
               </p>
             </div>
           ) : null}
           {error ? (
-            <p role="alert" className="mt-4 rounded-2xl bg-rose-50 p-4 text-center text-sm font-bold text-rose-800">
+            <p
+              role="alert"
+              className="mt-4 rounded-2xl bg-rose-50 p-4 text-center text-sm font-bold text-rose-800"
+            >
               {error}
             </p>
           ) : null}
         </section>
         <footer className="px-3 pb-2 text-center text-xs leading-relaxed text-slate-500">
-          Pesquisa anônima. Dados de contato são opcionais e usados somente com seu consentimento.
+          {compact
+            ? "Pesquisa anônima. Sua opinião ajuda a melhorar nosso atendimento."
+            : "Pesquisa anônima. Dados de contato são opcionais e usados somente com seu consentimento."}
         </footer>
       </div>
     </main>
